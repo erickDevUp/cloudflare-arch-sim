@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cloudflare architecture simulator</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -21,7 +22,7 @@
     <div class="actions">
       <button id="tog-pal" class="ghost on" title="Show or hide the component palette">Components</button>
       <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
-      <button id="reset" class="ghost">Reset</button>
+      <button id="reset" class="ghost" title="Reset time, spent and chaos; keeps the architecture">Reset sim</button>
       <button id="fit" class="ghost">Fit view</button>
     </div>
   </header>
@@ -35,7 +36,7 @@
 
     <main class="stage">
       <div class="canvas-wrap">
-      <div class="alerts" id="alerts"></div>
+      <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
       <div class="canvas" id="canvas">
         <div class="world" id="world">
           <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>

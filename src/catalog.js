@@ -89,7 +89,7 @@ window.CATALOG = {
     },
     external: {
       name: 'Tiendanube API', group: 'external', icon: 'plug',
-      p: { concurrency: 1, latency: 300, price: 0, units: 1 },
+      p: { concurrency: 1, latency: 500, price: 0, units: 1 },
       fields: ['concurrency', 'latency'],
       verified: 'Leaky bucket of 2 req/s with burst of 40, per store and app. One shared server model = a hard wall.',
       doc: 'https://tiendanube.github.io/api-documentation/intro'

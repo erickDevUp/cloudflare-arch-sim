@@ -73,6 +73,7 @@
   }
 
   function compute() {
+    state.res = {};
     const inc = {}, out = {};
     state.nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
     state.edges.forEach(e => {
@@ -127,7 +128,7 @@
       }
       out[id].forEach(to => {
         lambda[to] += outLambda[id];
-        arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
+        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
       });
     });
 
@@ -149,16 +150,32 @@
     let rate = 0;
     Object.keys(state.res).forEach(k => { rate += state.res[k].cost || 0; });
     state.rate = rate;
-    state.pathLat = state.nodes.reduce((m, n) => Math.max(m, (state.res[n.id] || {}).lat || 0), 0);
+    state.pathLat = state.nodes.reduce((m, n) => {
+      const r = state.res[n.id] || {};
+      return r.lambda > 0 ? Math.max(m, (arrive[n.id] || 0) + (lat[n.id] || 0)) : m;
+    }, 0);
+  }
+
+  function addFromPalette(type) {
+    const rect = $('#canvas').getBoundingClientRect();
+    const gx = (rect.width / 2 - state.px) / state.zoom;
+    const gy = (rect.height / 2 - state.py) / state.zoom;
+    const n = addNode(type, gx - 37, gy - 37);
+    compute();
+    select(n.id);
+    render();
+    return n;
   }
 
   function renderPalette() {
     const q = ($('#search').value || '').toLowerCase();
     const wrap = $('#palette-list');
     wrap.innerHTML = '';
+    let shown = 0;
     GROUPS.forEach(g => {
       const items = Object.keys(TYPES).filter(k => TYPES[k].group === g.id && TYPES[k].name.toLowerCase().includes(q));
       if (!items.length) return;
+      shown += items.length;
       const sec = document.createElement('div');
       sec.className = 'pal-group';
       sec.innerHTML = '<div class="pal-title">' + g.label + '</div>';
@@ -170,22 +187,23 @@
         el.className = 'pal-item';
         el.title = def.note || def.name;
         el.innerHTML = '<span class="pal-ico" style="color:' + groupColor(k) + '">' + svg(k) + '</span><span>' + def.name + '</span>';
-        el.addEventListener('pointerdown', ev => ev.stopPropagation());
         el.addEventListener('pointerdown', ev => {
           ev.preventDefault();
-          const rect = $('#canvas').getBoundingClientRect();
-          const gx = (rect.width / 2 - state.px) / state.zoom;
-          const gy = (rect.height / 2 - state.py) / state.zoom;
-          const n = addNode(k, gx - 37, gy - 37);
-          select(n.id);
+          ev.stopPropagation();
+          const n = addFromPalette(k);
           drag = { id: n.id, sx: ev.clientX, sy: ev.clientY, ox: n.x, oy: n.y };
-          render();
+        });
+        el.addEventListener('keydown', ev => {
+          if (ev.key !== 'Enter' && ev.key !== ' ') return;
+          ev.preventDefault();
+          addFromPalette(k);
         });
         grid.appendChild(el);
       });
       sec.appendChild(grid);
       wrap.appendChild(sec);
     });
+    if (!shown) wrap.innerHTML = '<div class="pal-empty">No components match.</div>';
   }
 
   function svg(type) {
@@ -347,7 +365,23 @@
     if (errs.length) out.push({ t: 'ERROR BUDGET BURN', c: 'warn' });
     if (drops) out.push({ t: 'DATA LOSS RISK \u00b7 sync drops', c: 'warn' });
     if (spof && out.length < 3) out.push({ t: 'SPOF \u00b7 ' + nname(spof.n), c: 'warn' });
-    $('#alerts').innerHTML = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
+    const html = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
+    const box = $('#alerts');
+    if (box.innerHTML !== html) box.innerHTML = html;
+  }
+
+  function statsHtml(r) {
+    return '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
+      '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
+      '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
+      '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
+      '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>';
+  }
+
+  function renderInspectorStats() {
+    const el = $('#ins-stats');
+    if (!el || !state.sel) return;
+    el.innerHTML = statsHtml(state.res[state.sel] || {});
   }
 
   function renderInspector() {
@@ -377,13 +411,7 @@
       const L = labels[f] || [f, 0, 1e6, 1];
       html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + n.p[f] + '"></label>';
     });
-    html += '<div class="ins-stats">' +
-      '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
-      '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
-      '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
-      '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
-      '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>' +
-      '</div>';
+    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
     if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
     if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
@@ -391,9 +419,13 @@
     box.innerHTML = html;
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
-        const v = parseFloat(inp.value);
-        if (!isNaN(v)) { n.p[inp.dataset.f] = v; compute(); renderNodes(); renderCost(); }
+        const raw = parseFloat(inp.value);
+        if (isNaN(raw)) return;
+        const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
+        n.p[inp.dataset.f] = Math.min(hi, Math.max(lo, raw));
+        compute(); renderNodes(); renderCost(); renderInspectorStats();
       });
+      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f]; });
     });
     $('#delnode').addEventListener('click', () => {
       state.nodes = state.nodes.filter(x => x.id !== n.id);
@@ -577,7 +609,7 @@
       acc += dtReal;
       if (acc >= 0.22) {
         acc = 0;
-        renderCost(); renderNodes(); renderAlerts();
+        renderCost(); renderNodes(); renderAlerts(); renderInspectorStats();
       }
     }
     animateEdges(ts);
