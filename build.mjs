@@ -21,9 +21,21 @@ html = html.replace('<link rel="stylesheet" href="styles.css">', () => `<style>\
 html = html.replace('<script src="pricing.js"></script>', () => `<script>\n${read('pricing.js')}\n</script>`);
 html = html.replace('<script src="catalog.js"></script>',
   () => `<script>\nwindow.ICONS = ${JSON.stringify(icons)};\n</script>\n<script>\n${read('catalog.js')}\n</script>`);
-html = html.replace('<script src="app.js"></script>', () => `<script>\n${read('app.js')}\n</script>`);
+html = html.replace('<script src="scenario.js"></script>', () => `<script>\n${read('scenario.js')}\n</script>`);
+
+const flag = process.argv.indexOf('--scenario');
+const scenarioFile = flag >= 0 ? process.argv[flag + 1] : null;
+if (scenarioFile) {
+  const raw = fs.readFileSync(path.resolve(scenarioFile), 'utf8');
+  JSON.parse(raw); // fail the build on a broken scenario file
+  const embedded = raw.replace(/</g, '\\u003c');
+  html = html.replace('<script src="app.js"></script>',
+    () => `<script>\nwindow.__SCENARIO__ = ${embedded};\n</script>\n<script>\n${read('app.js')}\n</script>`);
+} else {
+  html = html.replace('<script src="app.js"></script>', () => `<script>\n${read('app.js')}\n</script>`);
+}
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 const out = path.join(root, 'dist', 'cloudflare-arch-sim.html');
 fs.writeFileSync(out, html);
-console.log(`${out}  ${(html.length / 1024).toFixed(1)} KB  ${iconNames.length} icons`);
+console.log(`${out}  ${(html.length / 1024).toFixed(1)} KB  ${iconNames.length} icons${scenarioFile ? '  scenario: ' + scenarioFile : ''}`);

@@ -6,10 +6,26 @@ window.CATALOG = {
     { id: 'ai', label: 'AI', color: '#e11d48' },
     { id: 'external', label: 'External', color: '#f59e0b' }
   ],
+  // One source of truth for editable bounds: [min, max, step]. The inspector
+  // and the scenario validator both read this table so they cannot drift.
+  ranges: {
+    rate: [1, 100000, 1],
+    concurrency: [1, 1000000, 1],
+    latency: [0, 60000, 1],
+    price: [0, 100, 0.001],
+    units: [0, 100000, 1],
+    hit: [0, 100, 1],
+    priceGBs: [0, 100, 0.01],
+    cpuMs: [0, 30000, 0.5],
+    inPrice: [0, 1000, 0.01],
+    outPrice: [0, 1000, 0.01],
+    inTokens: [0, 1000000, 1],
+    outTokens: [0, 1000000, 1]
+  },
   types: {
     traffic: {
       name: 'Traffic', group: 'edge', icon: 'activity', source: true,
-      p: { rate: 40, concurrency: 0, latency: 0, price: 0, units: 1 },
+      p: { rate: 40, concurrency: 1, latency: 0, price: 0, units: 1 },
       fields: ['rate'],
       note: 'Request arrivals. Everything downstream is driven by this.'
     },
