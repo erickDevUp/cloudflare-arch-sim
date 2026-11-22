@@ -308,7 +308,7 @@ button{font:inherit;cursor:pointer}
           </div>
         </div>
         <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
-        <div class="krow small asof"><span id="k-asof"></span><a class="src" id="k-src" target="_blank" rel="noopener">source</a></div>
+        <div class="krow small asof"><span id="k-asof"></span><span id="k-src"></span></div>
       </div>
       <div class="inspect" id="inspect"></div>
     </aside>
@@ -327,44 +327,44 @@ button{font:inherit;cursor:pointer}
   };
 
   const PLANS = {
-    free: { label: 'Free', base: 0 },
-    paid: { label: 'Paid $5', base: 5 },
-    custom: { label: 'Custom', base: 0 }
+    free: { base: 0 },
+    paid: { base: 5 },
+    custom: { base: 0 }
   };
 
   const DIMS = [
     {
-      id: 'workersRequests', label: 'Workers requests', unit: 1e6, unitLabel: 'M',
+      id: 'workersRequests', label: 'Workers requests', unit: 1e6,
       price: 0.30, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6, unitLabel: 'M CPU-ms',
+      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6,
       price: 0.02, paidIncluded: 3e7, freePerRequest: 10,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'd1Rows', label: 'D1 rows read', unit: 1e6, unitLabel: 'M rows',
+      id: 'd1Rows', label: 'D1 rows read', unit: 1e6,
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.d1
     },
     {
-      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6, unitLabel: 'M requests',
+      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
       price: 0.15, paidIncluded: 1e6, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6, unitLabel: 'M GB-s',
+      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
       price: 12.5, paidIncluded: 4e5, freeDaily: 13000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'kvReads', label: 'KV reads', unit: 1e6, unitLabel: 'M reads',
+      id: 'kvReads', label: 'KV reads', unit: 1e6,
       price: 0.50, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'queueOps', label: 'Queues operations', unit: 1e6, unitLabel: 'M ops',
+      id: 'queueOps', label: 'Queues operations', unit: 1e6,
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
       verified: true, source: SOURCES.workers
     }
@@ -428,7 +428,34 @@ button{font:inherit;cursor:pointer}
     };
   }
 
-  const api = { asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES, plans: PLANS, dims: DIMS, monthlyCost };
+  // The simulation accumulates dollars per simulated second. Converting that
+  // rate to a monthly figure is this module's job, so the 3600 factor can
+  // never be dropped at a call site again.
+  function monthlyUsage(ratePerSecond) {
+    return (+ratePerSecond || 0) * 3600 * HOURS_PER_MONTH;
+  }
+
+  // The model bucket is separate by design: it is computed only from the
+  // user-entered token prices and never enters the Cloudflare total. It stays
+  // unset until every token field is present.
+  const TOKEN_FIELDS = ['inPrice', 'outPrice', 'inTokens', 'outTokens'];
+  function modelSpend(models) {
+    const list = models || [];
+    if (!list.length) return { set: false, total: 0 };
+    let total = 0;
+    for (const m of list) {
+      const p = (m && m.p) || {};
+      if (TOKEN_FIELDS.some(k => p[k] == null)) return { set: false, total: 0 };
+      const perRequest = (p.inTokens * p.inPrice + p.outTokens * p.outPrice) / 1e6;
+      total += monthlyUsage((+m.lambda || 0) * perRequest);
+    }
+    return { set: true, total };
+  }
+
+  const api = {
+    asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
+    plans: PLANS, dims: DIMS, monthlyCost, monthlyUsage, modelSpend
+  };
   root.PRICING = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -503,7 +530,7 @@ window.CATALOG = {
     },
     kv: {
       name: 'KV', group: 'data', icon: 'key-round',
-      p: { concurrency: 1000000, latency: 5, price: 0.2, units: 1 },
+      p: { concurrency: 1000000, latency: 5, price: 0.5, units: 1 },
       note: 'Read-heavy, eventually consistent. Reads are cheap, writes are not.'
     },
     r2: {
@@ -522,14 +549,14 @@ window.CATALOG = {
       note: 'No charge for the gateway itself. It buys you caching, rate limits and logs, not capacity.'
     },
     workers_ai: {
-      name: 'Model', group: 'ai', icon: 'sparkles',
-      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000,
+      name: 'Model', group: 'ai', icon: 'sparkles', cloudflare: false,
+      p: { concurrency: 24, latency: 900,
         inPrice: null, outPrice: null, inTokens: null, outTokens: null },
-      fields: ['concurrency', 'latency', 'units', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
-      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price and stay out of the Cloudflare bill.'
+      fields: ['concurrency', 'latency', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
+      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price, shown only as Model spend and never in the Cloudflare bill.'
     },
     external: {
-      name: 'Tiendanube API', group: 'external', icon: 'plug',
+      name: 'Tiendanube API', group: 'external', icon: 'plug', cloudflare: false,
       p: { concurrency: 1, latency: 500, price: 0, units: 1 },
       fields: ['concurrency', 'latency'],
       verified: 'Leaky bucket of 2 req/s with burst of 40, per store and app. One shared server model = a hard wall.',
@@ -679,10 +706,16 @@ window.CATALOG = {
       const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0, out: 0 });
       const { p } = eff(n);
       const def = typeOf(n);
-      let cost = r.lambda * p.units * p.price / 1e6;
-      if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
-      if (n.type === 'durable_objects' && p.priceGBs != null) {
-        cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+      // rate/spent are Cloudflare-only money. Non-Cloudflare nodes (the model
+      // provider, external APIs) never add to them; the model lives in its own
+      // token-price bucket.
+      let cost = 0;
+      if (def.cloudflare !== false) {
+        cost = r.lambda * p.units * p.price / 1e6;
+        if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
+        if (n.type === 'durable_objects' && p.priceGBs != null) {
+          cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+        }
       }
       r.cost = cost;
       r.cpu = (p.cpuMs || 0) * r.lambda;
@@ -998,6 +1031,8 @@ window.CATALOG = {
     return '$' + v.toFixed(2);
   }
 
+  function pctText(v) { return v > 0 && v < 10 ? v.toFixed(1) : String(Math.round(v)); }
+
   function human(n) {
     if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
     if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -1016,7 +1051,8 @@ window.CATALOG = {
     return state.nodes.reduce((s, n) => s + (typeOf(n).source ? (n.p.rate || 0) : 0), 0);
   }
 
-  function monthlyUsage() {
+  // Monthly Cloudflare usage by plan dimension, from each node's live rate.
+  function dimUsage() {
     const mult = 3600 * PRICING.hoursPerMonth;
     const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0, doRequests: 0, doGbS: 0, kvReads: 0, queueOps: 0, cpuMsPerRequest: 0 };
     let wReq = 0, wCpu = 0;
@@ -1037,20 +1073,10 @@ window.CATALOG = {
   }
 
   // External model tokens are user-entered and never part of the Cloudflare bill.
-  function modelSpend() {
-    const models = state.nodes.filter(n => n.type === 'workers_ai');
-    if (!models.length) return { set: false, total: 0 };
-    let total = 0;
-    for (const n of models) {
-      const p = n.p;
-      if (['inPrice', 'outPrice', 'inTokens', 'outTokens'].some(k => p[k] == null)) {
-        return { set: false, total: 0 };
-      }
-      const r = state.res[n.id] || {};
-      const perReq = (p.inTokens * p.inPrice + p.outTokens * p.outPrice) / 1e6;
-      total += (r.lambda || 0) * perReq * 3600 * PRICING.hoursPerMonth;
-    }
-    return { set: true, total };
+  function modelBucket() {
+    return PRICING.modelSpend(state.nodes
+      .filter(n => n.type === 'workers_ai')
+      .map(n => ({ p: n.p, lambda: (state.res[n.id] || {}).lambda || 0 })));
   }
 
   function planLinesHtml(res, plan) {
@@ -1059,7 +1085,7 @@ window.CATALOG = {
     if (plan === 'free') {
       if (!res.exceeded.length) return '<div class="plan-line">within free limits</div>';
       return res.exceeded.map(l => {
-        const lim = l.period === 'per request' ? l.limit + ' ms/req' : l.daily.toLocaleString() + '/day';
+        const lim = l.period === 'per request' ? l.limit + ' ms/req' : human(l.limit) + '/mo';
         const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/mo';
         return '<div class="plan-line over"><span>Free limit: ' + l.label + ' (' + lim + ')</span><b>' + used + '</b></div>';
       }).join('');
@@ -1083,10 +1109,10 @@ window.CATALOG = {
     $('#k-path').textContent = status;
     $('#k-path').className = 'v ' + (anyErr || state.pathLat >= 30 ? 'bad' : state.pathLat > 3 ? 'warn' : 'good');
 
-    const usage = monthlyUsage();
+    const usage = dimUsage();
     const res = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
       baseFee: state.baseFee,
-      rateMonthly: rate * PRICING.hoursPerMonth
+      rateMonthly: PRICING.monthlyUsage(rate)
     }));
     $('#k-base').textContent = money(res.base);
     $('#k-overage').textContent = money(res.overage);
@@ -1095,16 +1121,16 @@ window.CATALOG = {
     let rawPct = 0, label = '', value = '\u2014';
     if (state.plan === 'custom') {
       rawPct = state.budget > 0 ? res.total / state.budget * 100 : 0;
-      label = 'budget used \u00b7 ' + Math.round(rawPct) + '%';
+      label = 'budget used \u00b7 ' + pctText(rawPct) + '%';
       value = '$' + state.budget.toLocaleString();
     } else {
       const peak = res.lines.reduce((a, l) => l.ratio > (a ? a.ratio : -1) ? l : a, null);
       rawPct = peak ? peak.ratio * 100 : 0;
       if (peak) {
-        label = peak.label + ' \u00b7 ' + Math.round(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
+        label = peak.label + ' \u00b7 ' + pctText(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
         value = peak.period === 'per request'
           ? peak.limit + ' ms/req'
-          : state.plan === 'paid' ? human(peak.included) + '/mo' : peak.daily.toLocaleString() + '/day';
+          : state.plan === 'paid' ? human(peak.included) + '/mo' : human(peak.limit) + '/mo';
       } else {
         label = state.plan === 'paid' ? 'within included usage' : 'within free limits';
       }
@@ -1117,7 +1143,7 @@ window.CATALOG = {
     $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
     $('#custom-fields').hidden = state.plan !== 'custom';
 
-    const ms = modelSpend();
+    const ms = modelBucket();
     const mdl = $('#k-model');
     mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
     mdl.className = ms.set ? 'v good' : '';
@@ -1273,7 +1299,7 @@ window.CATALOG = {
       state.t += dtSim;
       state.spent += state.rate * dtSim;
       state.reqs += sourceRate() * dtSim;
-      const ms = modelSpend();
+      const ms = modelBucket();
       if (ms.set) state.modelSpent += ms.total / (3600 * PRICING.hoursPerMonth) * dtSim;
       compute();
       acc += dtReal;
@@ -1319,7 +1345,10 @@ window.CATALOG = {
   $('#plan').addEventListener('change', e => { state.plan = e.target.value; renderCost(); });
   $('#basefee').addEventListener('change', e => { state.baseFee = Math.max(0, parseFloat(e.target.value) || 0); renderCost(); });
   $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
-  $('#k-src').href = PRICING.sources.workers;
+  $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
+    '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
+    k.charAt(0).toUpperCase() + k.slice(1) + '</a>'
+  ).join(' &middot; ');
 
   $('#canvas').addEventListener('pointerdown', ev => {
     if (ev.target.closest('.node')) return;

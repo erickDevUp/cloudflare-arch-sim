@@ -63,7 +63,7 @@ window.CATALOG = {
     },
     kv: {
       name: 'KV', group: 'data', icon: 'key-round',
-      p: { concurrency: 1000000, latency: 5, price: 0.2, units: 1 },
+      p: { concurrency: 1000000, latency: 5, price: 0.5, units: 1 },
       note: 'Read-heavy, eventually consistent. Reads are cheap, writes are not.'
     },
     r2: {
@@ -82,14 +82,14 @@ window.CATALOG = {
       note: 'No charge for the gateway itself. It buys you caching, rate limits and logs, not capacity.'
     },
     workers_ai: {
-      name: 'Model', group: 'ai', icon: 'sparkles',
-      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000,
+      name: 'Model', group: 'ai', icon: 'sparkles', cloudflare: false,
+      p: { concurrency: 24, latency: 900,
         inPrice: null, outPrice: null, inTokens: null, outTokens: null },
-      fields: ['concurrency', 'latency', 'units', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
-      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price and stay out of the Cloudflare bill.'
+      fields: ['concurrency', 'latency', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
+      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price, shown only as Model spend and never in the Cloudflare bill.'
     },
     external: {
-      name: 'Tiendanube API', group: 'external', icon: 'plug',
+      name: 'Tiendanube API', group: 'external', icon: 'plug', cloudflare: false,
       p: { concurrency: 1, latency: 500, price: 0, units: 1 },
       fields: ['concurrency', 'latency'],
       verified: 'Leaky bucket of 2 req/s with burst of 40, per store and app. One shared server model = a hard wall.',

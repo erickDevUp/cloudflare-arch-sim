@@ -137,10 +137,16 @@
       const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0, out: 0 });
       const { p } = eff(n);
       const def = typeOf(n);
-      let cost = r.lambda * p.units * p.price / 1e6;
-      if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
-      if (n.type === 'durable_objects' && p.priceGBs != null) {
-        cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+      // rate/spent are Cloudflare-only money. Non-Cloudflare nodes (the model
+      // provider, external APIs) never add to them; the model lives in its own
+      // token-price bucket.
+      let cost = 0;
+      if (def.cloudflare !== false) {
+        cost = r.lambda * p.units * p.price / 1e6;
+        if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
+        if (n.type === 'durable_objects' && p.priceGBs != null) {
+          cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+        }
       }
       r.cost = cost;
       r.cpu = (p.cpuMs || 0) * r.lambda;
@@ -456,6 +462,8 @@
     return '$' + v.toFixed(2);
   }
 
+  function pctText(v) { return v > 0 && v < 10 ? v.toFixed(1) : String(Math.round(v)); }
+
   function human(n) {
     if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
     if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -474,7 +482,8 @@
     return state.nodes.reduce((s, n) => s + (typeOf(n).source ? (n.p.rate || 0) : 0), 0);
   }
 
-  function monthlyUsage() {
+  // Monthly Cloudflare usage by plan dimension, from each node's live rate.
+  function dimUsage() {
     const mult = 3600 * PRICING.hoursPerMonth;
     const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0, doRequests: 0, doGbS: 0, kvReads: 0, queueOps: 0, cpuMsPerRequest: 0 };
     let wReq = 0, wCpu = 0;
@@ -495,20 +504,10 @@
   }
 
   // External model tokens are user-entered and never part of the Cloudflare bill.
-  function modelSpend() {
-    const models = state.nodes.filter(n => n.type === 'workers_ai');
-    if (!models.length) return { set: false, total: 0 };
-    let total = 0;
-    for (const n of models) {
-      const p = n.p;
-      if (['inPrice', 'outPrice', 'inTokens', 'outTokens'].some(k => p[k] == null)) {
-        return { set: false, total: 0 };
-      }
-      const r = state.res[n.id] || {};
-      const perReq = (p.inTokens * p.inPrice + p.outTokens * p.outPrice) / 1e6;
-      total += (r.lambda || 0) * perReq * 3600 * PRICING.hoursPerMonth;
-    }
-    return { set: true, total };
+  function modelBucket() {
+    return PRICING.modelSpend(state.nodes
+      .filter(n => n.type === 'workers_ai')
+      .map(n => ({ p: n.p, lambda: (state.res[n.id] || {}).lambda || 0 })));
   }
 
   function planLinesHtml(res, plan) {
@@ -517,7 +516,7 @@
     if (plan === 'free') {
       if (!res.exceeded.length) return '<div class="plan-line">within free limits</div>';
       return res.exceeded.map(l => {
-        const lim = l.period === 'per request' ? l.limit + ' ms/req' : l.daily.toLocaleString() + '/day';
+        const lim = l.period === 'per request' ? l.limit + ' ms/req' : human(l.limit) + '/mo';
         const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/mo';
         return '<div class="plan-line over"><span>Free limit: ' + l.label + ' (' + lim + ')</span><b>' + used + '</b></div>';
       }).join('');
@@ -541,10 +540,10 @@
     $('#k-path').textContent = status;
     $('#k-path').className = 'v ' + (anyErr || state.pathLat >= 30 ? 'bad' : state.pathLat > 3 ? 'warn' : 'good');
 
-    const usage = monthlyUsage();
+    const usage = dimUsage();
     const res = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
       baseFee: state.baseFee,
-      rateMonthly: rate * PRICING.hoursPerMonth
+      rateMonthly: PRICING.monthlyUsage(rate)
     }));
     $('#k-base').textContent = money(res.base);
     $('#k-overage').textContent = money(res.overage);
@@ -553,16 +552,16 @@
     let rawPct = 0, label = '', value = '\u2014';
     if (state.plan === 'custom') {
       rawPct = state.budget > 0 ? res.total / state.budget * 100 : 0;
-      label = 'budget used \u00b7 ' + Math.round(rawPct) + '%';
+      label = 'budget used \u00b7 ' + pctText(rawPct) + '%';
       value = '$' + state.budget.toLocaleString();
     } else {
       const peak = res.lines.reduce((a, l) => l.ratio > (a ? a.ratio : -1) ? l : a, null);
       rawPct = peak ? peak.ratio * 100 : 0;
       if (peak) {
-        label = peak.label + ' \u00b7 ' + Math.round(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
+        label = peak.label + ' \u00b7 ' + pctText(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
         value = peak.period === 'per request'
           ? peak.limit + ' ms/req'
-          : state.plan === 'paid' ? human(peak.included) + '/mo' : peak.daily.toLocaleString() + '/day';
+          : state.plan === 'paid' ? human(peak.included) + '/mo' : human(peak.limit) + '/mo';
       } else {
         label = state.plan === 'paid' ? 'within included usage' : 'within free limits';
       }
@@ -575,7 +574,7 @@
     $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
     $('#custom-fields').hidden = state.plan !== 'custom';
 
-    const ms = modelSpend();
+    const ms = modelBucket();
     const mdl = $('#k-model');
     mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
     mdl.className = ms.set ? 'v good' : '';
@@ -731,7 +730,7 @@
       state.t += dtSim;
       state.spent += state.rate * dtSim;
       state.reqs += sourceRate() * dtSim;
-      const ms = modelSpend();
+      const ms = modelBucket();
       if (ms.set) state.modelSpent += ms.total / (3600 * PRICING.hoursPerMonth) * dtSim;
       compute();
       acc += dtReal;
@@ -777,7 +776,10 @@
   $('#plan').addEventListener('change', e => { state.plan = e.target.value; renderCost(); });
   $('#basefee').addEventListener('change', e => { state.baseFee = Math.max(0, parseFloat(e.target.value) || 0); renderCost(); });
   $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
-  $('#k-src').href = PRICING.sources.workers;
+  $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
+    '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
+    k.charAt(0).toUpperCase() + k.slice(1) + '</a>'
+  ).join(' &middot; ');
 
   $('#canvas').addEventListener('pointerdown', ev => {
     if (ev.target.closest('.node')) return;

@@ -10,44 +10,44 @@
   };
 
   const PLANS = {
-    free: { label: 'Free', base: 0 },
-    paid: { label: 'Paid $5', base: 5 },
-    custom: { label: 'Custom', base: 0 }
+    free: { base: 0 },
+    paid: { base: 5 },
+    custom: { base: 0 }
   };
 
   const DIMS = [
     {
-      id: 'workersRequests', label: 'Workers requests', unit: 1e6, unitLabel: 'M',
+      id: 'workersRequests', label: 'Workers requests', unit: 1e6,
       price: 0.30, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6, unitLabel: 'M CPU-ms',
+      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6,
       price: 0.02, paidIncluded: 3e7, freePerRequest: 10,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'd1Rows', label: 'D1 rows read', unit: 1e6, unitLabel: 'M rows',
+      id: 'd1Rows', label: 'D1 rows read', unit: 1e6,
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.d1
     },
     {
-      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6, unitLabel: 'M requests',
+      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
       price: 0.15, paidIncluded: 1e6, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6, unitLabel: 'M GB-s',
+      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
       price: 12.5, paidIncluded: 4e5, freeDaily: 13000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'kvReads', label: 'KV reads', unit: 1e6, unitLabel: 'M reads',
+      id: 'kvReads', label: 'KV reads', unit: 1e6,
       price: 0.50, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'queueOps', label: 'Queues operations', unit: 1e6, unitLabel: 'M ops',
+      id: 'queueOps', label: 'Queues operations', unit: 1e6,
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
       verified: true, source: SOURCES.workers
     }
@@ -111,7 +111,34 @@
     };
   }
 
-  const api = { asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES, plans: PLANS, dims: DIMS, monthlyCost };
+  // The simulation accumulates dollars per simulated second. Converting that
+  // rate to a monthly figure is this module's job, so the 3600 factor can
+  // never be dropped at a call site again.
+  function monthlyUsage(ratePerSecond) {
+    return (+ratePerSecond || 0) * 3600 * HOURS_PER_MONTH;
+  }
+
+  // The model bucket is separate by design: it is computed only from the
+  // user-entered token prices and never enters the Cloudflare total. It stays
+  // unset until every token field is present.
+  const TOKEN_FIELDS = ['inPrice', 'outPrice', 'inTokens', 'outTokens'];
+  function modelSpend(models) {
+    const list = models || [];
+    if (!list.length) return { set: false, total: 0 };
+    let total = 0;
+    for (const m of list) {
+      const p = (m && m.p) || {};
+      if (TOKEN_FIELDS.some(k => p[k] == null)) return { set: false, total: 0 };
+      const perRequest = (p.inTokens * p.inPrice + p.outTokens * p.outPrice) / 1e6;
+      total += monthlyUsage((+m.lambda || 0) * perRequest);
+    }
+    return { set: true, total };
+  }
+
+  const api = {
+    asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
+    plans: PLANS, dims: DIMS, monthlyCost, monthlyUsage, modelSpend
+  };
   root.PRICING = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

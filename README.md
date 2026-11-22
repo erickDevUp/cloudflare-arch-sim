@@ -47,10 +47,13 @@ emit `::orca-visual{file="cloudflare-arch-sim.html"}`).
 - `Requests` counts accepted source traffic since reset, and `Cloudflare $/req` is
   `spent / requests`: usage only, excluding the plan base fee. External model token prices are
   entered on the Model node and shown as separate `Model spend` / `Model $/req` rows; they never
-  enter the Cloudflare total, overage, projection or budget bar.
-- Cost per second is `rate * unitsPerRequest * pricePerMillion`. Workers add
+  enter the Cloudflare total, overage, projection or budget bar. Nodes marked non-Cloudflare (the
+  Model provider, external APIs) contribute nothing to `Usage`, `Spent` or `Cloudflare $/req`.
+- Cost per second is `rate * unitsPerRequest * pricePerMillion`, for Cloudflare nodes only. Workers add
   `rate * cpuMs * $0.02/M CPU-ms`; Durable Objects add
   `rate * latency * 0.128 GB * pricePerGBs`.
+- The catalog's default unit prices are compared against `PRICING.dims` by the test suite, so a
+  price that drifts between the two tables fails `node --test`.
 - Errors appear above 100% utilization (`min(85%, (util - 1) * 0.55)`), and the store 402 chaos
   pins the external node at 100% errors.
 - Critical path is the longest chain of node latencies from any source.
