@@ -76,41 +76,61 @@
     </main>
 
     <aside class="right">
-      <div class="cost">
-        <div class="cost-head">Simulation</div>
-        <div class="krow"><span>Usage</span><b id="k-rate">$0.00/h</b></div>
-        <div class="krow"><span>Spent</span><b id="k-spent">$0.00</b></div>
-        <div class="krow"><span>Requests</span><b id="k-reqs">0</b></div>
-        <div class="krow small"><span>Cloudflare $/req &middot; usage only, no base fee</span><b id="k-perreq">&mdash;</b></div>
-        <div class="krow small"><span>Model $/req &middot; not Cloudflare</span><b id="k-modelreq">&mdash;</b></div>
-        <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
-        <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
-        <div class="krow"><span>CPU time</span><b id="k-cpu">0 ms/s</b></div>
-        <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
-        <div class="budget">
-          <div class="krow"><span>Plan</span>
-            <select id="plan" class="plan-in" aria-label="Cloudflare plan">
-              <option value="free">Free</option>
-              <option value="paid">Paid $5</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          <div class="krow small"><span>base / mo</span><b id="k-base">$0</b></div>
-          <div class="krow small"><span>overage / mo</span><b id="k-overage">$0</b></div>
-          <div class="krow"><span>total / mo</span><b id="k-proj">$0</b></div>
-          <div class="barmark"><i id="budget-bar"></i></div>
-          <div class="krow small"><span id="bar-label">allowance</span><b id="k-budget">&mdash;</b></div>
-          <div id="plan-lines" class="plan-lines"></div>
+      <div class="cost-tabs" role="tablist" aria-label="Right panel views">
+        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost">Costos</button>
+        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect">Componentes</button>
+      </div>
+      <div class="cost" id="cost">
+        <div class="headline">
+          <span>Total <b id="k-total">$0.00/mo</b></span>
+          <select id="plan" class="plan-in" aria-label="Cloudflare plan">
+            <option value="free">Free</option>
+            <option value="paid">Paid $5</option>
+            <option value="custom">Custom</option>
+          </select>
         </div>
-        <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
-        <div class="krow small asof"><span id="k-asof"></span><span id="k-src"></span></div>
+        <div id="over-chip" class="chip">Dentro del plan</div>
+
+        <div class="realtime">
+          Spent <b id="k-spent">$0.00</b> <span class="sep">&middot;</span> <b id="k-rate">$0.00/h</b>
+          <span class="sep">&middot;</span> <span class="muted">proyección 30d</span> <b id="k-proj">$0.00/mo</b>
+        </div>
+
+        <div class="bars">
+          <div class="bar-row">
+            <div class="bar-head"><span>Incluido</span><b id="incl-label">&mdash;</b></div>
+            <div class="barmark"><i id="budget-bar"></i></div>
+          </div>
+          <div class="bar-row" id="extra-row" hidden>
+            <div class="bar-head"><span>Extra</span><b id="extra-label">&mdash;</b></div>
+            <div class="barmark"><i id="extra-bar" class="bad"></i></div>
+          </div>
+        </div>
+
+        <div id="capacity" class="capacity" hidden></div>
+
+        <details id="breakdown" class="breakdown">
+          <summary>Desglose</summary>
+          <div class="breakdown-body">
+            <div id="plan-lines" class="plan-lines"></div>
+            <div class="krow"><span>Requests</span><b id="k-reqs">0</b></div>
+            <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
+            <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
+            <div class="krow"><span>CPU time</span><b id="k-cpu">0 ms/s</b></div>
+            <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
+            <div class="krow small"><span>Cloudflare $/req &middot; usage only, no base fee</span><b id="k-perreq">&mdash;</b></div>
+            <div class="krow small"><span>Model $/req &middot; not Cloudflare</span><b id="k-modelreq">&mdash;</b></div>
+            <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
+            <div class="krow small asof"><span id="k-asof"></span><span id="k-src"></span></div>
+          </div>
+        </details>
       </div>
       <div id="custom-fields" class="custom-fields cost" hidden>
         <div class="cost-head">Custom plan settings</div>
         <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
         <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
       </div>
-      <div class="inspect" id="inspect"></div>
+      <div class="inspect" id="inspect" hidden></div>
     </aside>
   </div>
 </div>
