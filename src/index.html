@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cloudflare architecture simulator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2.5-5 5-7 8-4s4 6 8-2"/></svg>
+      </span>
+      <div>
+        <b>Cloudflare Architecture Simulator</b>
+        <span>model of real Cloudflare behaviour &mdash; not a load test</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="tog-pal" class="ghost on" title="Show or hide the component palette">Components</button>
+      <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
+      <button id="reset" class="ghost">Reset</button>
+      <button id="fit" class="ghost">Fit view</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="palette">
+      <div class="pal-head">Components</div>
+      <input id="search" class="search" placeholder="Search components" autocomplete="off">
+      <div id="palette-list" class="pal-list"></div>
+    </aside>
+
+    <main class="stage">
+      <div class="canvas-wrap">
+      <div class="alerts" id="alerts"></div>
+      <div class="canvas" id="canvas">
+        <div class="world" id="world">
+          <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
+          <div class="node-layer" id="node-layer"></div>
+        </div>
+      </div>
+
+        <div class="toast" id="toast"></div>
+      </div>
+      <div class="stage-bar">
+      <div class="toolbar">
+        <button id="start" class="primary">Start simulation</button>
+        <div class="speeds">
+          <input id="speed" type="number" min="1" max="7200" step="1" value="60"
+                 aria-label="Simulation speed" title="Simulated seconds per real second">
+          <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+        </div>
+      </div>
+
+      <div class="chaos">
+        <span class="chaos-lbl">CHAOS:</span>
+        <button class="chaos-btn" data-c="m429" title="Provider returns 429, concurrency drops">429</button>
+        <button class="chaos-btn" data-c="doEvict" title="A Durable Object is evicted mid-stream">DO evict</button>
+        <button class="chaos-btn" data-c="d1Write" title="Write contention on the D1 primary">D1 writes</button>
+        <button class="chaos-btn" data-c="cacheStorm" title="Cache hit ratio goes to zero">Cache miss</button>
+        <button class="chaos-btn" data-c="store402" title="Store stops paying: 402 on every call">Store 402</button>
+        <button class="chaos-btn" data-c="webhook" title="Webhook burst on the sync path">Webhooks</button>
+      </div>
+
+      <div class="zoombar">
+        <button id="zoomout">&minus;</button>
+        <span id="zoomlabel">100%</span>
+        <button id="zoomin">+</button>
+      </div>
+      </div>
+    </main>
+
+    <aside class="right">
+      <div class="cost">
+        <div class="cost-head">Simulation</div>
+        <div class="krow"><span>Rate</span><b id="k-rate">$0.00/h</b></div>
+        <div class="krow"><span>Spent</span><b id="k-spent">$0.00</b></div>
+        <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
+        <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
+        <div class="krow"><span>CPU time</span><b id="k-cpu">0 ms/s</b></div>
+        <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
+        <div class="budget">
+          <div class="krow"><span>Budget / mo</span><b id="k-budget">$5,000</b></div>
+          <div class="barmark"><i id="budget-bar"></i></div>
+          <div class="krow small"><span>projected / mo</span><b id="k-proj">$0</b></div>
+          <input type="number" id="budget" step="500" min="1" class="budget-in" value="5000">
+        </div>
+      </div>
+      <div class="inspect" id="inspect"></div>
+    </aside>
+  </div>
+</div>
+<script src="catalog.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

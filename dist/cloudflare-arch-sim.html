@@ -1,0 +1,1048 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cloudflare architecture simulator</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#08080a;color:#e8e8ec;
+  font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;cursor:pointer}
+.app{width:100%;max-width:1180px;margin:0 auto;border:1px solid #1b1b22;border-radius:14px;
+  overflow:hidden;background:#0a0a0d}
+
+.top{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #17171d;
+  background:linear-gradient(180deg,#101015,#0b0b0f)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(140deg,#2a1f6b,#12121a);border:1px solid #2c2c3a;color:#a99bff;flex:none}
+.logo svg{width:19px;height:19px}
+.brand b{display:block;font-size:13.5px;letter-spacing:-.01em}
+.brand span{display:block;font-size:10.5px;color:#7a7a88}
+.actions{margin-left:auto;display:flex;gap:7px}
+.ghost{background:#14141a;color:#cfcfd8;border:1px solid #24242e;border-radius:8px;padding:5px 10px;font-size:11.5px}
+.ghost:hover{background:#1b1b23;border-color:#33333f}
+.ghost.on{background:#242433;border-color:#4a4a63;color:#fff}
+
+.body{display:grid;grid-template-columns:var(--pal,196px) minmax(0,1fr) var(--insp,236px);height:var(--h,620px)}
+.app.no-pal{--pal:0px}
+.app.no-insp{--insp:0px}
+.app.no-pal .palette{overflow:hidden;border:0;padding:0}
+.app.no-insp .right{overflow:hidden;border:0}
+
+.palette{border-right:1px solid #17171d;background:#0b0b0f;display:flex;flex-direction:column;min-height:0}
+.pal-head{padding:10px 12px 6px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#8a8a99}
+.search{margin:0 10px 8px;background:#101016;border:1px solid #20202a;border-radius:8px;
+  color:#e8e8ec;padding:6px 9px;font-size:11.5px;outline:none}
+.search:focus{border-color:#3a3a4d}
+.pal-list{overflow:auto;padding:0 8px 12px;min-height:0}
+.pal-group{margin-bottom:12px}
+.pal-title{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f6f7e;padding:6px 4px}
+.pal-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pal-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px 7px;
+  background:#101016;border:1px solid #1e1e27;border-radius:10px;color:#c9c9d4;font-size:10px;
+  text-align:center;line-height:1.2}
+.pal-item:hover{background:#16161e;border-color:#33334a;color:#fff}
+.pal-ico{width:19px;height:19px}
+.pal-ico svg{width:100%;height:100%}
+
+.stage{display:flex;flex-direction:column;min-width:0;min-height:0}
+.canvas-wrap{position:relative;flex:1;min-height:0;overflow:hidden;
+  background:
+    radial-gradient(circle at 1px 1px,rgba(255,255,255,.055) 1px,transparent 0) 0 0/22px 22px,
+    linear-gradient(180deg,#08080b,#0a0a0e)}
+.canvas{position:absolute;inset:0;cursor:grab}
+.canvas:active{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.edge-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.edge{fill:none;stroke:#262633;stroke-width:1.6;transition:stroke .25s}
+.bead{fill:#3ef2c0;stroke:rgba(62,242,192,.22);stroke-width:3;transition:fill .2s,stroke .2s}
+.bead.hot{fill:#ff3b5c;stroke:rgba(255,59,92,.26)}
+.edge.hot{stroke:#ef4444;stroke-width:2}
+.edge.temp{stroke:#6d5cff;stroke-dasharray:5 4}
+
+.node-layer{position:absolute;left:0;top:0}
+.node{position:absolute;width:74px;user-select:none;cursor:grab}
+.nbox{position:relative;width:74px;height:74px;border-radius:16px;display:grid;place-items:center;
+  background:linear-gradient(160deg,#14141d,#0e0e14);
+  border:1px solid #262632;box-shadow:0 0 0 1px rgba(0,0,0,.4),0 8px 24px -12px var(--c);
+  transition:border-color .18s,box-shadow .18s}
+.node:hover .nbox{border-color:#3b3b4d}
+.nbox.warm{border-color:#b45309;box-shadow:0 0 0 1px rgba(180,83,9,.3),0 0 22px -6px #b45309}
+.nbox.hot{border-color:#ef4444;box-shadow:0 0 0 1px rgba(239,68,68,.35),0 0 26px -4px #ef4444}
+.node.sel .nbox{outline:2px solid #6d5cff;outline-offset:2px}
+.node.hit .nbox{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 1px rgba(239,68,68,.4),0 0 26px -6px #ef4444}50%{box-shadow:0 0 0 3px rgba(239,68,68,.2),0 0 34px -4px #ef4444}}
+.node.sat .nbox{animation:shake .16s infinite}
+@keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(1.3px,-1.1px)}50%{transform:translate(-1.1px,1px)}75%{transform:translate(1px,1.2px)}}
+.nicon{width:28px;height:28px;color:var(--c)}
+.nicon svg{width:100%;height:100%}
+.nrate{position:absolute;top:5px;right:8px;font:9px/1 ui-monospace,monospace;color:#9d9daa}
+.nbar{position:absolute;left:9px;right:9px;bottom:6px;height:3px;border-radius:2px;background:#1b1b26;overflow:hidden}
+.nbar i{display:block;height:100%;width:0;background:var(--c);transition:width .25s,background .25s}
+.nbar i.warm{background:#f59e0b}
+.nbar i.hot{background:#ef4444}
+.nbar i.over{background:#ff1f4b;box-shadow:0 0 8px #ff1f4b}
+.nlabel{margin-top:6px;width:96px;margin-left:-11px;text-align:center;font-size:10.5px;color:#c8c8d4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nbadge{text-align:center;font:9px/1.3 ui-monospace,monospace;color:#6e6e7d}
+.nbadge.warn{color:#f59e0b}
+.nbadge.bad{color:#ff4d4d;font-weight:700}
+.port{position:absolute;right:-7px;top:31px;width:12px;height:12px;border-radius:50%;
+  background:#0d0d12;border:2px solid #4b4b63;opacity:0;transition:.15s;cursor:crosshair}
+.node:hover .port,.node.sel .port{opacity:1}
+.port:hover{background:#6d5cff;border-color:#8b7bff}
+
+.stage-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;
+  border-top:1px solid #17171d;background:#0a0a0e}
+.toolbar,.chaos,.zoombar{position:static;transform:none;background:transparent;border:0;
+  padding:0;backdrop-filter:none;max-width:none}
+.toolbar{display:flex;align-items:center;gap:8px}
+.primary{background:linear-gradient(180deg,#7b6bff,#5b4ae8);color:#fff;border:1px solid #8b7bff;
+  border-radius:9px;padding:7px 14px;font-size:12px;font-weight:600}
+.primary.on{background:linear-gradient(180deg,#3a3a4a,#2a2a36);border-color:#4a4a60}
+.speeds{display:flex;align-items:center;gap:4px;background:#14141b;border-radius:8px;padding:2px 6px 2px 2px}
+.speeds input{width:56px;background:#0d0d12;border:1px solid #24242f;border-radius:6px;color:#e8e8ec;
+  padding:4px 6px;font:11px ui-monospace,monospace;text-align:right}
+.speeds input:focus{outline:none;border-color:#4b3fb0}
+.speeds .sp-eq{font:10px/1 ui-monospace,monospace;color:#8c8c9c;white-space:nowrap;padding-right:2px}
+
+.chaos{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.chaos-lbl{font:10px/1 ui-monospace,monospace;letter-spacing:.08em;color:#6a6a7a;margin-right:2px}
+.chaos-btn{background:#15151d;border:1px solid #24242f;color:#b9b9c6;border-radius:999px;
+  font-size:10.5px;padding:5px 9px;white-space:nowrap}
+.chaos-btn:hover{border-color:#7f1d1d;color:#fecaca;background:#1b1113}
+.chaos::-webkit-scrollbar{display:none}
+
+.zoombar{display:flex;align-items:center;gap:4px;margin-left:auto}
+.zoombar button{background:transparent;border:0;color:#a0a0b0;font-size:14px;width:24px;height:22px;border-radius:6px}
+.zoombar button:hover{background:#1d1d27;color:#fff}
+.zoombar span{font:10px/1 ui-monospace,monospace;color:#8a8a99;min-width:34px;text-align:center}
+
+.alerts{position:absolute;top:12px;left:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;pointer-events:none;z-index:3}
+.alert{font:700 10px/1 ui-monospace,monospace;letter-spacing:.06em;padding:6px 9px;border-radius:6px;background:#3b0d16;color:#ff8fa0;border:1px solid #7f1d2b;box-shadow:0 0 18px -8px #ef4444}
+.alert.warn{background:#3a2408;color:#ffc76b;border-color:#7a4d0b;box-shadow:0 0 18px -8px #f59e0b}
+.toast{position:absolute;top:14px;left:50%;transform:translate(-50%,-14px);opacity:0;
+  background:#1a1220;border:1px solid #4a2340;color:#f0c7e4;border-radius:9px;padding:7px 12px;
+  font-size:11.5px;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.right{border-left:1px solid #17171d;background:#0b0b0f;display:flex;flex-direction:column;
+  min-height:0;overflow:auto}
+.cost{padding:11px 12px;border-bottom:1px solid #17171d}
+.cost-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f6f7e;margin-bottom:8px}
+.krow{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:#8a8a99;
+  padding:2px 0}
+.krow b{color:#e8e8ec;font:600 12px/1.3 ui-monospace,monospace}
+.krow.small{font-size:10px;color:#6f6f7e}
+.krow.small b{font-size:10.5px;color:#b0b0be}
+.v.good{color:#34d399}
+.v.warn{color:#f59e0b}
+.v.bad{color:#ef4444}
+.budget{margin-top:8px;border-top:1px dashed #1f1f29;padding-top:8px}
+.barmark{height:5px;border-radius:3px;background:#17171f;overflow:hidden;margin:6px 0}
+.barmark i{display:block;height:100%;width:0;background:#34d399;transition:width .3s,background .3s}
+.barmark i.warn{background:#f59e0b}
+.barmark i.bad{background:#ef4444}
+.budget-in{width:100%;margin-top:6px;background:#101016;border:1px solid #20202a;border-radius:7px;
+  color:#e8e8ec;padding:5px 8px;font:11px ui-monospace,monospace}
+
+.inspect{padding:12px;min-height:0}
+.ins-head{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:4px}
+.ins-head .dot{width:8px;height:8px;border-radius:3px;flex:none}
+.ins-sub{font-size:10px;margin-bottom:10px}
+.ins-sub .ok{color:#34d399}
+.ins-sub .asm{color:#f59e0b}
+.field{display:block;margin-bottom:8px}
+.field span{display:block;font-size:10.5px;color:#8a8a99;margin-bottom:3px}
+.field input{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
+  color:#e8e8ec;padding:5px 8px;font:11.5px ui-monospace,monospace}
+.field input:focus{outline:none;border-color:#4b3fb0}
+.ins-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+.ins-stats div{background:#101016;border:1px solid #1c1c25;border-radius:8px;padding:6px 8px}
+.ins-stats span{display:block;font-size:9.5px;color:#6f6f7e;text-transform:uppercase;letter-spacing:.04em}
+.ins-stats b{font:600 12px ui-monospace,monospace;color:#e8e8ec}
+.note{font-size:10.5px;color:#8a8a99;line-height:1.45;margin:8px 0 0}
+.ok-note{color:#8fbfa8}
+.src{display:inline-block;margin-top:6px;font-size:10px;color:#7b8cff;text-decoration:none}
+.src:hover{text-decoration:underline}
+.del{margin-top:12px;width:100%;background:#1a1114;border:1px solid #3f1d24;color:#f0a8b4;
+  border-radius:8px;padding:6px;font-size:11px}
+.del:hover{background:#25141a}
+.empty{font-size:11px;color:#6f6f7e;line-height:1.6}
+
+@media(max-width:1040px){
+  .app{--pal:150px;--insp:200px;--h:560px}
+}
+@media(max-width:860px){
+  .app{--pal:118px;--insp:186px;--h:540px}
+  .pal-grid{grid-template-columns:1fr}
+  .pal-item{flex-direction:row;gap:7px;padding:6px;font-size:9.5px;text-align:left;align-items:center}
+  .pal-ico{width:16px;height:16px;flex:none}
+  .pal-title{font-size:9px;padding:5px 2px}
+  .pal-head{padding:8px 8px 4px;font-size:10px}
+  .search{margin:0 8px 6px;font-size:10.5px}
+}
+@media(max-width:700px){
+  .app{--pal:104px;--insp:172px;--h:520px}
+  .actions{display:none}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2.5-5 5-7 8-4s4 6 8-2"/></svg>
+      </span>
+      <div>
+        <b>Cloudflare Architecture Simulator</b>
+        <span>model of real Cloudflare behaviour &mdash; not a load test</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="tog-pal" class="ghost on" title="Show or hide the component palette">Components</button>
+      <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
+      <button id="reset" class="ghost">Reset</button>
+      <button id="fit" class="ghost">Fit view</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="palette">
+      <div class="pal-head">Components</div>
+      <input id="search" class="search" placeholder="Search components" autocomplete="off">
+      <div id="palette-list" class="pal-list"></div>
+    </aside>
+
+    <main class="stage">
+      <div class="canvas-wrap">
+      <div class="alerts" id="alerts"></div>
+      <div class="canvas" id="canvas">
+        <div class="world" id="world">
+          <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
+          <div class="node-layer" id="node-layer"></div>
+        </div>
+      </div>
+
+        <div class="toast" id="toast"></div>
+      </div>
+      <div class="stage-bar">
+      <div class="toolbar">
+        <button id="start" class="primary">Start simulation</button>
+        <div class="speeds">
+          <input id="speed" type="number" min="1" max="7200" step="1" value="60"
+                 aria-label="Simulation speed" title="Simulated seconds per real second">
+          <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+        </div>
+      </div>
+
+      <div class="chaos">
+        <span class="chaos-lbl">CHAOS:</span>
+        <button class="chaos-btn" data-c="m429" title="Provider returns 429, concurrency drops">429</button>
+        <button class="chaos-btn" data-c="doEvict" title="A Durable Object is evicted mid-stream">DO evict</button>
+        <button class="chaos-btn" data-c="d1Write" title="Write contention on the D1 primary">D1 writes</button>
+        <button class="chaos-btn" data-c="cacheStorm" title="Cache hit ratio goes to zero">Cache miss</button>
+        <button class="chaos-btn" data-c="store402" title="Store stops paying: 402 on every call">Store 402</button>
+        <button class="chaos-btn" data-c="webhook" title="Webhook burst on the sync path">Webhooks</button>
+      </div>
+
+      <div class="zoombar">
+        <button id="zoomout">&minus;</button>
+        <span id="zoomlabel">100%</span>
+        <button id="zoomin">+</button>
+      </div>
+      </div>
+    </main>
+
+    <aside class="right">
+      <div class="cost">
+        <div class="cost-head">Simulation</div>
+        <div class="krow"><span>Rate</span><b id="k-rate">$0.00/h</b></div>
+        <div class="krow"><span>Spent</span><b id="k-spent">$0.00</b></div>
+        <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
+        <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
+        <div class="krow"><span>CPU time</span><b id="k-cpu">0 ms/s</b></div>
+        <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
+        <div class="budget">
+          <div class="krow"><span>Budget / mo</span><b id="k-budget">$5,000</b></div>
+          <div class="barmark"><i id="budget-bar"></i></div>
+          <div class="krow small"><span>projected / mo</span><b id="k-proj">$0</b></div>
+          <input type="number" id="budget" step="500" min="1" class="budget-in" value="5000">
+        </div>
+      </div>
+      <div class="inspect" id="inspect"></div>
+    </aside>
+  </div>
+</div>
+<script>
+window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" />","globe":"<svg class=\"lucide lucide-globe\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /> <path d=\"M2 12h20\" />","shield":"<svg class=\"lucide lucide-shield\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" />","shield-check":"<svg class=\"lucide lucide-shield-check\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" />","layers":"<svg class=\"lucide lucide-layers\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","zap":"<svg class=\"lucide lucide-zap\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","box":"<svg class=\"lucide lucide-box\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\" /> <path d=\"m3.3 7 8.7 5 8.7-5\" /> <path d=\"M12 22V12\" />","list-ordered":"<svg class=\"lucide lucide-list-ordered\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11 5h10\" /> <path d=\"M11 12h10\" /> <path d=\"M11 19h10\" /> <path d=\"M4 4h1v5\" /> <path d=\"M4 9h2\" /> <path d=\"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02\" />","database":"<svg class=\"lucide lucide-database\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />","key-round":"<svg class=\"lucide lucide-key-round\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","archive":"<svg class=\"lucide lucide-archive\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /> <path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /> <path d=\"M10 12h4\" />","scan-search":"<svg class=\"lucide lucide-scan-search\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" /> <path d=\"m16 16-1.9-1.9\" />","route":"<svg class=\"lucide lucide-route\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <circle cx=\"6\" cy=\"5\" r=\"3\" />","sparkles":"<svg class=\"lucide lucide-sparkles\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />","plug":"<svg class=\"lucide lucide-plug\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 22v-5\" /> <path d=\"M15 8V2\" /> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\" /> <path d=\"M9 8V2\" />"};
+</script>
+<script>
+window.CATALOG = {
+  groups: [
+    { id: 'edge', label: 'Traffic & Edge', color: '#7c5cff' },
+    { id: 'compute', label: 'Compute', color: '#00c2a8' },
+    { id: 'data', label: 'Data', color: '#3b82f6' },
+    { id: 'ai', label: 'AI', color: '#e11d48' },
+    { id: 'external', label: 'External', color: '#f59e0b' }
+  ],
+  types: {
+    traffic: {
+      name: 'Traffic', group: 'edge', icon: 'activity', source: true,
+      p: { rate: 40, concurrency: 0, latency: 0, price: 0, units: 1 },
+      fields: ['rate'],
+      note: 'Request arrivals. Everything downstream is driven by this.'
+    },
+    dns: {
+      name: 'DNS', group: 'edge', icon: 'globe',
+      p: { concurrency: 1000000, latency: 8, price: 0, units: 1 },
+      note: 'Authoritative resolution, no charge at this layer.'
+    },
+    waf: {
+      name: 'WAF', group: 'edge', icon: 'shield',
+      p: { concurrency: 1000000, latency: 3, price: 0, units: 1 },
+      note: 'Managed rules run before your code. No per-request charge.'
+    },
+    turnstile: {
+      name: 'Turnstile', group: 'edge', icon: 'shield-check',
+      p: { concurrency: 1000000, latency: 25, price: 0, units: 1 },
+      note: 'Bot token check at the edge. Free, and it keeps junk out of the model.'
+    },
+    cache: {
+      name: 'Cache', group: 'edge', icon: 'layers',
+      p: { concurrency: 1000000, latency: 2, price: 0, units: 1, hit: 60 },
+      fields: ['hit'],
+      note: 'Cache offload: downstream only sees (1 - hit) of the traffic.'
+    },
+    workers: {
+      name: 'Workers', group: 'compute', icon: 'zap',
+      p: { concurrency: 1000, latency: 6, price: 0.30, units: 1, cpuMs: 6 },
+      fields: ['concurrency', 'latency', 'cpuMs'],
+      priceCpu: 0.02,
+      verified: '10M req/mo included, then $0.30/M. 30M CPU-ms included, then $0.02/M. CPU is billed per millisecond actually executed, so JSON parsing and crypto land here, not in the request count.',
+      doc: 'https://developers.cloudflare.com/workers/platform/pricing/'
+    },
+    durable_objects: {
+      name: 'Durable Objects', group: 'compute', icon: 'box',
+      p: { concurrency: 1000, latency: 20, price: 0.15, units: 1, priceGBs: 12.5 },
+      fields: ['concurrency'],
+      verified: '$0.15/M requests, $12.50/M GB-s. Soft limit ~1,000 req/s per object; scale with more objects, not more load on one.',
+      doc: 'https://developers.cloudflare.com/durable-objects/platform/pricing/'
+    },
+    queues: {
+      name: 'Queues', group: 'compute', icon: 'list-ordered',
+      p: { concurrency: 50, latency: 10, price: 0.4, units: 1 },
+      note: 'Absorbs bursts and retries. Price varies by operations: treat it as editable.'
+    },
+    d1: {
+      name: 'D1', group: 'data', icon: 'database',
+      p: { concurrency: 50, latency: 60, price: 0.001, units: 25 },
+      fields: ['units'],
+      verified: '25B rows read/mo included then $0.001/M. 50M rows written included then $1.00/M. One primary per database.',
+      doc: 'https://developers.cloudflare.com/d1/platform/pricing/'
+    },
+    kv: {
+      name: 'KV', group: 'data', icon: 'key-round',
+      p: { concurrency: 1000000, latency: 5, price: 0.2, units: 1 },
+      note: 'Read-heavy, eventually consistent. Reads are cheap, writes are not.'
+    },
+    r2: {
+      name: 'R2', group: 'data', icon: 'archive',
+      p: { concurrency: 1000000, latency: 30, price: 0.36, units: 1 },
+      note: 'Objects by key, no egress fee. Price per operation is an assumption here.'
+    },
+    vectorize: {
+      name: 'Vectorize', group: 'data', icon: 'scan-search',
+      p: { concurrency: 50, latency: 80, price: 0, units: 1 },
+      note: 'Vector query with metadata filters. Paid plan only; per-query cost left at 0, editable.'
+    },
+    ai_gateway: {
+      name: 'AI Gateway', group: 'ai', icon: 'route',
+      p: { concurrency: 1000000, latency: 4, price: 0, units: 1 },
+      note: 'No charge for the gateway itself. It buys you caching, rate limits and logs, not capacity.'
+    },
+    workers_ai: {
+      name: 'Model', group: 'ai', icon: 'sparkles',
+      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000 },
+      fields: ['concurrency', 'latency', 'units'],
+      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost.'
+    },
+    external: {
+      name: 'Tiendanube API', group: 'external', icon: 'plug',
+      p: { concurrency: 1, latency: 300, price: 0, units: 1 },
+      fields: ['concurrency', 'latency'],
+      verified: 'Leaky bucket of 2 req/s with burst of 40, per store and app. One shared server model = a hard wall.',
+      doc: 'https://tiendanube.github.io/api-documentation/intro'
+    }
+  }
+};
+
+</script>
+<script>
+(function () {
+  const TYPES = window.CATALOG.types;
+  const GROUPS = window.CATALOG.groups;
+  const NS = 'http://www.w3.org/2000/svg';
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+  const state = {
+    nodes: [], edges: [], sel: null, zoom: 1, px: 40, py: 40,
+    running: false, speed: 60, budget: 5000, edgeEls: [], cpuRate: 0,
+    t: 0, spent: 0, chaos: {}, errors: 0,
+    res: {}, rate: 0, pathLat: 0
+  };
+  let seq = 1;
+  const uid = () => 'n' + seq++;
+
+  function typeOf(n) { return TYPES[n.type]; }
+  function groupColor(t) { return (GROUPS.find(g => g.id === TYPES[t].group) || {}).color || '#888'; }
+
+  function addNode(type, x, y) {
+    const def = TYPES[type];
+    const node = { id: uid(), type, x, y, p: Object.assign({}, def.p) };
+    state.nodes.push(node);
+    return node;
+  }
+
+  function addEdge(from, to) {
+    if (from === to) return null;
+    if (state.edges.some(e => e.from === from && e.to === to)) return null;
+    const e = { from, to };
+    state.edges.push(e);
+    return e;
+  }
+
+  function nodeById(id) { return state.nodes.find(n => n.id === id); }
+
+  function eff(n) {
+    const p = Object.assign({}, n.p);
+    const now = performance.now() / 1000;
+    let slashed = false;
+    if (n.type === 'workers_ai' && state.chaos.model429 > now) {
+      p.latency *= 3; p.concurrency = Math.max(1, Math.round(p.concurrency * 0.4)); slashed = true;
+    }
+    if (n.type === 'durable_objects' && state.chaos.doEvict > now) {
+      p.latency *= 8; slashed = true;
+    }
+    if (n.type === 'd1' && state.chaos.d1Write > now) {
+      p.latency *= 20; slashed = true;
+    }
+    if (n.type === 'cache' && state.chaos.cacheStorm > now) {
+      p.hit = 0; slashed = true;
+    }
+    if (n.type === 'external' && state.chaos.store402 > now) {
+      p.latency *= 100; slashed = true;
+    }
+    if (n.type === 'queues' && state.chaos.webhook > now) {
+      p.latency *= 2; slashed = true;
+    }
+    return { p, slashed };
+  }
+
+  function erlangC(a, c) {
+    if (c <= 1) return Math.min(1, a);
+    if (a <= 0) return 0;
+    const rho = a / c;
+    if (rho >= 1) return 1;
+    let sum = 1, term = 1;
+    const cap = Math.min(c, 400);
+    for (let k = 1; k < cap; k++) { term *= a / k; sum += term; }
+    const acfact = term * a / cap;
+    const tail = acfact / (1 - rho);
+    return tail / (sum + tail);
+  }
+
+  function compute() {
+    const inc = {}, out = {};
+    state.nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
+    state.edges.forEach(e => {
+      if (out[e.from]) out[e.from].push(e.to);
+      if (inc[e.to]) inc[e.to].push(e.from);
+    });
+
+    const indeg = {};
+    state.nodes.forEach(n => { indeg[n.id] = inc[n.id].length; });
+    const q = state.nodes.filter(n => indeg[n.id] === 0).map(n => n.id);
+    const order = [];
+    while (q.length) {
+      const id = q.shift();
+      order.push(id);
+      out[id].forEach(to => { indeg[to]--; if (indeg[to] === 0) q.push(to); });
+    }
+
+    const lambda = {}, outLambda = {}, lat = {}, arrive = {};
+    state.nodes.forEach(n => { lambda[n.id] = 0; outLambda[n.id] = 0; lat[n.id] = 0; arrive[n.id] = 0; });
+
+    order.forEach(id => {
+      const n = nodeById(id);
+      if (!n) return;
+      const { p } = eff(n);
+      const t = typeOf(n);
+      if (t.source) {
+        lambda[id] = p.rate;
+        lat[id] = 0;
+        outLambda[id] = p.rate;
+        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0 };
+      } else {
+        let util = 0, waitS = 0;
+        if (p.concurrency > 0 && p.latency > 0) {
+          const mu = 1000 / p.latency;
+          util = lambda[id] / (mu * p.concurrency);
+          if (util >= 1) {
+            waitS = 30;
+          } else if (p.concurrency > 400) {
+            waitS = 0;
+          } else if (util > 0.005) {
+            const C = erlangC(lambda[id] / mu, Math.max(1, Math.round(p.concurrency)));
+            waitS = C / Math.max(0.0001, p.concurrency * mu - lambda[id]);
+          }
+        }
+        const latS = p.latency / 1000 + waitS;
+        lat[id] = latS;
+        const hit = n.type === 'cache' ? Math.max(0, Math.min(100, p.hit)) / 100 : 0;
+        outLambda[id] = lambda[id] * (1 - hit);
+        const failing = n.type === 'external' && state.chaos.store402 > performance.now() / 1000;
+        const err = failing ? 1 : util > 1 ? Math.min(0.85, (util - 1) * 0.55) : 0;
+        state.res[id] = { lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0 };
+      }
+      out[id].forEach(to => {
+        lambda[to] += outLambda[id];
+        arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
+      });
+    });
+
+    state.cpuRate = 0;
+    state.nodes.forEach(n => {
+      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0 });
+      const { p } = eff(n);
+      const def = typeOf(n);
+      let cost = r.lambda * p.units * p.price / 1e6;
+      if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
+      if (n.type === 'durable_objects' && p.priceGBs != null) {
+        cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+      }
+      r.cost = cost;
+      r.cpu = (p.cpuMs || 0) * r.lambda;
+      state.cpuRate += r.cpu;
+    });
+
+    let rate = 0;
+    Object.keys(state.res).forEach(k => { rate += state.res[k].cost || 0; });
+    state.rate = rate;
+    state.pathLat = state.nodes.reduce((m, n) => Math.max(m, (state.res[n.id] || {}).lat || 0), 0);
+  }
+
+  function renderPalette() {
+    const q = ($('#search').value || '').toLowerCase();
+    const wrap = $('#palette-list');
+    wrap.innerHTML = '';
+    GROUPS.forEach(g => {
+      const items = Object.keys(TYPES).filter(k => TYPES[k].group === g.id && TYPES[k].name.toLowerCase().includes(q));
+      if (!items.length) return;
+      const sec = document.createElement('div');
+      sec.className = 'pal-group';
+      sec.innerHTML = '<div class="pal-title">' + g.label + '</div>';
+      const grid = document.createElement('div');
+      grid.className = 'pal-grid';
+      items.forEach(k => {
+        const def = TYPES[k];
+        const el = document.createElement('button');
+        el.className = 'pal-item';
+        el.title = def.note || def.name;
+        el.innerHTML = '<span class="pal-ico" style="color:' + groupColor(k) + '">' + svg(k) + '</span><span>' + def.name + '</span>';
+        el.addEventListener('pointerdown', ev => ev.stopPropagation());
+        el.addEventListener('pointerdown', ev => {
+          ev.preventDefault();
+          const rect = $('#canvas').getBoundingClientRect();
+          const gx = (rect.width / 2 - state.px) / state.zoom;
+          const gy = (rect.height / 2 - state.py) / state.zoom;
+          const n = addNode(k, gx - 37, gy - 37);
+          select(n.id);
+          drag = { id: n.id, sx: ev.clientX, sy: ev.clientY, ox: n.x, oy: n.y };
+          render();
+        });
+        grid.appendChild(el);
+      });
+      sec.appendChild(grid);
+      wrap.appendChild(sec);
+    });
+  }
+
+  function svg(type) {
+    const def = TYPES[type];
+    const inner = (window.ICONS && window.ICONS[def.icon]) || '';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  }
+
+  function render() {
+    const world = $('#world');
+    world.style.transform = 'translate(' + state.px + 'px,' + state.py + 'px) scale(' + state.zoom + ')';
+    $('#zoomlabel').textContent = Math.round(state.zoom * 100) + '%';
+    buildEdges();
+    renderNodes();
+    renderInspector();
+    renderCost();
+    renderAlerts();
+  }
+
+  function samplePath(path, len) {
+    const n = 48, pts = [];
+    for (let i = 0; i <= n; i++) {
+      const at = (i / n) * len;
+      const p = path.getPointAtLength(at);
+      pts.push({ x: p.x, y: p.y, l: at });
+    }
+    return pts;
+  }
+
+  function pointOn(e, pos) {
+    const pts = e.pts;
+    let lo = 0, hi = pts.length - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      if (pts[mid].l <= pos) lo = mid; else hi = mid;
+    }
+    const a = pts[lo], b = pts[hi];
+    const f = b.l === a.l ? 0 : (pos - a.l) / (b.l - a.l);
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+  }
+
+  function buildEdges() {
+    const g = $('#edge-layer');
+    g.innerHTML = '';
+    state.edgeEls = [];
+    state.edges.forEach(e => {
+      const a = nodeById(e.from), b = nodeById(e.to);
+      if (!a || !b) return;
+      const x1 = a.x + 74, y1 = a.y + 37, x2 = b.x, y2 = b.y + 37;
+      const d = 'M' + x1 + ',' + y1 + ' C' + (x1 + 46) + ',' + y1 + ' ' + (x2 - 46) + ',' + y2 + ' ' + x2 + ',' + y2;
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'edge');
+      g.appendChild(path);
+      const len = path.getTotalLength();
+      const pool = Math.min(64, Math.max(8, Math.ceil(len / 4) + 2));
+      const dots = [];
+      for (let i = 0; i < pool; i++) {
+        const c = document.createElementNS(NS, 'circle');
+        c.setAttribute('r', 2.2);
+        c.setAttribute('class', 'bead');
+        c.style.opacity = 0;
+        g.appendChild(c);
+        dots.push({ el: c });
+      }
+      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), to: e.to });
+    });
+  }
+
+  function animateEdges(ts) {
+    const t = ts / 1000;
+    (state.edgeEls || []).forEach(e => {
+      const r = state.res[e.to] || {};
+      const lam = r.lambda || 0;
+      const hot = (r.util || 0) >= 0.9 || (r.err || 0) > 0;
+      const cls = 'edge' + (hot ? ' hot' : '');
+      if (e.path.getAttribute('class') !== cls) e.path.setAttribute('class', cls);
+      if (!state.running || lam <= 0 || e.len <= 0) {
+        e.dots.forEach(d => { if (d.el.style.opacity !== '0') d.el.style.opacity = 0; });
+        return;
+      }
+      const rate = Math.min(50, lam);
+      let speed = 90 + Math.min(180, lam * 2.2);
+      if (speed / rate > e.len) speed = rate * e.len;
+      const spacing = speed / rate;
+      const n = Math.min(e.dots.length, Math.floor(e.len / spacing) + 1);
+      for (let i = 0; i < e.dots.length; i++) {
+        const d = e.dots[i];
+        if (i >= n) { d.el.style.opacity = 0; continue; }
+        const pos = (t * speed + i * spacing) % e.len;
+        const pt = pointOn(e, pos);
+        const j = hot ? (Math.random() - 0.5) * 2.4 : 0;
+        d.el.setAttribute('cx', pt.x + j);
+        d.el.setAttribute('cy', pt.y + j);
+        d.el.setAttribute('r', hot ? 2.6 : 2.2);
+        d.el.setAttribute('class', 'bead' + (hot ? ' hot' : ''));
+        d.el.style.opacity = 0.95;
+      }
+    });
+  }
+
+  function renderNodes() {
+    const layer = $('#node-layer');
+    layer.innerHTML = '';
+    state.nodes.forEach(n => {
+      const def = typeOf(n);
+      const r = state.res[n.id] || { lambda: 0, util: 0, err: 0, lat: 0, cost: 0 };
+      const { slashed } = eff(n);
+      const util = r.util || 0;
+      const pct = Math.round(util * 100);
+      const bad = (r.err || 0) > 0 || util >= 1;
+      const cls = bad ? 'hot' : util > 0.9 ? 'hot' : util > 0.7 ? 'warm' : '';
+      const barCls = (r.err || 0) > 0 ? 'over' : util >= 1 ? 'over' : util > 0.9 ? 'hot' : util > 0.7 ? 'warm' : '';
+      const bcls = (r.err || 0) > 0 ? 'bad' : util >= 1 ? 'bad' : util > 0.7 ? 'warn' : '';
+      const el = document.createElement('div');
+      el.className = 'node' + (state.sel === n.id ? ' sel' : '') + (slashed ? ' hit' : '') + (bad ? ' sat' : '');
+      el.dataset.id = n.id;
+      el.style.left = n.x + 'px';
+      el.style.top = n.y + 'px';
+      const color = groupColor(n.type);
+      el.innerHTML =
+        '<div class="nbox ' + cls + '" style="--c:' + color + '">' +
+          '<span class="nicon">' + svg(n.type) + '</span>' +
+          (def.source ? '<span class="nrate">' + Math.round(r.lambda) + '/s</span>' : '') +
+          '<span class="nbar"><i class="' + barCls + '" style="width:' + Math.min(100, pct) + '%"></i></span>' +
+        '</div>' +
+        '<div class="nlabel">' + (n.alias || def.name) + '</div>' +
+        '<div class="nbadge ' + bcls + '">' + badge(n, r) + '</div>' +
+        '<span class="port" data-port="1"></span>';
+      layer.appendChild(el);
+    });
+    $$('.node').forEach(el => { el.addEventListener('pointerdown', onNodeDown); });
+    $$('.port').forEach(p => { p.addEventListener('pointerdown', onPortDown); });
+  }
+
+  function badge(n, r) {
+    if (typeOf(n).source) return Math.round(r.lambda || 0) + '/s in';
+    if (!r || !r.lambda) return 'idle';
+    const pct = Math.round((r.util || 0) * 100);
+    if ((r.err || 0) > 0) return 'ERR ' + Math.round(r.err * 100) + '%';
+    if (r.util >= 1) return 'SATURATED ' + pct + '%';
+    if (r.util > 0.9) return 'LOAD ' + pct + '%';
+    return 'LOAD ' + pct + '% \u00b7 ' + r.lambda.toFixed(1) + '/s';
+  }
+
+  function nname(n) { return n.alias || typeOf(n).name; }
+
+  function renderAlerts() {
+    const rows = state.nodes.map(n => ({ n, r: state.res[n.id] || {} }));
+    const out = [];
+    const over = rows.filter(x => (x.r.util || 0) >= 1.15).sort((a, b) => b.r.util - a.r.util)[0];
+    const errs = rows.filter(x => (x.r.err || 0) > 0 && x.n.type !== 'external');
+    const drops = rows.filter(x => (x.r.err || 0) > 0 && x.n.type === 'external').length;
+    const spof = rows.filter(x => {
+      const p = eff(x.n).p;
+      return x.r.lambda > 0 && p.concurrency === 1 && (x.r.util || 0) >= 0.55 && x.n.type !== 'external';
+    })[0];
+    if (over) out.push({ t: 'HOT PATH BOTTLENECK \u00b7 ' + nname(over.n), c: 'crit' });
+    if (errs.length) out.push({ t: 'ERROR BUDGET BURN', c: 'warn' });
+    if (drops) out.push({ t: 'DATA LOSS RISK \u00b7 sync drops', c: 'warn' });
+    if (spof && out.length < 3) out.push({ t: 'SPOF \u00b7 ' + nname(spof.n), c: 'warn' });
+    $('#alerts').innerHTML = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
+  }
+
+  function renderInspector() {
+    const box = $('#inspect');
+    if (!state.sel) {
+      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Add from the palette. Drag the dot on a node to connect. Drag the canvas to pan.</div>';
+      return;
+    }
+    const n = nodeById(state.sel);
+    if (!n) return;
+    const def = typeOf(n);
+    const r = state.res[n.id] || {};
+    const fields = def.fields || ['concurrency', 'latency', 'price'];
+    const labels = {
+      rate: ['Requests / s', 1, 100000, 1],
+      concurrency: ['Concurrency', 1, 1000000, 1],
+      latency: ['Service time (ms)', 0, 60000, 1],
+      price: ['$ per million units', 0, 100, 0.001],
+      units: ['Units per request', 0, 100000, 1],
+      hit: ['Cache hit %', 0, 100, 1],
+      priceGBs: ['$ per M GB-s', 0, 100, 0.01],
+      cpuMs: ['CPU ms / request', 0, 30000, 0.5]
+    };
+    let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + (n.alias || def.name) + '</b></div>';
+    html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
+    fields.forEach(f => {
+      const L = labels[f] || [f, 0, 1e6, 1];
+      html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + n.p[f] + '"></label>';
+    });
+    html += '<div class="ins-stats">' +
+      '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
+      '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
+      '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
+      '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
+      '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>' +
+      '</div>';
+    if (def.note) html += '<p class="note">' + def.note + '</p>';
+    if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
+    if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
+    html += '<button class="del" id="delnode">Delete node</button>';
+    box.innerHTML = html;
+    $$('input[data-f]', box).forEach(inp => {
+      inp.addEventListener('input', () => {
+        const v = parseFloat(inp.value);
+        if (!isNaN(v)) { n.p[inp.dataset.f] = v; compute(); renderNodes(); renderCost(); }
+      });
+    });
+    $('#delnode').addEventListener('click', () => {
+      state.nodes = state.nodes.filter(x => x.id !== n.id);
+      state.edges = state.edges.filter(e => e.from !== n.id && e.to !== n.id);
+      state.sel = null;
+      compute(); render();
+    });
+  }
+
+  function fmt(v) { return v < 1000 ? Math.round(v) + 'ms' : (v / 1000).toFixed(1) + 's'; }
+
+  function renderCost() {
+    const rate = state.rate;
+    const hours = state.t / 3600;
+    $('#k-rate').textContent = '$' + (rate * 3600).toFixed(2) + '/h';
+    $('#k-spent').textContent = '$' + state.spent.toFixed(2);
+    $('#k-time').textContent = hours < 1 ? Math.round(state.t) + 's' : hours.toFixed(2) + 'h';
+    $('#k-lat').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
+    $('#k-cpu').textContent = Math.round(state.cpuRate || 0) + ' ms/s';
+    const anyErr = state.nodes.some(n => (state.res[n.id] || {}).err > 0);
+    const status = anyErr ? 'ERR' : state.pathLat >= 30 ? 'saturated' : state.pathLat > 3 ? 'slow' : 'ok';
+    $('#k-path').textContent = status;
+    $('#k-path').className = 'v ' + (anyErr || state.pathLat >= 30 ? 'bad' : state.pathLat > 3 ? 'warn' : 'good');
+
+    const monthly = rate * 3600 * 730;
+    const pct = Math.min(100, (monthly / state.budget) * 100);
+    $('#k-proj').textContent = '$' + monthly.toFixed(0);
+    const bar = $('#budget-bar');
+    bar.style.width = pct + '%';
+    bar.className = pct > 100 ? 'bad' : pct > 70 ? 'warn' : '';
+    $('#k-budget').textContent = '$' + state.budget.toLocaleString();
+  }
+
+  let drag = null, link = null, pan = null;
+
+  function onNodeDown(ev) {
+    if (ev.target.closest('.port')) return;
+    ev.stopPropagation();
+    const el = ev.target.closest('.node');
+    const n = nodeById(el.dataset.id);
+    select(n.id);
+    drag = { id: n.id, sx: ev.clientX, sy: ev.clientY, ox: n.x, oy: n.y };
+  }
+
+  function onPortDown(ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+    const el = ev.target.closest('.node');
+    link = { from: el.dataset.id, x: 0, y: 0 };
+    const a = nodeById(link.from);
+    link.x0 = a.x + 74; link.y0 = a.y + 37;
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tmp.setAttribute('class', 'edge temp');
+    tmp.id = 'temp-edge';
+    $('#edge-layer').appendChild(tmp);
+    link.el = tmp;
+  }
+
+  function onMove(ev) {
+    if (drag) {
+      const n = nodeById(drag.id);
+      if (!n) return;
+      n.x = drag.ox + (ev.clientX - drag.sx) / state.zoom;
+      n.y = drag.oy + (ev.clientY - drag.sy) / state.zoom;
+      renderNodes(); buildEdges();
+      return;
+    }
+    if (link && link.el) {
+      const rect = $('#canvas').getBoundingClientRect();
+      const x2 = (ev.clientX - rect.left - state.px) / state.zoom;
+      const y2 = (ev.clientY - rect.top - state.py) / state.zoom;
+      const d = 'M' + link.x0 + ',' + link.y0 + ' C' + (link.x0 + 46) + ',' + link.y0 + ' ' + (x2 - 46) + ',' + y2 + ' ' + x2 + ',' + y2;
+      link.el.setAttribute('d', d);
+      return;
+    }
+    if (pan) {
+      state.px = pan.px + (ev.clientX - pan.sx);
+      state.py = pan.py + (ev.clientY - pan.sy);
+      $('#world').style.transform = 'translate(' + state.px + 'px,' + state.py + 'px) scale(' + state.zoom + ')';
+    }
+  }
+
+  function onUp(ev) {
+    if (link) {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = el && el.closest('.node');
+      if (target && target.dataset.id !== link.from) addEdge(link.from, target.dataset.id);
+      if (link.el) link.el.remove();
+      link = null;
+      compute(); render();
+    }
+    drag = null;
+    pan = null;
+  }
+
+  function select(id) {
+    state.sel = id;
+    renderNodes();
+    renderInspector();
+  }
+
+  function fit() {
+    if (!state.nodes.length) return;
+    const minX = Math.min(...state.nodes.map(n => n.x)) - 20;
+    const maxX = Math.max(...state.nodes.map(n => n.x + 74)) + 20;
+    const minY = Math.min(...state.nodes.map(n => n.y)) - 20;
+    const maxY = Math.max(...state.nodes.map(n => n.y + 120)) + 20;
+    const w = $('#canvas').clientWidth, h = $('#canvas').clientHeight;
+    const z = Math.max(0.35, Math.min(1, Math.min(w / (maxX - minX), h / (maxY - minY))));
+    state.zoom = z;
+    state.px = (w - (maxX - minX) * z) / 2 - minX * z;
+    state.py = (h - (maxY - minY) * z) / 2 - minY * z;
+    render();
+  }
+
+  function loadTemplate() {
+    state.nodes = []; state.edges = []; seq = 1;
+    state.t = 0; state.spent = 0; state.chaos = {};
+    const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
+    const waf = addNode('waf', 160, 220);
+    const cache = addNode('cache', 300, 220);
+    const workers = addNode('workers', 440, 220);
+    const agent = addNode('durable_objects', 590, 220);
+    const gw = addNode('ai_gateway', 750, 105);
+    const model = addNode('workers_ai', 890, 105);
+    const vec = addNode('vectorize', 750, 220);
+    const d1 = addNode('d1', 750, 335);
+    const q = addNode('queues', 440, 430);
+    const ext = addNode('external', 600, 430);
+    const sync = addNode('traffic', 20, 430); sync.p.rate = 1; sync.alias = 'Catalog sync';
+    ext.p.latency = 500;
+    addEdge(t.id, waf.id);
+    addEdge(waf.id, cache.id);
+    addEdge(cache.id, workers.id);
+    addEdge(workers.id, agent.id);
+    addEdge(agent.id, gw.id);
+    addEdge(gw.id, model.id);
+    addEdge(agent.id, vec.id);
+    addEdge(agent.id, d1.id);
+    addEdge(sync.id, q.id);
+    addEdge(q.id, ext.id);
+    state.sel = model.id;
+    compute();
+    render();
+    fit();
+  }
+
+  function chaos(key) {
+    const map = {
+      m429: ['model429', 10], doEvict: ['doEvict', 8], d1Write: ['d1Write', 10],
+      cacheStorm: ['cacheStorm', 12], store402: ['store402', 12], webhook: ['webhook', 10]
+    };
+    const [k, dur] = map[key];
+    state.chaos[k] = performance.now() / 1000 + dur;
+    toast(label(key) + ' for ' + dur + ' seconds');
+    compute(); render();
+  }
+  function label(k) {
+    return { m429: 'Model 429s', doEvict: 'DO eviction', d1Write: 'D1 write storm', cacheStorm: 'Cache miss storm', store402: 'Store 402', webhook: 'Webhook storm' }[k];
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  let lastReal = 0, acc = 0;
+  function loop(ts) {
+    if (!lastReal) lastReal = ts;
+    const dtReal = Math.min(0.5, (ts - lastReal) / 1000);
+    lastReal = ts;
+    if (state.running) {
+      const dtSim = dtReal * state.speed;
+      state.t += dtSim;
+      state.spent += state.rate * dtSim;
+      compute();
+      acc += dtReal;
+      if (acc >= 0.22) {
+        acc = 0;
+        renderCost(); renderNodes(); renderAlerts();
+      }
+    }
+    animateEdges(ts);
+    requestAnimationFrame(loop);
+  }
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+
+  $('#search').addEventListener('input', renderPalette);
+  $('#start').addEventListener('click', () => {
+    state.running = !state.running;
+    $('#start').textContent = state.running ? 'Pause simulation' : 'Start simulation';
+    $('#start').classList.toggle('on', state.running);
+    compute(); render();
+  });
+  $('#reset').addEventListener('click', () => {
+    state.t = 0; state.spent = 0; state.chaos = {};
+    compute(); render(); toast('Simulation reset');
+  });
+  function speedEq(v) {
+    if (v < 60) return '1s = ' + v + 's';
+    if (v < 3600) return '1s = ' + (Math.round(v / 6) / 10) + 'm';
+    return '1s = ' + (Math.round(v / 360) / 10) + 'h';
+  }
+  $('#speed').addEventListener('input', e => {
+    const v = parseInt(e.target.value, 10);
+    if (!isNaN(v)) state.speed = Math.max(1, Math.min(7200, v));
+    $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
+  });
+  $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
+  $$('.chaos-btn').forEach(b => b.addEventListener('click', () => chaos(b.dataset.c)));
+  $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
+  $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
+  $('#fit').addEventListener('click', fit);
+  $('#budget').addEventListener('change', e => { state.budget = Math.max(1, parseFloat(e.target.value) || 1); renderCost(); });
+
+  $('#canvas').addEventListener('pointerdown', ev => {
+    if (ev.target.closest('.node')) return;
+    pan = { sx: ev.clientX, sy: ev.clientY, px: state.px, py: state.py };
+    state.sel = null; renderNodes(); renderInspector();
+  });
+  $('#canvas').addEventListener('wheel', ev => {
+    ev.preventDefault();
+    state.zoom = Math.max(0.35, Math.min(1.8, state.zoom * (ev.deltaY < 0 ? 1.08 : 0.93)));
+    render();
+  }, { passive: false });
+
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
+    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (!state.sel) return;
+    ev.preventDefault();
+    state.nodes = state.nodes.filter(x => x.id !== state.sel);
+    state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
+    state.sel = null;
+    compute(); render();
+  });
+
+  let rz = null;
+  const refit = () => { clearTimeout(rz); rz = setTimeout(() => fit(), 140); };
+  window.addEventListener('resize', refit);
+  if (window.ResizeObserver) new ResizeObserver(refit).observe($('#canvas'));
+
+  const app = document.querySelector('.app');
+  const toggle = (btn, cls) => {
+    app.classList.toggle(cls);
+    btn.classList.toggle('on', app.classList.contains(cls));
+    refit();
+  };
+  $('#tog-pal').addEventListener('click', () => toggle($('#tog-pal'), 'no-pal'));
+  $('#tog-insp').addEventListener('click', () => toggle($('#tog-insp'), 'no-insp'));
+  if (window.innerWidth < 780) { app.classList.add('no-insp'); $('#tog-insp').classList.remove('on'); }
+
+  renderPalette();
+  loadTemplate();
+  $('#budget').value = state.budget;
+  requestAnimationFrame(loop);
+})();
+
+</script>
+</body>
+</html>

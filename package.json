@@ -1,0 +1,15 @@
+{
+  "name": "cloudflare-arch-sim",
+  "version": "1.0.0",
+  "description": "A drag-and-drop Cloudflare architecture simulator that renders **inside an Orca chat**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "lucide-static": "^1.77.0"
+  }
+}
