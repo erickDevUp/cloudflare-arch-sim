@@ -1,146 +1,226 @@
 # cloudflare-arch-sim
 
-A drag-and-drop Cloudflare architecture simulator that renders **inside an Orca chat**.
+A drag-and-drop Cloudflare architecture simulator that renders **inside an Orca chat** as a
+single self-contained HTML file. Drop components on the canvas, wire them, send simulated traffic,
+throw chaos at the system, and watch where it saturates and what it costs per hour.
 
-Dark canvas, drag components from a palette, wire them, run simulated traffic, throw chaos at
-it, and watch where it saturates and what it costs per hour. Each node carries a live 0-100% load
-bar, a `LOAD` / `SATURATED` / `ERR` badge, and shakes red when it goes over 100%. Request beads
-speed up and jitter with load, turn red on a hot edge, and the canvas raises alerts
-(`HOT PATH BOTTLENECK`, `ERROR BUDGET BURN`, `DATA LOSS RISK`, `SPOF`). Built as one self-contained HTML
-file so Orca can render it with `::orca-visual`.
+![The default scenario: component palette, wired graph, chaos bar and the plan selector in the cost panel](docs/images/overview.png)
 
-## Why it exists
+*The default "Beauty store on Cloudflare" scenario, running with the Paid $5 plan selected.
+Every node shows live load and its own status badge; edges carry animated request beads.*
 
-Architecture diagrams lie: they show boxes, not bottlenecks. This one carries the real
-constraint of each Cloudflare product (concurrency, per-object limits, rows billed, per-store
-API throttles) and turns them into queueing behaviour you can see.
+## What it is — and when to use it
 
-It is a **model**, not a load test. The numbers are only as good as the parameters, and every
-node says whether it was verified in the docs or is an assumption you can edit.
+Use it to talk through an architecture: "what happens if the store API slows down?", "does the
+cache actually save us money?", "which node is the single point of failure?". It is a **model**,
+not a load test and not a Cloudflare emulator. It gives you a shared picture you can edit together
+in a chat, or embed as one offline HTML file with no runtime dependencies.
 
-## Run it
+Open `dist/cloudflare-arch-sim.html` in Orca, or copy it into `$ORCA_CHAT_SCRATCH_DIR` and emit
+`::orca-visual{file="cloudflare-arch-sim.html"}` to render it in the conversation. The static file
+is the whole app: CSS, JavaScript and icons are inlined by `build.mjs`. The live, file-backed
+channel described below is an optional addition served by `serve.mjs`.
+
+## Engine model
+
+- **Flow follows the edges.** A source emits `rate` requests/second. Every other node passes its
+  **full output rate to every outgoing edge** — one node calling three services sends `lambda` to
+  each of them. This is calls, not a weighted split. Edge `weight` is validated, stored and
+  exported, but **does not affect the physics yet** (roadmap).
+- **Queueing is M/M/c with Erlang-C.** Service time is the node's `latency` in ms
+  (`mu = 1000 / latency`), `c` is `concurrency`, and `util = lambda / (mu * c)`. Erlang-C gives
+  the wait; `util >= 1` pins the node at a 30 s wait and paints it red. A cache forwards only
+  `1 - hit` of its input downstream.
+- **Errors and alerts.** Above full utilization, `err = min(0.85, (util - 1) * 0.55)`; a store 402
+  chaos pins the external node at `err = 1`. The canvas raises `HOT PATH BOTTLENECK`,
+  `ERROR BUDGET BURN`, `DATA LOSS RISK` and `SPOF` alerts. The reported critical path is the
+  longest chain of node latencies from any source.
+- **Beads are decoration.** An edge animates `min(50, sender output rate)` beads per second; the
+  cap of 50 is **visual only**. Utilization, latency and cost always use the real rate, and a
+  source at 0 req/s keeps its edge idle even when the node downstream is hot.
+- **Chaos uses real time.** The 429, DO eviction, D1 write storm, cache miss, store 402 and
+  webhook buttons set expiry with `performance.now()` in **real seconds** (8–12 s depending on
+  the button), independently of the simulation-speed multiplier.
+- **Verified vs assumption.** The inspector labels a node `verified in docs` only when
+  `src/catalog.js` carries a `verified` note and a source link. Every other number says
+  `assumption — edit it`; those fields are editable and keep the simulator honest about what is
+  a hard limit and what is a guess.
+
+## Cost model
+
+The cost panel separates Cloudflare spend from model-token spend.
+
+| Row | Meaning |
+|---|---|
+| `Usage` | Cloudflare spend rate, `$/h` (`rate * 3600`, where `rate` is USD/s across Cloudflare nodes only) |
+| `Spent`, `Requests` | Dollars and accepted source requests accumulated since reset |
+| `Cloudflare $/req` | `spent / requests`: **usage only, excluding the plan base fee** |
+| `Model spend`, `Model $/req` | Token spend from the external model provider, in its own bucket |
+| Plan rows | Base fee, overage, projected monthly total and the allowance/budget bar |
+
+Per second, a Cloudflare node costs `lambda * units * price / 1e6` USD. Workers add
+`lambda * cpuMs * $0.02/M CPU-ms`; Durable Objects add
+`lambda * latency(s) * 0.128 GB * $12.50/M GB-s`. Non-Cloudflare nodes (the Model provider and
+the Tiendanube API) never contribute to Cloudflare usage, spent, `$/req`, overage or the budget
+bar. Per-second dollars are projected to a month with `3600 * 730` hours.
+
+**Plans:** *Free* has no base fee and flags the daily limits it exceeds; *Paid $5* adds the
+included monthly allowances and bills overage at the unit prices below; *Custom* uses a base fee
+plus raw usage against your monthly budget, with no included allowances.
+
+**Verified unit prices** (`PRICING.asOf = 2026-11-21`; sources are linked in the panel and kept in
+`src/pricing.js`):
+
+| Dimension | Paid plan includes | Overage price | Source |
+|---|---|---|---|
+| Workers requests | 10M / month | $0.30 / million | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+| Workers CPU time | 30M CPU-ms / month | $0.02 / million CPU-ms | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+| D1 rows read | 25B / month | $0.001 / million | [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) |
+| Durable Objects requests | 1M / month | $0.15 / million | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+| Durable Objects duration | 400k GB-s / month | $12.50 / million GB-s | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+| Workers KV reads | 10M / month | $0.50 / million | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+| Queues operations | 1M / month | $0.40 / million | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+
+The free-plan daily limits applied by the simulator come from the same pages: 100k Workers
+requests/day and 10 ms CPU per invocation, 5M D1 rows read/day, 100k DO requests/day and 13k
+DO GB-s/day, 100k KV reads/day, and 10k queue operations/day. No other limits are asserted.
+
+Model token spend is computed only when all four fields on the Model node are filled:
+`((inTokens * inPrice) + (outTokens * outPrice)) / 1e6` dollars per request, multiplied by the
+node's request rate. It stays `unset` until then and is never folded into the Cloudflare total,
+overage, projection or budget bar. The test suite cross-checks every catalog price against
+`PRICING.dims`, so the two tables cannot drift silently.
+
+![Custom plan: base fee, monthly budget bar, and model token spend in its own row](docs/images/cost-panel.png)
+
+*The Custom plan with a $10 base fee and a $5,000 budget. The model row shows a separately
+computed token bill; it never enters the Cloudflare total above it.*
+
+## Install and run
+
+There is **no published npm package and no `npx` command** for this project. `package.json` only
+provides `npm test` and a build-time icon dependency (`lucide-static`); run the tools from a
+checkout with Node 18 or newer:
 
 ```bash
-node build.mjs        # -> dist/cloudflare-arch-sim.html (single file, no deps)
+npm install              # one-time: build-time icons only, no runtime dependencies
+node build.mjs           # -> dist/cloudflare-arch-sim.html (single offline file)
+# open dist/cloudflare-arch-sim.html in Orca, or use ::orca-visual in a chat
+
+node serve.mjs --port 8788            # page + shared scenario channel on 127.0.0.1:8788
+node build.mjs --scenario scenario.json   # offline build with scenario.json embedded
+node --test                            # 46 tests: pricing, scenario schema, HTTP channel
 ```
 
-Open `dist/cloudflare-arch-sim.html` over http (or drop it in `$ORCA_CHAT_SCRATCH_DIR` and
-emit `::orca-visual{file="cloudflare-arch-sim.html"}`).
+`node serve.mjs --port 8788` serves the page at `http://127.0.0.1:8788/`, the live `scenario.json`
+at `/scenario`, and an SSE stream at `/events`. Build trap: `node build.mjs --scenario` embeds a
+**pinned** scenario that outranks `GET /scenario`. Rebuild with plain `node build.mjs` before
+starting the shared channel, or point `serve.mjs --file` at the pinned build and accept that it is
+a snapshot. The server warns when the page it serves embeds a scenario.
 
-## Model
+## State channel — humans and agents edit the same scenario
 
-- Flow follows the edges. A node passes the same rate to every outgoing edge (calls, not a split).
-- Each node is an M/M/c queue: `c` concurrency, `service time`, Erlang-C wait. `util >= 1`
-  pins the node at a 30 s wait and paints it red.
-- A cache node forwards `1 - hit` downstream.
-- Beads cross a link at `min(50, lambda)` per second, where `lambda` is the **sending**
-  node's output rate: 1 req/s shows one bead per second, 10 shows ten. A source at 0 req/s
-  keeps its edge dim and idle even when the downstream node is hot. The 50 cap is visual only;
-  utilization, latency and cost always use the real rate.
-- The cost panel follows a plan. **Free** flags the daily limits it exceeds; **Paid $5** adds
-  the included Workers, D1, Durable Objects, KV and Queues allowances and bills the overage at
-  unit prices; **Custom** uses a base fee plus raw usage against your monthly budget. Prices and
-  allowances live in one table in `src/pricing.js`, with `asOf` and source URLs.
-- `Requests` counts accepted source traffic since reset, and `Cloudflare $/req` is
-  `spent / requests`: usage only, excluding the plan base fee. External model token prices are
-  entered on the Model node and shown as separate `Model spend` / `Model $/req` rows; they never
-  enter the Cloudflare total, overage, projection or budget bar. Nodes marked non-Cloudflare (the
-  Model provider, external APIs) contribute nothing to `Usage`, `Spent` or `Cloudflare $/req`.
-- Cost per second is `rate * unitsPerRequest * pricePerMillion`, for Cloudflare nodes only. Workers add
-  `rate * cpuMs * $0.02/M CPU-ms`; Durable Objects add
-  `rate * latency * 0.128 GB * pricePerGBs`.
-- The catalog's default unit prices are compared against `PRICING.dims` by the test suite, so a
-  price that drifts between the two tables fails `node --test`.
-- Errors appear above 100% utilization (`min(85%, (util - 1) * 0.55)`), and the store 402 chaos
-  pins the external node at 100% errors.
-- Critical path is the longest chain of node latencies from any source.
-- Chaos effects last in real seconds, not simulated ones.
+`scenario.json` is the source of truth for the shared channel. The page loads, in order: a valid
+`#s=` hash, an embedded `window.__SCENARIO__`, `GET /scenario` over HTTP, then the built-in
+template. Missing fields fall back to catalog defaults.
 
-## Verified defaults (checked in docs)
+![Copy JSON exports the current scenario; an agent-loaded name and rate are already on the graph](docs/images/state-channel.png)
 
-| Component | Constraint | Source |
-|---|---|---|
-| Workers | 10M req/mo included, then $0.30/M; 30M CPU-ms included, then $0.02/M | workers/platform/pricing |
-| Durable Objects | $0.15/M requests, $12.50/M GB-s; ~1,000 req/s soft limit per object | durable-objects/platform/pricing |
-| D1 | 25B rows read included then $0.001/M; 50M written then $1.00/M | d1/platform/pricing |
-| Tiendanube API | 2 req/s leaky bucket, burst 40, per store + app | tiendanube.github.io/api-documentation |
+*The `Copy JSON` button exports the current scenario. Here an agent has also called
+`window.__SIM__.load()` to rename the source and raise its rate before exporting it again.*
 
-Everything else (KV, R2, Queues, Vectorize, AI Gateway, Workers AI, Cache, WAF, Turnstile)
-is marked **assumption** in the inspector: the field is editable and the node says so.
+**Schema:** a root object with `version` (1), `name`, `nodes` and `edges`. A node has `id`,
+`type`, `x`, `y`, an optional `alias` and a `p` object of parameters; an edge has `from`, `to`
+and an optional non-negative `weight`. Unknown root/node/edge fields, unknown params and unknown
+node types are kept verbatim, so an edit cannot silently delete data the app does not understand.
+Unknown types are preserved but not rendered, and cannot be *introduced* through POST.
 
-## Adding a component
+**Agent API:** `window.__SIM__ = { load, export, getState }`.
 
-All of it lives in `src/catalog.js`: name, group, icon, default params, `verified` text, `doc`
-link. Add an entry and it appears in the palette.
+- `load(scenario)` validates and applies a scenario, then fits the view; returns `true` or
+  `false`.
+- `export()` returns the current scenario object (the same JSON `Copy JSON` writes).
+- `getState()` returns `{ time, spent, rate, pathLat, running, nodes }`. `time` is simulated
+  seconds, `spent` is USD, `rate` is USD/s (the UI shows `rate * 3600` as `$/h`), `pathLat` and
+  per-node `lat` are seconds, per-node `cost` is USD/s, `lambda` is req/s, and `util`/`err` are
+  0..1 fractions.
 
-## State channel (human and agent edit the same scenario)
+```js
+// In the page console — read, change, preview, then let the UI publish it:
+const s = window.__SIM__.export();
+s.nodes.find(n => n.type === 'traffic').p.rate = 25;
+window.__SIM__.load(s);
+window.__SIM__.getState().nodes;   // live util / err / lat / cost per node
 
-`scenario.json` is the source of truth. The page loads it from, in order: a valid `#s=` hash,
-an embedded `window.__SCENARIO__`, `GET /scenario` when served over HTTP, then the built-in
-template. Missing fields fall back to catalog defaults. Unknown node types, extra fields and
-extra params are kept as-is and reported in one line (rendered only when the type exists).
-`serve.mjs` merges the stored unknown data back into every write: an omitted opaque node,
-unknown field/param, or edge attached to a preserved node comes back, and removing a *known*
-node still works. If an incoming node reuses a stored opaque id, the stored node's unknown
-fields/params are attached to the incoming one (whose type/identity win); a partial opaque node
-whose id is already in the file is completed from storage. A genuinely new unknown type is
-rejected with 400, and a type reuse whose extras cannot be attached is rejected with a 400
-naming the id and both types. Genuinely unusable content is rejected. Aliases are plain text
-(max 80 characters, no control characters) and are escaped at every render. Every catalog param
-in `p`, sources included, is clamped to `CATALOG.ranges` (the same table the inspector uses);
-preserved unknown params are kept verbatim and are not clamped. Out-of-range catalog values
-produce a one-line error and POST rejects them with 400. A legacy source `concurrency: 0` is
-normalized to 1 with a one-line note; negatives still fail. Prototype names (`__proto__`,
-`constructor`, ...) are rejected outright.
+// Build a shareable #s= link by hand (there is no Copy link button yet):
+const hash = '#s=' + window.SCENARIO.encode(s); // null if over 8000 chars
+```
+
+From a terminal, round-trip the stored file rather than posting a partial object — omitted known
+nodes are treated as deletions:
 
 ```bash
-node serve.mjs                            # page on 127.0.0.1:8787, scenario.json, SSE /events
-node serve.mjs --host 0.0.0.0             # open the socket (prints a warning)
-node build.mjs --scenario scenario.json   # offline dist with the scenario embedded
+curl -s http://127.0.0.1:8788/scenario -o scenario.json   # GET serves the stored bytes
+# ...edit scenario.json...
+curl -s -X POST http://127.0.0.1:8788/scenario \
+  -H 'content-type: application/json' \
+  --data-binary @scenario.json
 ```
 
-`serve.mjs` binds loopback by default because anyone who can reach it can rewrite the file.
-The `Host` header is pinned to the loopback pairs (`127.0.0.1:<port>`, `localhost:<port>`,
-`[::1]:<port>`) on every route, so a DNS-rebinding page cannot use its own domain; an
-explicit non-wildcard `--host` is added to the allowlist, but with a wildcard bind browsers
-must still use a loopback name. When `Origin` is present it must be `http://` plus an allowed
-host, and `Origin: null` is rejected: the channel is only for the page served by `serve.mjs`,
-not for a page opened from `file://`. No CORS headers are emitted.
+**Writes and updates:** human edits (a real drag, a new edge, a parameter edit, add/delete) POST
+to `/scenario` debounced by 400 ms; a click that does not move a node publishes nothing. A
+successful atomic write broadcasts the scenario over `/events` with a `clientId`, so other tabs
+converge without echoing the writer's own change. `POST /scenario` requires
+`content-type: application/json` and a `nodes` array; invalid content gets a 400/415, a failing
+write gets a 500, and broadcasting happens only after the write succeeds.
 
-`POST /scenario` requires `content-type: application/json` (415 otherwise), a `nodes` array,
-and a valid scenario. It writes atomically, answers 500 with a one-line error if the write
-fails (the server stays up), and only broadcasts after a successful write. `GET /scenario`
-serves the stored bytes untouched. Every write merges the stored unknown data back in, so an
-omission cannot delete an opaque node, an unknown param/field, or an edge attached to a
-preserved node; edges and unknown fields of removed *known* nodes are not resurrected.
+**Lossless round-trip:** every write merges stored unknown data back in. An omitted opaque node,
+an unknown field or param, and an edge attached to a preserved node all come back; removing a
+*known* node still works. Reusing a stored opaque node's id attaches its unknown data to the
+incoming node (the incoming type wins), and a partial opaque node is completed from storage.
+Introducing a genuinely new unknown type is rejected with a 400; so is a type reuse whose extras
+cannot be preserved, which names the id and both types. Catalog params are clamped to `CATALOG.ranges`
+(the same table the inspector uses) and out-of-range values are rejected; unknown params are kept
+verbatim. Aliases are limited to 80 characters without control characters and are escaped at
+every render; prototype names (`__proto__`, `constructor`, ...) are rejected.
 
-`window.__SIM__` is the agent API: `load(scenario)`, `export()`, `getState()`. The `Copy JSON`
-header button copies `export()`; human edits POST to `/scenario` debounced and the server
-broadcasts them over SSE, so both sides converge. A click without moving a node publishes
-nothing; only real changes (moved node, new edge, param edit, add/delete) are written.
+**Localhost-only, not authenticated.** `serve.mjs` binds loopback by default and pins the `Host`
+header to the loopback pairs for its port (`127.0.0.1`, `localhost`, `[::1]`). An explicit
+non-wildcard `--host` is added to the allowlist, but a wildcard bind still requires a loopback
+name in the browser. If `Origin` is present it must be `http://` plus an allowed host; `Origin:
+null` (a `file://` page) is rejected, and no CORS headers are emitted. Anyone who can reach the
+port can rewrite the file — there is no login or token. Keep it on loopback.
 
-`getState()` units: `time` is simulated seconds, `spent` and per-node `cost` are USD and USD/s,
-`rate` is USD/s (the UI shows `rate * 3600` as $/h), per-node `lat` and `pathLat` are seconds,
-`lambda` is req/s, and `util` and `err` are 0..1 fractions.
+## Architecture map
 
-Build trap: `node build.mjs --scenario scenario.json` overwrites `dist/cloudflare-arch-sim.html`
-with a pinned snapshot, and `__SCENARIO__` outranks `GET /scenario`. Run `node build.mjs`
-(no flag) before `node serve.mjs` for the live loop, or point `serve.mjs --file` at the
-embedded build and accept the pinned snapshot. `serve.mjs` warns when the page it serves
-embeds a scenario.
+| File | Role |
+|---|---|
+| `src/index.html`, `src/styles.css` | Page layout (palette, canvas, inspector, cost panel) and dark theme |
+| `src/catalog.js` | Component types, editable ranges, defaults, verified notes and doc links |
+| `src/pricing.js` | Plans, verified pricing dimensions, `asOf`/sources, monthly math, model bucket |
+| `src/scenario.js` | Pure schema shared by page, server and tests: validate, merge, `#s=` encode/decode, layout |
+| `src/app.js` | Queueing engine, rendering, chaos, UI events, `window.__SIM__` and the channel client |
+| `serve.mjs` | Local page, JSON endpoint, SSE broadcast, atomic writes and Host/Origin checks |
+| `build.mjs` | Inlines CSS/JS/icons into `dist/cloudflare-arch-sim.html`; optional `--scenario` snapshot |
+| `scenario.json` | Live source of truth when served by `serve.mjs` |
+| `tests/` | `pricing`, `scenario` and `serve` test files (`node --test`) |
+| `docs/images/` | Screenshots used in this README; `dist/` is generated, not hand-edited |
 
-## Known gaps
+## Verification and known gaps
 
-- The static dist has no persistence on its own: reloading it restarts from the embedded
-  scenario (run `serve.mjs` for the live file-backed loop). A plain static server gets one
-  `/scenario` probe at load and no SSE connection.
-- There is no `Copy link` button yet; `SCENARIO.encode(export())` still builds a `#s=` link
-  by hand.
-- Fan-out is "calls", not weighted routing; no load balancer split. Edge `weight` is preserved
-  in the JSON but physics ignores it so far.
-- Cycles are ignored by the topological pass (nodes in a cycle get zero traffic).
-- Pricing is request/row based only; storage and egress are not modelled.
-- External model token pricing is user-entered and kept outside the Cloudflare total; D1 rows
-  written, Vectorize dimensions and R2 operations are not part of the plan overage.
-- The plan table has no unverified numbers: every unit price and allowance was checked against
-  the live Cloudflare docs on the `asOf` date.
+`node --test` passes all 46 tests on this branch (pricing math, catalog/price parity, schema
+validation, merge rules and the HTTP channel). Prices are the values in `PRICING.dims` with
+`asOf: 2026-11-21`; adding a component or a price means updating `src/catalog.js` and
+`src/pricing.js` together. This README change is documentation only — no source behavior was
+modified.
+
+- The static HTML has no persistence of its own: reloading restarts from the embedded scenario
+  (or the built-in template). Only `serve.mjs` provides the file-backed, SSE-driven loop; a plain
+  static server gets one `/scenario` probe and no subscriptions.
+- There is no `Copy link` button; `window.SCENARIO.encode(export())` builds a `#s=` link by hand.
+- Fan-out is calls, not weighted routing: edge `weight` is stored and exported but ignored by
+  physics. Cycles are skipped by the topological pass, so nodes in a cycle get zero traffic.
+- Storage and egress are not modelled. D1 rows written, Vectorize dimensions and R2 operations
+  are documented prices but are not part of the plan overage.
+- The channel is localhost-only by Host/Origin checks, not authenticated; do not expose the port
+  to an untrusted network.
