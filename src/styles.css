@@ -55,6 +55,7 @@ button{font:inherit;cursor:pointer}
 .bead.hot{fill:#ff3b5c;stroke:rgba(255,59,92,.26)}
 .edge.hot{stroke:#ef4444;stroke-width:2}
 .edge.temp{stroke:#6d5cff;stroke-dasharray:5 4}
+.edge.idle{stroke:#17171d;opacity:.55}
 
 .node-layer{position:absolute;left:0;top:0}
 .node{position:absolute;width:74px;user-select:none;cursor:grab}
@@ -139,8 +140,20 @@ button{font:inherit;cursor:pointer}
 .barmark i{display:block;height:100%;width:0;background:#34d399;transition:width .3s,background .3s}
 .barmark i.warn{background:#f59e0b}
 .barmark i.bad{background:#ef4444}
-.budget-in{width:100%;margin-top:6px;background:#101016;border:1px solid #20202a;border-radius:7px;
-  color:#e8e8ec;padding:5px 8px;font:11px ui-monospace,monospace}
+.plan-in{background:#101016;border:1px solid #20202a;border-radius:7px;color:#e8e8ec;
+  font:11px ui-monospace,monospace;padding:2px 5px;outline:none}
+.plan-in:focus{border-color:#4b3fb0}
+.plan-lines{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.plan-line{display:flex;justify-content:space-between;align-items:baseline;gap:6px;
+  font:9.5px/1.35 ui-monospace,monospace;color:#8a8a99}
+.plan-line span{min-width:0;overflow-wrap:anywhere}
+.plan-line b{color:#b0b0be;font-weight:600;white-space:nowrap}
+.plan-line.over b{color:#ff8fa0}
+.custom-fields{margin-top:6px}
+.custom-fields .field{margin-bottom:6px}
+.model{margin-top:6px;border-top:1px dashed #1f1f29;padding-top:8px}
+.asof{margin-top:8px;border-top:1px dashed #1f1f29;padding-top:8px;align-items:center}
+.asof a.src{margin:0}
 
 .inspect{padding:12px;min-height:0}
 .ins-head{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:4px}

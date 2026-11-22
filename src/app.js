@@ -7,8 +7,8 @@
 
   const state = {
     nodes: [], edges: [], sel: null, zoom: 1, px: 40, py: 40,
-    running: false, speed: 60, budget: 5000, edgeEls: [], cpuRate: 0,
-    t: 0, spent: 0, chaos: {}, errors: 0,
+    running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
+    t: 0, spent: 0, reqs: 0, modelSpent: 0, chaos: {}, errors: 0,
     res: {}, rate: 0, pathLat: 0
   };
   let seq = 1;
@@ -103,7 +103,7 @@
         lambda[id] = p.rate;
         lat[id] = 0;
         outLambda[id] = p.rate;
-        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0 };
+        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0, out: p.rate };
       } else {
         let util = 0, waitS = 0;
         if (p.concurrency > 0 && p.latency > 0) {
@@ -124,7 +124,7 @@
         outLambda[id] = lambda[id] * (1 - hit);
         const failing = n.type === 'external' && state.chaos.store402 > performance.now() / 1000;
         const err = failing ? 1 : util > 1 ? Math.min(0.85, (util - 1) * 0.55) : 0;
-        state.res[id] = { lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0 };
+        state.res[id] = { lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0, out: outLambda[id] };
       }
       out[id].forEach(to => {
         lambda[to] += outLambda[id];
@@ -134,13 +134,19 @@
 
     state.cpuRate = 0;
     state.nodes.forEach(n => {
-      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0 });
+      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0, out: 0 });
       const { p } = eff(n);
       const def = typeOf(n);
-      let cost = r.lambda * p.units * p.price / 1e6;
-      if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
-      if (n.type === 'durable_objects' && p.priceGBs != null) {
-        cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+      // rate/spent are Cloudflare-only money. Non-Cloudflare nodes (the model
+      // provider, external APIs) never add to them; the model lives in its own
+      // token-price bucket.
+      let cost = 0;
+      if (def.cloudflare !== false) {
+        cost = r.lambda * p.units * p.price / 1e6;
+        if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
+        if (n.type === 'durable_objects' && p.priceGBs != null) {
+          cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
+        }
       }
       r.cost = cost;
       r.cpu = (p.cpuMs || 0) * r.lambda;
@@ -269,24 +275,27 @@
         g.appendChild(c);
         dots.push({ el: c });
       }
-      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), to: e.to });
+      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), from: e.from, to: e.to });
     });
   }
 
   function animateEdges(ts) {
     const t = ts / 1000;
     (state.edgeEls || []).forEach(e => {
+      // ponytail: the from-node rate stands in for the edge's own share;
+      // per-edge weights (roadmap) will replace it with the edge share.
+      const fr = state.res[e.from] || {};
+      const flow = fr.out || 0;
       const r = state.res[e.to] || {};
-      const lam = r.lambda || 0;
-      const hot = (r.util || 0) >= 0.9 || (r.err || 0) > 0;
-      const cls = 'edge' + (hot ? ' hot' : '');
+      const hot = flow > 0 && ((r.util || 0) >= 0.9 || (r.err || 0) > 0);
+      const cls = 'edge' + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
       if (e.path.getAttribute('class') !== cls) e.path.setAttribute('class', cls);
-      if (!state.running || lam <= 0 || e.len <= 0) {
+      if (!state.running || flow <= 0 || e.len <= 0) {
         e.dots.forEach(d => { if (d.el.style.opacity !== '0') d.el.style.opacity = 0; });
         return;
       }
-      const rate = Math.min(50, lam);
-      let speed = 90 + Math.min(180, lam * 2.2);
+      const rate = Math.min(50, flow);
+      let speed = 90 + Math.min(180, flow * 2.2);
       if (speed / rate > e.len) speed = rate * e.len;
       const spacing = speed / rate;
       const n = Math.min(e.dots.length, Math.floor(e.len / spacing) + 1);
@@ -396,20 +405,24 @@
     const r = state.res[n.id] || {};
     const fields = def.fields || ['concurrency', 'latency', 'price'];
     const labels = {
-      rate: ['Requests / s', 1, 100000, 1],
+      rate: ['Requests / s', 0, 100000, 1],
       concurrency: ['Concurrency', 1, 1000000, 1],
       latency: ['Service time (ms)', 0, 60000, 1],
       price: ['$ per million units', 0, 100, 0.001],
       units: ['Units per request', 0, 100000, 1],
       hit: ['Cache hit %', 0, 100, 1],
       priceGBs: ['$ per M GB-s', 0, 100, 0.01],
-      cpuMs: ['CPU ms / request', 0, 30000, 0.5]
+      cpuMs: ['CPU ms / request', 0, 30000, 0.5],
+      inPrice: ['Input $ / 1M tokens', 0, 1000, 0.01],
+      outPrice: ['Output $ / 1M tokens', 0, 1000, 0.01],
+      inTokens: ['Input tokens / request', 0, 1000000, 1],
+      outTokens: ['Output tokens / request', 0, 1000000, 1]
     };
     let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + (n.alias || def.name) + '</b></div>';
     html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
     fields.forEach(f => {
       const L = labels[f] || [f, 0, 1e6, 1];
-      html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + n.p[f] + '"></label>';
+      html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
@@ -419,13 +432,19 @@
     box.innerHTML = html;
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
+        const f = inp.dataset.f;
+        const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
+        if (inp.value.trim() === '') {
+          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); }
+          return;
+        }
         const raw = parseFloat(inp.value);
         if (isNaN(raw)) return;
         const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
-        n.p[inp.dataset.f] = Math.min(hi, Math.max(lo, raw));
+        n.p[f] = Math.min(hi, Math.max(lo, raw));
         compute(); renderNodes(); renderCost(); renderInspectorStats();
       });
-      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f]; });
+      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
     });
     $('#delnode').addEventListener('click', () => {
       state.nodes = state.nodes.filter(x => x.id !== n.id);
@@ -437,10 +456,81 @@
 
   function fmt(v) { return v < 1000 ? Math.round(v) + 'ms' : (v / 1000).toFixed(1) + 's'; }
 
+  function money(v) {
+    if (!(v > 0)) return '$0.00';
+    if (v < 0.01) return '$' + v.toFixed(4);
+    return '$' + v.toFixed(2);
+  }
+
+  function pctText(v) { return v > 0 && v < 10 ? v.toFixed(1) : String(Math.round(v)); }
+
+  function human(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+    return Math.round(n) + '';
+  }
+
+  function perReq(v) {
+    if (!(v > 0)) return '$0';
+    if (v < 0.0001) return '$' + v.toExponential(2);
+    if (v < 0.01) return '$' + v.toFixed(6);
+    return '$' + v.toFixed(4);
+  }
+
+  function sourceRate() {
+    return state.nodes.reduce((s, n) => s + (typeOf(n).source ? (n.p.rate || 0) : 0), 0);
+  }
+
+  // Monthly Cloudflare usage by plan dimension, from each node's live rate.
+  function dimUsage() {
+    const mult = 3600 * PRICING.hoursPerMonth;
+    const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0, doRequests: 0, doGbS: 0, kvReads: 0, queueOps: 0, cpuMsPerRequest: 0 };
+    let wReq = 0, wCpu = 0;
+    state.nodes.forEach(n => {
+      const r = state.res[n.id] || {};
+      const req = (r.lambda || 0) * mult;
+      const { p } = eff(n);
+      if (n.type === 'workers') { wReq += req; wCpu += req * (p.cpuMs || 0); }
+      else if (n.type === 'd1') u.d1Rows += req * (p.units || 0);
+      else if (n.type === 'durable_objects') { u.doRequests += req; u.doGbS += req * (r.lat || 0) * 0.128; }
+      else if (n.type === 'kv') u.kvReads += req * (p.units || 0);
+      else if (n.type === 'queues') u.queueOps += req * (p.units || 0);
+    });
+    u.workersRequests = wReq;
+    u.workersCpuMs = wCpu;
+    u.cpuMsPerRequest = wReq > 0 ? wCpu / wReq : 0;
+    return u;
+  }
+
+  // External model tokens are user-entered and never part of the Cloudflare bill.
+  function modelBucket() {
+    return PRICING.modelSpend(state.nodes
+      .filter(n => n.type === 'workers_ai')
+      .map(n => ({ p: n.p, lambda: (state.res[n.id] || {}).lambda || 0 })));
+  }
+
+  function planLinesHtml(res, plan) {
+    if (plan === 'custom') return '<div class="plan-line">base fee + usage &middot; no included allowances</div>';
+    if (!res.lines.length) return '<div class="plan-line">no billable usage yet</div>';
+    if (plan === 'free') {
+      if (!res.exceeded.length) return '<div class="plan-line">within free limits</div>';
+      return res.exceeded.map(l => {
+        const lim = l.period === 'per request' ? l.limit + ' ms/req' : human(l.limit) + '/mo';
+        const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/mo';
+        return '<div class="plan-line over"><span>Free limit: ' + l.label + ' (' + lim + ')</span><b>' + used + '</b></div>';
+      }).join('');
+    }
+    return res.lines.map(l =>
+      '<div class="plan-line' + (l.cost > 0 ? ' over' : '') + '"><span>' + l.label + ' ' +
+      human(l.used) + ' / ' + human(l.included) + '</span><b>' + (l.cost > 0 ? '+' + money(l.cost) : '$0') + '</b></div>'
+    ).join('');
+  }
+
   function renderCost() {
     const rate = state.rate;
     const hours = state.t / 3600;
-    $('#k-rate').textContent = '$' + (rate * 3600).toFixed(2) + '/h';
+    $('#k-rate').textContent = money(rate * 3600) + '/h';
     $('#k-spent').textContent = '$' + state.spent.toFixed(2);
     $('#k-time').textContent = hours < 1 ? Math.round(state.t) + 's' : hours.toFixed(2) + 'h';
     $('#k-lat').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
@@ -450,13 +540,47 @@
     $('#k-path').textContent = status;
     $('#k-path').className = 'v ' + (anyErr || state.pathLat >= 30 ? 'bad' : state.pathLat > 3 ? 'warn' : 'good');
 
-    const monthly = rate * 3600 * 730;
-    const pct = Math.min(100, (monthly / state.budget) * 100);
-    $('#k-proj').textContent = '$' + monthly.toFixed(0);
+    const usage = dimUsage();
+    const res = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
+      baseFee: state.baseFee,
+      rateMonthly: PRICING.monthlyUsage(rate)
+    }));
+    $('#k-base').textContent = money(res.base);
+    $('#k-overage').textContent = money(res.overage);
+    $('#k-proj').textContent = money(res.total) + '/mo';
+
+    let rawPct = 0, label = '', value = '\u2014';
+    if (state.plan === 'custom') {
+      rawPct = state.budget > 0 ? res.total / state.budget * 100 : 0;
+      label = 'budget used \u00b7 ' + pctText(rawPct) + '%';
+      value = '$' + state.budget.toLocaleString();
+    } else {
+      const peak = res.lines.reduce((a, l) => l.ratio > (a ? a.ratio : -1) ? l : a, null);
+      rawPct = peak ? peak.ratio * 100 : 0;
+      if (peak) {
+        label = peak.label + ' \u00b7 ' + pctText(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
+        value = peak.period === 'per request'
+          ? peak.limit + ' ms/req'
+          : state.plan === 'paid' ? human(peak.included) + '/mo' : human(peak.limit) + '/mo';
+      } else {
+        label = state.plan === 'paid' ? 'within included usage' : 'within free limits';
+      }
+    }
     const bar = $('#budget-bar');
-    bar.style.width = pct + '%';
-    bar.className = pct > 100 ? 'bad' : pct > 70 ? 'warn' : '';
-    $('#k-budget').textContent = '$' + state.budget.toLocaleString();
+    bar.style.width = Math.min(100, rawPct) + '%';
+    bar.className = rawPct > 100 ? 'bad' : rawPct > 70 ? 'warn' : '';
+    $('#bar-label').textContent = label;
+    $('#k-budget').textContent = value;
+    $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
+    $('#custom-fields').hidden = state.plan !== 'custom';
+
+    const ms = modelBucket();
+    const mdl = $('#k-model');
+    mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
+    mdl.className = ms.set ? 'v good' : '';
+    $('#k-reqs').textContent = Math.round(state.reqs).toLocaleString();
+    $('#k-perreq').textContent = state.reqs > 0 ? perReq(state.spent / state.reqs) : '\u2014';
+    $('#k-modelreq').textContent = !ms.set ? 'unset' : state.reqs > 0 ? perReq(state.modelSpent / state.reqs) : '\u2014';
   }
 
   let drag = null, link = null, pan = null;
@@ -543,7 +667,7 @@
 
   function loadTemplate() {
     state.nodes = []; state.edges = []; seq = 1;
-    state.t = 0; state.spent = 0; state.chaos = {};
+    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
     const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
     const waf = addNode('waf', 160, 220);
     const cache = addNode('cache', 300, 220);
@@ -605,6 +729,9 @@
       const dtSim = dtReal * state.speed;
       state.t += dtSim;
       state.spent += state.rate * dtSim;
+      state.reqs += sourceRate() * dtSim;
+      const ms = modelBucket();
+      if (ms.set) state.modelSpent += ms.total / (3600 * PRICING.hoursPerMonth) * dtSim;
       compute();
       acc += dtReal;
       if (acc >= 0.22) {
@@ -627,7 +754,7 @@
     compute(); render();
   });
   $('#reset').addEventListener('click', () => {
-    state.t = 0; state.spent = 0; state.chaos = {};
+    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
     compute(); render(); toast('Simulation reset');
   });
   function speedEq(v) {
@@ -646,6 +773,13 @@
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
   $('#budget').addEventListener('change', e => { state.budget = Math.max(1, parseFloat(e.target.value) || 1); renderCost(); });
+  $('#plan').addEventListener('change', e => { state.plan = e.target.value; renderCost(); });
+  $('#basefee').addEventListener('change', e => { state.baseFee = Math.max(0, parseFloat(e.target.value) || 0); renderCost(); });
+  $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
+  $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
+    '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
+    k.charAt(0).toUpperCase() + k.slice(1) + '</a>'
+  ).join(' &middot; ');
 
   $('#canvas').addEventListener('pointerdown', ev => {
     if (ev.target.closest('.node')) return;
@@ -687,5 +821,7 @@
   renderPalette();
   loadTemplate();
   $('#budget').value = state.budget;
+  $('#plan').value = state.plan;
+  $('#basefee').value = state.baseFee;
   requestAnimationFrame(loop);
 })();
