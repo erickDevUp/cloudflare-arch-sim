@@ -36,7 +36,18 @@ emit `::orca-visual{file="cloudflare-arch-sim.html"}`).
 - Each node is an M/M/c queue: `c` concurrency, `service time`, Erlang-C wait. `util >= 1`
   pins the node at a 30 s wait and paints it red.
 - A cache node forwards `1 - hit` downstream.
-- Beads cross a link at `min(50, lambda)` per second: 1 req/s shows one bead per second, 10 shows ten. The 50 cap is visual only; utilization, latency and cost always use the real rate.
+- Beads cross a link at `min(50, lambda)` per second, where `lambda` is the **sending**
+  node's output rate: 1 req/s shows one bead per second, 10 shows ten. A source at 0 req/s
+  keeps its edge dim and idle even when the downstream node is hot. The 50 cap is visual only;
+  utilization, latency and cost always use the real rate.
+- The cost panel follows a plan. **Free** flags the daily limits it exceeds; **Paid $5** adds
+  the included Workers, D1, Durable Objects, KV and Queues allowances and bills the overage at
+  unit prices; **Custom** uses a base fee plus raw usage against your monthly budget. Prices and
+  allowances live in one table in `src/pricing.js`, with `asOf` and source URLs.
+- `Requests` counts accepted source traffic since reset, and `Cloudflare $/req` is
+  `spent / requests`: usage only, excluding the plan base fee. External model token prices are
+  entered on the Model node and shown as separate `Model spend` / `Model $/req` rows; they never
+  enter the Cloudflare total, overage, projection or budget bar.
 - Cost per second is `rate * unitsPerRequest * pricePerMillion`. Workers add
   `rate * cpuMs * $0.02/M CPU-ms`; Durable Objects add
   `rate * latency * 0.128 GB * pricePerGBs`.
@@ -67,4 +78,8 @@ link. Add an entry and it appears in the palette.
 - No persistence: the topology resets on reload.
 - Fan-out is "calls", not weighted routing; no load balancer split.
 - Cycles are ignored by the topological pass (nodes in a cycle get zero traffic).
-- Pricing is request/row based only; storage, egress and per-model token prices are not modelled.
+- Pricing is request/row based only; storage and egress are not modelled.
+- External model token pricing is user-entered and kept outside the Cloudflare total; D1 rows
+  written, Vectorize dimensions and R2 operations are not part of the plan overage.
+- The plan table has no unverified numbers: every unit price and allowance was checked against
+  the live Cloudflare docs on the `asOf` date.

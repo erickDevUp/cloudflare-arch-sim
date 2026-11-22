@@ -77,23 +77,42 @@
     <aside class="right">
       <div class="cost">
         <div class="cost-head">Simulation</div>
-        <div class="krow"><span>Rate</span><b id="k-rate">$0.00/h</b></div>
+        <div class="krow"><span>Usage</span><b id="k-rate">$0.00/h</b></div>
         <div class="krow"><span>Spent</span><b id="k-spent">$0.00</b></div>
+        <div class="krow"><span>Requests</span><b id="k-reqs">0</b></div>
+        <div class="krow small"><span>Cloudflare $/req &middot; usage only</span><b id="k-perreq">&mdash;</b></div>
+        <div class="krow small"><span>Model $/req &middot; not Cloudflare</span><b id="k-modelreq">&mdash;</b></div>
         <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
         <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
         <div class="krow"><span>CPU time</span><b id="k-cpu">0 ms/s</b></div>
         <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
         <div class="budget">
-          <div class="krow"><span>Budget / mo</span><b id="k-budget">$5,000</b></div>
+          <div class="krow"><span>Plan</span>
+            <select id="plan" class="plan-in" aria-label="Cloudflare plan">
+              <option value="free">Free</option>
+              <option value="paid">Paid $5</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="krow small"><span>base / mo</span><b id="k-base">$0</b></div>
+          <div class="krow small"><span>overage / mo</span><b id="k-overage">$0</b></div>
+          <div class="krow"><span>total / mo</span><b id="k-proj">$0</b></div>
           <div class="barmark"><i id="budget-bar"></i></div>
-          <div class="krow small"><span>projected / mo</span><b id="k-proj">$0</b></div>
-          <input type="number" id="budget" step="500" min="1" class="budget-in" value="5000">
+          <div class="krow small"><span id="bar-label">allowance</span><b id="k-budget">&mdash;</b></div>
+          <div id="plan-lines" class="plan-lines"></div>
+          <div id="custom-fields" class="custom-fields" hidden>
+            <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
+            <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
+          </div>
         </div>
+        <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
+        <div class="krow small asof"><span id="k-asof"></span><a class="src" id="k-src" target="_blank" rel="noopener">source</a></div>
       </div>
       <div class="inspect" id="inspect"></div>
     </aside>
   </div>
 </div>
+<script src="pricing.js"></script>
 <script src="catalog.js"></script>
 <script src="app.js"></script>
 </body>

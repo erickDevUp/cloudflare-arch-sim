@@ -18,6 +18,7 @@ for (const name of iconNames) {
 
 let html = read('index.html');
 html = html.replace('<link rel="stylesheet" href="styles.css">', () => `<style>\n${read('styles.css')}\n</style>`);
+html = html.replace('<script src="pricing.js"></script>', () => `<script>\n${read('pricing.js')}\n</script>`);
 html = html.replace('<script src="catalog.js"></script>',
   () => `<script>\nwindow.ICONS = ${JSON.stringify(icons)};\n</script>\n<script>\n${read('catalog.js')}\n</script>`);
 html = html.replace('<script src="app.js"></script>', () => `<script>\n${read('app.js')}\n</script>`);

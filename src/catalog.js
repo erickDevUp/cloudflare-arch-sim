@@ -83,9 +83,10 @@ window.CATALOG = {
     },
     workers_ai: {
       name: 'Model', group: 'ai', icon: 'sparkles',
-      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000 },
-      fields: ['concurrency', 'latency', 'units'],
-      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost.'
+      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000,
+        inPrice: null, outPrice: null, inTokens: null, outTokens: null },
+      fields: ['concurrency', 'latency', 'units', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
+      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price and stay out of the Cloudflare bill.'
     },
     external: {
       name: 'Tiendanube API', group: 'external', icon: 'plug',

@@ -63,6 +63,7 @@ button{font:inherit;cursor:pointer}
 .bead.hot{fill:#ff3b5c;stroke:rgba(255,59,92,.26)}
 .edge.hot{stroke:#ef4444;stroke-width:2}
 .edge.temp{stroke:#6d5cff;stroke-dasharray:5 4}
+.edge.idle{stroke:#17171d;opacity:.55}
 
 .node-layer{position:absolute;left:0;top:0}
 .node{position:absolute;width:74px;user-select:none;cursor:grab}
@@ -147,8 +148,20 @@ button{font:inherit;cursor:pointer}
 .barmark i{display:block;height:100%;width:0;background:#34d399;transition:width .3s,background .3s}
 .barmark i.warn{background:#f59e0b}
 .barmark i.bad{background:#ef4444}
-.budget-in{width:100%;margin-top:6px;background:#101016;border:1px solid #20202a;border-radius:7px;
-  color:#e8e8ec;padding:5px 8px;font:11px ui-monospace,monospace}
+.plan-in{background:#101016;border:1px solid #20202a;border-radius:7px;color:#e8e8ec;
+  font:11px ui-monospace,monospace;padding:2px 5px;outline:none}
+.plan-in:focus{border-color:#4b3fb0}
+.plan-lines{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.plan-line{display:flex;justify-content:space-between;align-items:baseline;gap:6px;
+  font:9.5px/1.35 ui-monospace,monospace;color:#8a8a99}
+.plan-line span{min-width:0;overflow-wrap:anywhere}
+.plan-line b{color:#b0b0be;font-weight:600;white-space:nowrap}
+.plan-line.over b{color:#ff8fa0}
+.custom-fields{margin-top:6px}
+.custom-fields .field{margin-bottom:6px}
+.model{margin-top:6px;border-top:1px dashed #1f1f29;padding-top:8px}
+.asof{margin-top:8px;border-top:1px dashed #1f1f29;padding-top:8px;align-items:center}
+.asof a.src{margin:0}
 
 .inspect{padding:12px;min-height:0}
 .ins-head{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:4px}
@@ -266,23 +279,161 @@ button{font:inherit;cursor:pointer}
     <aside class="right">
       <div class="cost">
         <div class="cost-head">Simulation</div>
-        <div class="krow"><span>Rate</span><b id="k-rate">$0.00/h</b></div>
+        <div class="krow"><span>Usage</span><b id="k-rate">$0.00/h</b></div>
         <div class="krow"><span>Spent</span><b id="k-spent">$0.00</b></div>
+        <div class="krow"><span>Requests</span><b id="k-reqs">0</b></div>
+        <div class="krow small"><span>Cloudflare $/req &middot; usage only</span><b id="k-perreq">&mdash;</b></div>
+        <div class="krow small"><span>Model $/req &middot; not Cloudflare</span><b id="k-modelreq">&mdash;</b></div>
         <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
         <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
         <div class="krow"><span>CPU time</span><b id="k-cpu">0 ms/s</b></div>
         <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
         <div class="budget">
-          <div class="krow"><span>Budget / mo</span><b id="k-budget">$5,000</b></div>
+          <div class="krow"><span>Plan</span>
+            <select id="plan" class="plan-in" aria-label="Cloudflare plan">
+              <option value="free">Free</option>
+              <option value="paid">Paid $5</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="krow small"><span>base / mo</span><b id="k-base">$0</b></div>
+          <div class="krow small"><span>overage / mo</span><b id="k-overage">$0</b></div>
+          <div class="krow"><span>total / mo</span><b id="k-proj">$0</b></div>
           <div class="barmark"><i id="budget-bar"></i></div>
-          <div class="krow small"><span>projected / mo</span><b id="k-proj">$0</b></div>
-          <input type="number" id="budget" step="500" min="1" class="budget-in" value="5000">
+          <div class="krow small"><span id="bar-label">allowance</span><b id="k-budget">&mdash;</b></div>
+          <div id="plan-lines" class="plan-lines"></div>
+          <div id="custom-fields" class="custom-fields" hidden>
+            <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
+            <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
+          </div>
         </div>
+        <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
+        <div class="krow small asof"><span id="k-asof"></span><a class="src" id="k-src" target="_blank" rel="noopener">source</a></div>
       </div>
       <div class="inspect" id="inspect"></div>
     </aside>
   </div>
 </div>
+<script>
+// Cloudflare plan pricing, verified against the live docs.
+// Every unit price and included allowance lives in DIMS. Prices without a
+// verified source stay out of the total and are surfaced as "unverified".
+(function (root) {
+  const HOURS_PER_MONTH = 730;
+
+  const SOURCES = {
+    workers: 'https://developers.cloudflare.com/workers/platform/pricing/',
+    d1: 'https://developers.cloudflare.com/d1/platform/pricing/'
+  };
+
+  const PLANS = {
+    free: { label: 'Free', base: 0 },
+    paid: { label: 'Paid $5', base: 5 },
+    custom: { label: 'Custom', base: 0 }
+  };
+
+  const DIMS = [
+    {
+      id: 'workersRequests', label: 'Workers requests', unit: 1e6, unitLabel: 'M',
+      price: 0.30, paidIncluded: 1e7, freeDaily: 100000,
+      verified: true, source: SOURCES.workers
+    },
+    {
+      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6, unitLabel: 'M CPU-ms',
+      price: 0.02, paidIncluded: 3e7, freePerRequest: 10,
+      verified: true, source: SOURCES.workers
+    },
+    {
+      id: 'd1Rows', label: 'D1 rows read', unit: 1e6, unitLabel: 'M rows',
+      price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
+      verified: true, source: SOURCES.d1
+    },
+    {
+      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6, unitLabel: 'M requests',
+      price: 0.15, paidIncluded: 1e6, freeDaily: 100000,
+      verified: true, source: SOURCES.workers
+    },
+    {
+      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6, unitLabel: 'M GB-s',
+      price: 12.5, paidIncluded: 4e5, freeDaily: 13000,
+      verified: true, source: SOURCES.workers
+    },
+    {
+      id: 'kvReads', label: 'KV reads', unit: 1e6, unitLabel: 'M reads',
+      price: 0.50, paidIncluded: 1e7, freeDaily: 100000,
+      verified: true, source: SOURCES.workers
+    },
+    {
+      id: 'queueOps', label: 'Queues operations', unit: 1e6, unitLabel: 'M ops',
+      price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
+      verified: true, source: SOURCES.workers
+    }
+  ];
+
+  // Pure monthly money math. usage is monthly totals; model spend is
+  // deliberately not part of it.
+  function monthlyCost(plan, usage) {
+    const u = usage || {};
+    const rateMonthly = +u.rateMonthly || 0;
+    const verified = DIMS.filter(d => d.verified);
+    const unverified = DIMS.filter(d => !d.verified).map(d => d.id);
+    const lines = [];
+    const exceeded = [];
+
+    if (plan === 'free') {
+      verified.forEach(d => {
+        const used = +u[d.id] || 0;
+        if (!used) return;
+        let line;
+        if (d.freePerRequest != null) {
+          const per = +u.cpuMsPerRequest || 0;
+          line = {
+            id: d.id, label: d.label, used: per, limit: d.freePerRequest,
+            period: 'per request', ratio: per / d.freePerRequest, over: per > d.freePerRequest, cost: 0
+          };
+        } else {
+          const limit = d.freeDaily * HOURS_PER_MONTH / 24;
+          line = {
+            id: d.id, label: d.label, used, limit, daily: d.freeDaily,
+            period: 'per day', ratio: used / limit, over: used > limit, cost: 0
+          };
+        }
+        lines.push(line);
+        if (line.over) exceeded.push(line);
+      });
+      return { plan, base: 0, overage: 0, total: 0, rateMonthly, lines, exceeded, unverified };
+    }
+
+    if (plan === 'paid') {
+      let overage = 0;
+      verified.forEach(d => {
+        const used = +u[d.id] || 0;
+        if (!used) return;
+        const over = Math.max(0, used - d.paidIncluded);
+        const cost = over / d.unit * d.price;
+        overage += cost;
+        lines.push({
+          id: d.id, label: d.label, used, included: d.paidIncluded,
+          over, cost, ratio: used / d.paidIncluded
+        });
+      });
+      const base = PLANS.paid.base;
+      return { plan, base, overage, total: base + overage, rateMonthly, lines, exceeded, unverified };
+    }
+
+    const base = +u.baseFee || 0;
+    return {
+      plan: 'custom', base, overage: 0, total: base + rateMonthly,
+      rateMonthly, lines, exceeded, unverified
+    };
+  }
+
+  const api = { asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES, plans: PLANS, dims: DIMS, monthlyCost };
+  root.PRICING = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
 <script>
 window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" />","globe":"<svg class=\"lucide lucide-globe\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /> <path d=\"M2 12h20\" />","shield":"<svg class=\"lucide lucide-shield\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" />","shield-check":"<svg class=\"lucide lucide-shield-check\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" />","layers":"<svg class=\"lucide lucide-layers\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","zap":"<svg class=\"lucide lucide-zap\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","box":"<svg class=\"lucide lucide-box\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\" /> <path d=\"m3.3 7 8.7 5 8.7-5\" /> <path d=\"M12 22V12\" />","list-ordered":"<svg class=\"lucide lucide-list-ordered\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11 5h10\" /> <path d=\"M11 12h10\" /> <path d=\"M11 19h10\" /> <path d=\"M4 4h1v5\" /> <path d=\"M4 9h2\" /> <path d=\"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02\" />","database":"<svg class=\"lucide lucide-database\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />","key-round":"<svg class=\"lucide lucide-key-round\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","archive":"<svg class=\"lucide lucide-archive\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /> <path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /> <path d=\"M10 12h4\" />","scan-search":"<svg class=\"lucide lucide-scan-search\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" /> <path d=\"m16 16-1.9-1.9\" />","route":"<svg class=\"lucide lucide-route\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <circle cx=\"6\" cy=\"5\" r=\"3\" />","sparkles":"<svg class=\"lucide lucide-sparkles\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />","plug":"<svg class=\"lucide lucide-plug\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 22v-5\" /> <path d=\"M15 8V2\" /> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\" /> <path d=\"M9 8V2\" />"};
 </script>
@@ -372,9 +523,10 @@ window.CATALOG = {
     },
     workers_ai: {
       name: 'Model', group: 'ai', icon: 'sparkles',
-      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000 },
-      fields: ['concurrency', 'latency', 'units'],
-      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost.'
+      p: { concurrency: 24, latency: 900, price: 0.3, units: 7000,
+        inPrice: null, outPrice: null, inTokens: null, outTokens: null },
+      fields: ['concurrency', 'latency', 'units', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
+      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price and stay out of the Cloudflare bill.'
     },
     external: {
       name: 'Tiendanube API', group: 'external', icon: 'plug',
@@ -397,8 +549,8 @@ window.CATALOG = {
 
   const state = {
     nodes: [], edges: [], sel: null, zoom: 1, px: 40, py: 40,
-    running: false, speed: 60, budget: 5000, edgeEls: [], cpuRate: 0,
-    t: 0, spent: 0, chaos: {}, errors: 0,
+    running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
+    t: 0, spent: 0, reqs: 0, modelSpent: 0, chaos: {}, errors: 0,
     res: {}, rate: 0, pathLat: 0
   };
   let seq = 1;
@@ -493,7 +645,7 @@ window.CATALOG = {
         lambda[id] = p.rate;
         lat[id] = 0;
         outLambda[id] = p.rate;
-        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0 };
+        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0, out: p.rate };
       } else {
         let util = 0, waitS = 0;
         if (p.concurrency > 0 && p.latency > 0) {
@@ -514,7 +666,7 @@ window.CATALOG = {
         outLambda[id] = lambda[id] * (1 - hit);
         const failing = n.type === 'external' && state.chaos.store402 > performance.now() / 1000;
         const err = failing ? 1 : util > 1 ? Math.min(0.85, (util - 1) * 0.55) : 0;
-        state.res[id] = { lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0 };
+        state.res[id] = { lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0, out: outLambda[id] };
       }
       out[id].forEach(to => {
         lambda[to] += outLambda[id];
@@ -524,7 +676,7 @@ window.CATALOG = {
 
     state.cpuRate = 0;
     state.nodes.forEach(n => {
-      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0 });
+      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0, out: 0 });
       const { p } = eff(n);
       const def = typeOf(n);
       let cost = r.lambda * p.units * p.price / 1e6;
@@ -659,24 +811,27 @@ window.CATALOG = {
         g.appendChild(c);
         dots.push({ el: c });
       }
-      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), to: e.to });
+      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), from: e.from, to: e.to });
     });
   }
 
   function animateEdges(ts) {
     const t = ts / 1000;
     (state.edgeEls || []).forEach(e => {
+      // ponytail: the from-node rate stands in for the edge's own share;
+      // per-edge weights (roadmap) will replace it with the edge share.
+      const fr = state.res[e.from] || {};
+      const flow = fr.out || 0;
       const r = state.res[e.to] || {};
-      const lam = r.lambda || 0;
-      const hot = (r.util || 0) >= 0.9 || (r.err || 0) > 0;
-      const cls = 'edge' + (hot ? ' hot' : '');
+      const hot = flow > 0 && ((r.util || 0) >= 0.9 || (r.err || 0) > 0);
+      const cls = 'edge' + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
       if (e.path.getAttribute('class') !== cls) e.path.setAttribute('class', cls);
-      if (!state.running || lam <= 0 || e.len <= 0) {
+      if (!state.running || flow <= 0 || e.len <= 0) {
         e.dots.forEach(d => { if (d.el.style.opacity !== '0') d.el.style.opacity = 0; });
         return;
       }
-      const rate = Math.min(50, lam);
-      let speed = 90 + Math.min(180, lam * 2.2);
+      const rate = Math.min(50, flow);
+      let speed = 90 + Math.min(180, flow * 2.2);
       if (speed / rate > e.len) speed = rate * e.len;
       const spacing = speed / rate;
       const n = Math.min(e.dots.length, Math.floor(e.len / spacing) + 1);
@@ -786,20 +941,24 @@ window.CATALOG = {
     const r = state.res[n.id] || {};
     const fields = def.fields || ['concurrency', 'latency', 'price'];
     const labels = {
-      rate: ['Requests / s', 1, 100000, 1],
+      rate: ['Requests / s', 0, 100000, 1],
       concurrency: ['Concurrency', 1, 1000000, 1],
       latency: ['Service time (ms)', 0, 60000, 1],
       price: ['$ per million units', 0, 100, 0.001],
       units: ['Units per request', 0, 100000, 1],
       hit: ['Cache hit %', 0, 100, 1],
       priceGBs: ['$ per M GB-s', 0, 100, 0.01],
-      cpuMs: ['CPU ms / request', 0, 30000, 0.5]
+      cpuMs: ['CPU ms / request', 0, 30000, 0.5],
+      inPrice: ['Input $ / 1M tokens', 0, 1000, 0.01],
+      outPrice: ['Output $ / 1M tokens', 0, 1000, 0.01],
+      inTokens: ['Input tokens / request', 0, 1000000, 1],
+      outTokens: ['Output tokens / request', 0, 1000000, 1]
     };
     let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + (n.alias || def.name) + '</b></div>';
     html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
     fields.forEach(f => {
       const L = labels[f] || [f, 0, 1e6, 1];
-      html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + n.p[f] + '"></label>';
+      html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
@@ -809,13 +968,19 @@ window.CATALOG = {
     box.innerHTML = html;
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
+        const f = inp.dataset.f;
+        const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
+        if (inp.value.trim() === '') {
+          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); }
+          return;
+        }
         const raw = parseFloat(inp.value);
         if (isNaN(raw)) return;
         const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
-        n.p[inp.dataset.f] = Math.min(hi, Math.max(lo, raw));
+        n.p[f] = Math.min(hi, Math.max(lo, raw));
         compute(); renderNodes(); renderCost(); renderInspectorStats();
       });
-      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f]; });
+      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
     });
     $('#delnode').addEventListener('click', () => {
       state.nodes = state.nodes.filter(x => x.id !== n.id);
@@ -827,10 +992,88 @@ window.CATALOG = {
 
   function fmt(v) { return v < 1000 ? Math.round(v) + 'ms' : (v / 1000).toFixed(1) + 's'; }
 
+  function money(v) {
+    if (!(v > 0)) return '$0.00';
+    if (v < 0.01) return '$' + v.toFixed(4);
+    return '$' + v.toFixed(2);
+  }
+
+  function human(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+    return Math.round(n) + '';
+  }
+
+  function perReq(v) {
+    if (!(v > 0)) return '$0';
+    if (v < 0.0001) return '$' + v.toExponential(2);
+    if (v < 0.01) return '$' + v.toFixed(6);
+    return '$' + v.toFixed(4);
+  }
+
+  function sourceRate() {
+    return state.nodes.reduce((s, n) => s + (typeOf(n).source ? (n.p.rate || 0) : 0), 0);
+  }
+
+  function monthlyUsage() {
+    const mult = 3600 * PRICING.hoursPerMonth;
+    const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0, doRequests: 0, doGbS: 0, kvReads: 0, queueOps: 0, cpuMsPerRequest: 0 };
+    let wReq = 0, wCpu = 0;
+    state.nodes.forEach(n => {
+      const r = state.res[n.id] || {};
+      const req = (r.lambda || 0) * mult;
+      const { p } = eff(n);
+      if (n.type === 'workers') { wReq += req; wCpu += req * (p.cpuMs || 0); }
+      else if (n.type === 'd1') u.d1Rows += req * (p.units || 0);
+      else if (n.type === 'durable_objects') { u.doRequests += req; u.doGbS += req * (r.lat || 0) * 0.128; }
+      else if (n.type === 'kv') u.kvReads += req * (p.units || 0);
+      else if (n.type === 'queues') u.queueOps += req * (p.units || 0);
+    });
+    u.workersRequests = wReq;
+    u.workersCpuMs = wCpu;
+    u.cpuMsPerRequest = wReq > 0 ? wCpu / wReq : 0;
+    return u;
+  }
+
+  // External model tokens are user-entered and never part of the Cloudflare bill.
+  function modelSpend() {
+    const models = state.nodes.filter(n => n.type === 'workers_ai');
+    if (!models.length) return { set: false, total: 0 };
+    let total = 0;
+    for (const n of models) {
+      const p = n.p;
+      if (['inPrice', 'outPrice', 'inTokens', 'outTokens'].some(k => p[k] == null)) {
+        return { set: false, total: 0 };
+      }
+      const r = state.res[n.id] || {};
+      const perReq = (p.inTokens * p.inPrice + p.outTokens * p.outPrice) / 1e6;
+      total += (r.lambda || 0) * perReq * 3600 * PRICING.hoursPerMonth;
+    }
+    return { set: true, total };
+  }
+
+  function planLinesHtml(res, plan) {
+    if (plan === 'custom') return '<div class="plan-line">base fee + usage &middot; no included allowances</div>';
+    if (!res.lines.length) return '<div class="plan-line">no billable usage yet</div>';
+    if (plan === 'free') {
+      if (!res.exceeded.length) return '<div class="plan-line">within free limits</div>';
+      return res.exceeded.map(l => {
+        const lim = l.period === 'per request' ? l.limit + ' ms/req' : l.daily.toLocaleString() + '/day';
+        const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/mo';
+        return '<div class="plan-line over"><span>Free limit: ' + l.label + ' (' + lim + ')</span><b>' + used + '</b></div>';
+      }).join('');
+    }
+    return res.lines.map(l =>
+      '<div class="plan-line' + (l.cost > 0 ? ' over' : '') + '"><span>' + l.label + ' ' +
+      human(l.used) + ' / ' + human(l.included) + '</span><b>' + (l.cost > 0 ? '+' + money(l.cost) : '$0') + '</b></div>'
+    ).join('');
+  }
+
   function renderCost() {
     const rate = state.rate;
     const hours = state.t / 3600;
-    $('#k-rate').textContent = '$' + (rate * 3600).toFixed(2) + '/h';
+    $('#k-rate').textContent = money(rate * 3600) + '/h';
     $('#k-spent').textContent = '$' + state.spent.toFixed(2);
     $('#k-time').textContent = hours < 1 ? Math.round(state.t) + 's' : hours.toFixed(2) + 'h';
     $('#k-lat').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
@@ -840,13 +1083,47 @@ window.CATALOG = {
     $('#k-path').textContent = status;
     $('#k-path').className = 'v ' + (anyErr || state.pathLat >= 30 ? 'bad' : state.pathLat > 3 ? 'warn' : 'good');
 
-    const monthly = rate * 3600 * 730;
-    const pct = Math.min(100, (monthly / state.budget) * 100);
-    $('#k-proj').textContent = '$' + monthly.toFixed(0);
+    const usage = monthlyUsage();
+    const res = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
+      baseFee: state.baseFee,
+      rateMonthly: rate * PRICING.hoursPerMonth
+    }));
+    $('#k-base').textContent = money(res.base);
+    $('#k-overage').textContent = money(res.overage);
+    $('#k-proj').textContent = money(res.total) + '/mo';
+
+    let rawPct = 0, label = '', value = '\u2014';
+    if (state.plan === 'custom') {
+      rawPct = state.budget > 0 ? res.total / state.budget * 100 : 0;
+      label = 'budget used \u00b7 ' + Math.round(rawPct) + '%';
+      value = '$' + state.budget.toLocaleString();
+    } else {
+      const peak = res.lines.reduce((a, l) => l.ratio > (a ? a.ratio : -1) ? l : a, null);
+      rawPct = peak ? peak.ratio * 100 : 0;
+      if (peak) {
+        label = peak.label + ' \u00b7 ' + Math.round(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
+        value = peak.period === 'per request'
+          ? peak.limit + ' ms/req'
+          : state.plan === 'paid' ? human(peak.included) + '/mo' : peak.daily.toLocaleString() + '/day';
+      } else {
+        label = state.plan === 'paid' ? 'within included usage' : 'within free limits';
+      }
+    }
     const bar = $('#budget-bar');
-    bar.style.width = pct + '%';
-    bar.className = pct > 100 ? 'bad' : pct > 70 ? 'warn' : '';
-    $('#k-budget').textContent = '$' + state.budget.toLocaleString();
+    bar.style.width = Math.min(100, rawPct) + '%';
+    bar.className = rawPct > 100 ? 'bad' : rawPct > 70 ? 'warn' : '';
+    $('#bar-label').textContent = label;
+    $('#k-budget').textContent = value;
+    $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
+    $('#custom-fields').hidden = state.plan !== 'custom';
+
+    const ms = modelSpend();
+    const mdl = $('#k-model');
+    mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
+    mdl.className = ms.set ? 'v good' : '';
+    $('#k-reqs').textContent = Math.round(state.reqs).toLocaleString();
+    $('#k-perreq').textContent = state.reqs > 0 ? perReq(state.spent / state.reqs) : '\u2014';
+    $('#k-modelreq').textContent = !ms.set ? 'unset' : state.reqs > 0 ? perReq(state.modelSpent / state.reqs) : '\u2014';
   }
 
   let drag = null, link = null, pan = null;
@@ -933,7 +1210,7 @@ window.CATALOG = {
 
   function loadTemplate() {
     state.nodes = []; state.edges = []; seq = 1;
-    state.t = 0; state.spent = 0; state.chaos = {};
+    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
     const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
     const waf = addNode('waf', 160, 220);
     const cache = addNode('cache', 300, 220);
@@ -995,6 +1272,9 @@ window.CATALOG = {
       const dtSim = dtReal * state.speed;
       state.t += dtSim;
       state.spent += state.rate * dtSim;
+      state.reqs += sourceRate() * dtSim;
+      const ms = modelSpend();
+      if (ms.set) state.modelSpent += ms.total / (3600 * PRICING.hoursPerMonth) * dtSim;
       compute();
       acc += dtReal;
       if (acc >= 0.22) {
@@ -1017,7 +1297,7 @@ window.CATALOG = {
     compute(); render();
   });
   $('#reset').addEventListener('click', () => {
-    state.t = 0; state.spent = 0; state.chaos = {};
+    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
     compute(); render(); toast('Simulation reset');
   });
   function speedEq(v) {
@@ -1036,6 +1316,10 @@ window.CATALOG = {
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
   $('#budget').addEventListener('change', e => { state.budget = Math.max(1, parseFloat(e.target.value) || 1); renderCost(); });
+  $('#plan').addEventListener('change', e => { state.plan = e.target.value; renderCost(); });
+  $('#basefee').addEventListener('change', e => { state.baseFee = Math.max(0, parseFloat(e.target.value) || 0); renderCost(); });
+  $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
+  $('#k-src').href = PRICING.sources.workers;
 
   $('#canvas').addEventListener('pointerdown', ev => {
     if (ev.target.closest('.node')) return;
@@ -1077,6 +1361,8 @@ window.CATALOG = {
   renderPalette();
   loadTemplate();
   $('#budget').value = state.budget;
+  $('#plan').value = state.plan;
+  $('#basefee').value = state.baseFee;
   requestAnimationFrame(loop);
 })();
 
