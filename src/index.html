@@ -16,7 +16,7 @@
       </span>
       <div>
         <b>Cloudflare Architecture Simulator</b>
-        <span>model of real Cloudflare behaviour &mdash; not a load test</span>
+        <span id="scenario-name">model of real Cloudflare behaviour &mdash; not a load test</span>
       </div>
     </div>
     <div class="actions">
@@ -24,6 +24,7 @@
       <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
       <button id="reset" class="ghost" title="Reset time, spent and chaos; keeps the architecture">Reset sim</button>
       <button id="fit" class="ghost">Fit view</button>
+      <button id="copy-json" class="ghost" title="Copy the scenario JSON for agents">Copy JSON</button>
     </div>
   </header>
 
@@ -114,6 +115,7 @@
 </div>
 <script src="pricing.js"></script>
 <script src="catalog.js"></script>
+<script src="scenario.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

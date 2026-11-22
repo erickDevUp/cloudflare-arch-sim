@@ -4,9 +4,15 @@
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const esc = v => String(v).replace(/[&<>"']/g, c => ESC[c]);
+  const NODE_KEYS = ['id', 'type', 'x', 'y', 'alias', 'p'];
+  const EDGE_KEYS = ['from', 'to', 'weight'];
+  const ROOT_KEYS = ['version', 'name', 'nodes', 'edges'];
+  const hasType = n => Object.hasOwn(TYPES, n.type);
 
   const state = {
-    nodes: [], edges: [], sel: null, zoom: 1, px: 40, py: 40,
+    nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
     running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
     t: 0, spent: 0, reqs: 0, modelSpent: 0, chaos: {}, errors: 0,
     res: {}, rate: 0, pathLat: 0
@@ -77,8 +83,10 @@
     const inc = {}, out = {};
     state.nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
     state.edges.forEach(e => {
-      if (out[e.from]) out[e.from].push(e.to);
-      if (inc[e.to]) inc[e.to].push(e.from);
+      // Edges touching a preserved unknown node are exported, not simulated.
+      if (!out[e.from] || !inc[e.to]) return;
+      out[e.from].push(e.to);
+      inc[e.to].push(e.from);
     });
 
     const indeg = {};
@@ -170,6 +178,7 @@
     compute();
     select(n.id);
     render();
+    pushScenario();
     return n;
   }
 
@@ -222,11 +231,21 @@
     const world = $('#world');
     world.style.transform = 'translate(' + state.px + 'px,' + state.py + 'px) scale(' + state.zoom + ')';
     $('#zoomlabel').textContent = Math.round(state.zoom * 100) + '%';
+    renderName();
     buildEdges();
     renderNodes();
     renderInspector();
     renderCost();
     renderAlerts();
+  }
+
+  function renderName() {
+    const el = $('#scenario-name');
+    if (!el) return;
+    const tagline = 'model of real Cloudflare behaviour \u2014 not a load test';
+    const text = state.name && state.name !== 'Untitled scenario' ? state.name : tagline;
+    if (el.textContent !== text) el.textContent = text;
+    if (document.title.indexOf(text) !== 0) document.title = text + ' \u2014 Cloudflare architecture simulator';
   }
 
   function samplePath(path, len) {
@@ -339,7 +358,7 @@
           (def.source ? '<span class="nrate">' + Math.round(r.lambda) + '/s</span>' : '') +
           '<span class="nbar"><i class="' + barCls + '" style="width:' + Math.min(100, pct) + '%"></i></span>' +
         '</div>' +
-        '<div class="nlabel">' + (n.alias || def.name) + '</div>' +
+        '<div class="nlabel">' + esc(n.alias || def.name) + '</div>' +
         '<div class="nbadge ' + bcls + '">' + badge(n, r) + '</div>' +
         '<span class="port" data-port="1"></span>';
       layer.appendChild(el);
@@ -370,10 +389,10 @@
       const p = eff(x.n).p;
       return x.r.lambda > 0 && p.concurrency === 1 && (x.r.util || 0) >= 0.55 && x.n.type !== 'external';
     })[0];
-    if (over) out.push({ t: 'HOT PATH BOTTLENECK \u00b7 ' + nname(over.n), c: 'crit' });
+    if (over) out.push({ t: 'HOT PATH BOTTLENECK \u00b7 ' + esc(nname(over.n)), c: 'crit' });
     if (errs.length) out.push({ t: 'ERROR BUDGET BURN', c: 'warn' });
     if (drops) out.push({ t: 'DATA LOSS RISK \u00b7 sync drops', c: 'warn' });
-    if (spof && out.length < 3) out.push({ t: 'SPOF \u00b7 ' + nname(spof.n), c: 'warn' });
+    if (spof && out.length < 3) out.push({ t: 'SPOF \u00b7 ' + esc(nname(spof.n)), c: 'warn' });
     const html = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
     const box = $('#alerts');
     if (box.innerHTML !== html) box.innerHTML = html;
@@ -405,24 +424,26 @@
     const r = state.res[n.id] || {};
     const fields = def.fields || ['concurrency', 'latency', 'price'];
     const labels = {
-      rate: ['Requests / s', 0, 100000, 1],
-      concurrency: ['Concurrency', 1, 1000000, 1],
-      latency: ['Service time (ms)', 0, 60000, 1],
-      price: ['$ per million units', 0, 100, 0.001],
-      units: ['Units per request', 0, 100000, 1],
-      hit: ['Cache hit %', 0, 100, 1],
-      priceGBs: ['$ per M GB-s', 0, 100, 0.01],
-      cpuMs: ['CPU ms / request', 0, 30000, 0.5],
-      inPrice: ['Input $ / 1M tokens', 0, 1000, 0.01],
-      outPrice: ['Output $ / 1M tokens', 0, 1000, 0.01],
-      inTokens: ['Input tokens / request', 0, 1000000, 1],
-      outTokens: ['Output tokens / request', 0, 1000000, 1]
+      rate: 'Requests / s',
+      concurrency: 'Concurrency',
+      latency: 'Service time (ms)',
+      price: '$ per million units',
+      units: 'Units per request',
+      hit: 'Cache hit %',
+      priceGBs: '$ per M GB-s',
+      cpuMs: 'CPU ms / request',
+      inPrice: 'Input $ / 1M tokens',
+      outPrice: 'Output $ / 1M tokens',
+      inTokens: 'Input tokens / request',
+      outTokens: 'Output tokens / request'
     };
-    let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + (n.alias || def.name) + '</b></div>';
+    const RANGES = window.CATALOG.ranges || {};
+    let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + esc(n.alias || def.name) + '</b></div>';
     html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
     fields.forEach(f => {
-      const L = labels[f] || [f, 0, 1e6, 1];
-      html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
+      const L = labels[f] || f;
+      const R = RANGES[f] || [0, 1e6, 1];
+      html += '<label class="field"><span>' + L + '</span><input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
@@ -443,6 +464,7 @@
         const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
         n.p[f] = Math.min(hi, Math.max(lo, raw));
         compute(); renderNodes(); renderCost(); renderInspectorStats();
+        pushScenario();
       });
       inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
     });
@@ -451,6 +473,7 @@
       state.edges = state.edges.filter(e => e.from !== n.id && e.to !== n.id);
       state.sel = null;
       compute(); render();
+      pushScenario();
     });
   }
 
@@ -633,16 +656,22 @@
   }
 
   function onUp(ev) {
+    let changed = false;
+    if (drag) {
+      const n = nodeById(drag.id);
+      changed = window.SCENARIO.moved(n, { x: drag.ox, y: drag.oy });
+    }
     if (link) {
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const target = el && el.closest('.node');
-      if (target && target.dataset.id !== link.from) addEdge(link.from, target.dataset.id);
+      if (target && target.dataset.id !== link.from) changed = !!addEdge(link.from, target.dataset.id) || changed;
       if (link.el) link.el.remove();
       link = null;
       compute(); render();
     }
     drag = null;
     pan = null;
+    if (changed) pushScenario();
   }
 
   function select(id) {
@@ -667,6 +696,7 @@
 
   function loadTemplate() {
     state.nodes = []; state.edges = []; seq = 1;
+    state.name = 'Beauty store on Cloudflare';
     state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
     const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
     const waf = addNode('waf', 160, 220);
@@ -801,6 +831,7 @@
     state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
     state.sel = null;
     compute(); render();
+    pushScenario();
   });
 
   let rz = null;
@@ -818,10 +849,183 @@
   $('#tog-insp').addEventListener('click', () => toggle($('#tog-insp'), 'no-insp'));
   if (window.innerWidth < 780) { app.classList.add('no-insp'); $('#tog-insp').classList.remove('on'); }
 
+  // Scenario channel: scenario.json is the source of truth for humans and agents.
+  function currentScenario() {
+    const nodes = state.nodes.map(n => {
+      const o = { id: n.id, type: n.type, x: Math.round(n.x), y: Math.round(n.y) };
+      if (n.alias) o.alias = n.alias;
+      o.p = Object.assign({}, n.p);
+      Object.keys(n).forEach(k => { if (NODE_KEYS.indexOf(k) < 0) o[k] = n[k]; });
+      return o;
+    }).concat(state.opaque);
+    const edges = state.edges.map(e => {
+      const o = { from: e.from, to: e.to };
+      if (typeof e.weight === 'number') o.weight = e.weight;
+      Object.keys(e).forEach(k => { if (EDGE_KEYS.indexOf(k) < 0) o[k] = e[k]; });
+      return o;
+    });
+    const scenario = { version: window.SCENARIO.VERSION, name: state.name, nodes: nodes, edges: edges };
+    Object.keys(state.rootExtra).forEach(k => { scenario[k] = state.rootExtra[k]; });
+    return scenario;
+  }
+
+  function simState() {
+    // Units: time is simulated seconds, spent/rate are USD and USD/s,
+    // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
+    const nodes = {};
+    state.nodes.forEach(n => {
+      const r = state.res[n.id] || {};
+      nodes[n.id] = {
+        type: n.type, lambda: r.lambda || 0, util: r.util || 0,
+        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0
+      };
+    });
+    return {
+      time: state.t, spent: state.spent, rate: state.rate,
+      pathLat: state.pathLat, running: state.running, nodes: nodes
+    };
+  }
+
+  function applyScenario(raw, doFit) {
+    const res = window.SCENARIO.validate(raw, window.CATALOG);
+    if (!res.scenario || res.dropped > 0) {
+      toast(res.error || 'Invalid scenario');
+      return false;
+    }
+    const s = res.scenario;
+    const known = s.nodes.filter(hasType);
+    if (!known.length && s.nodes.length) {
+      toast(res.error || 'Scenario has no renderable nodes');
+      return false;
+    }
+    state.name = s.name;
+    state.nodes = known;
+    state.opaque = s.nodes.filter(n => !hasType(n));
+    state.rootExtra = {};
+    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) state.rootExtra[k] = s[k]; });
+    state.edges = s.edges;
+    const keep = state.sel;
+    state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
+    drag = null;
+    link = null;
+    // Opaque ids count too: a palette node must never reuse a preserved id.
+    seq = window.SCENARIO.nextNodeSeq(s.nodes);
+    compute();
+    render();
+    if (doFit) fit();
+    if (res.error) toast(res.error);
+    return true;
+  }
+
+  const http = /^https?:$/.test(location.protocol);
+  const clientId = Math.random().toString(36).slice(2);
+  let saveTimer = null;
+  let channel = null; // set when the /scenario probe proves serve.mjs is behind the page
+
+  function pushScenario() {
+    if (!http || !channel) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      fetch('/scenario', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-client-id': clientId },
+        body: JSON.stringify(currentScenario())
+      }).then(r => {
+        if (r.status === 400) return r.json().then(j => toast(j.error || 'Scenario rejected'), () => {});
+      }).catch(() => {});
+    }, 400);
+  }
+
+  function copyJson() {
+    const text = JSON.stringify(currentScenario(), null, 2);
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      ta.remove();
+      toast(ok ? 'Scenario JSON copied' : 'Copy failed');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => toast('Scenario JSON copied'), fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  $('#copy-json').addEventListener('click', copyJson);
+
+  window.__SIM__ = {
+    load: raw => applyScenario(raw, true),
+    export: currentScenario,
+    getState: simState
+  };
+
   renderPalette();
   loadTemplate();
   $('#budget').value = state.budget;
   $('#plan').value = state.plan;
   $('#basefee').value = state.baseFee;
+
+  let booted = false;
+  const hashMatch = /^#s=(.+)$/.exec(location.hash);
+  let hashRaw = null;
+  if (hashMatch) {
+    hashRaw = window.SCENARIO.decode(hashMatch[1]);
+    if (!hashRaw) toast('Invalid #s= scenario link');
+  }
+  [hashRaw, window.__SCENARIO__].forEach(c => {
+    if (c && !booted) booted = applyScenario(c, true);
+  });
+
+  if (http) {
+    const subscribe = () => {
+      if (channel) return;
+      channel = new EventSource('/events');
+      channel.onmessage = ev => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch (e) { return; }
+        if (!msg || !msg.scenario || msg.clientId === clientId) return;
+        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) return;
+        const before = state.nodes.map(n => n.id).join('|');
+        if (applyScenario(msg.scenario, false)) {
+          booted = true;
+          if (state.nodes.map(n => n.id).join('|') !== before) fit();
+          toast('Scenario updated from the server');
+        }
+      };
+    };
+    // One probe: /scenario is both the bootstrap source and the signal that
+    // serve.mjs exists. A plain static server answers 404/HTML, so the page
+    // never subscribes or publishes to it.
+    fetch('/scenario')
+      .then(r => {
+        const type = r.headers.get('content-type') || '';
+        const json = type.indexOf('json') >= 0;
+        if (json) subscribe();
+        if (r.ok) return r.json();
+        if (json) {
+          return r.json().then(
+            j => { toast(j.error || 'Scenario unavailable (HTTP ' + r.status + ')'); throw 0; },
+            () => { throw 0; }
+          );
+        }
+        throw 0;
+      })
+      .then(s => { if (s && !booted) applyScenario(s, true); })
+      .catch(() => {});
+  }
+
+  window.addEventListener('hashchange', () => {
+    const m = /^#s=(.+)$/.exec(location.hash);
+    if (!m) return;
+    const s = window.SCENARIO.decode(m[1]);
+    if (s) applyScenario(s, true);
+    else toast('Invalid #s= scenario link');
+  });
+
   requestAnimationFrame(loop);
 })();
