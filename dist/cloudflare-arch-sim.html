@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cloudflare architecture simulator</title>
+<link rel="icon" href="data:,">
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#08080a;color:#e8e8ec;
@@ -38,13 +39,14 @@ button{font:inherit;cursor:pointer}
 .search:focus{border-color:#3a3a4d}
 .pal-list{overflow:auto;padding:0 8px 12px;min-height:0}
 .pal-group{margin-bottom:12px}
-.pal-title{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f6f7e;padding:6px 4px}
+.pal-title{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a99;padding:6px 4px}
 .pal-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .pal-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px 7px;
   background:#101016;border:1px solid #1e1e27;border-radius:10px;color:#c9c9d4;font-size:10px;
   text-align:center;line-height:1.2}
 .pal-item:hover{background:#16161e;border-color:#33334a;color:#fff}
 .pal-ico{width:19px;height:19px}
+.pal-empty{font-size:10.5px;color:#8a8a99;padding:8px 6px;line-height:1.4}
 .pal-ico svg{width:100%;height:100%}
 
 .stage{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -86,7 +88,7 @@ button{font:inherit;cursor:pointer}
 .nbar i.over{background:#ff1f4b;box-shadow:0 0 8px #ff1f4b}
 .nlabel{margin-top:6px;width:96px;margin-left:-11px;text-align:center;font-size:10.5px;color:#c8c8d4;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nbadge{text-align:center;font:9px/1.3 ui-monospace,monospace;color:#6e6e7d}
+.nbadge{text-align:center;font:9px/1.3 ui-monospace,monospace;color:#8f8f9e}
 .nbadge.warn{color:#f59e0b}
 .nbadge.bad{color:#ff4d4d;font-weight:700}
 .port{position:absolute;right:-7px;top:31px;width:12px;height:12px;border-radius:50%;
@@ -109,7 +111,7 @@ button{font:inherit;cursor:pointer}
 .speeds .sp-eq{font:10px/1 ui-monospace,monospace;color:#8c8c9c;white-space:nowrap;padding-right:2px}
 
 .chaos{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.chaos-lbl{font:10px/1 ui-monospace,monospace;letter-spacing:.08em;color:#6a6a7a;margin-right:2px}
+.chaos-lbl{font:10px/1 ui-monospace,monospace;letter-spacing:.08em;color:#8a8a99;margin-right:2px}
 .chaos-btn{background:#15151d;border:1px solid #24242f;color:#b9b9c6;border-radius:999px;
   font-size:10.5px;padding:5px 9px;white-space:nowrap}
 .chaos-btn:hover{border-color:#7f1d1d;color:#fecaca;background:#1b1113}
@@ -131,11 +133,11 @@ button{font:inherit;cursor:pointer}
 .right{border-left:1px solid #17171d;background:#0b0b0f;display:flex;flex-direction:column;
   min-height:0;overflow:auto}
 .cost{padding:11px 12px;border-bottom:1px solid #17171d}
-.cost-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f6f7e;margin-bottom:8px}
+.cost-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a99;margin-bottom:8px}
 .krow{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:#8a8a99;
   padding:2px 0}
 .krow b{color:#e8e8ec;font:600 12px/1.3 ui-monospace,monospace}
-.krow.small{font-size:10px;color:#6f6f7e}
+.krow.small{font-size:10px;color:#8a8a99}
 .krow.small b{font-size:10.5px;color:#b0b0be}
 .v.good{color:#34d399}
 .v.warn{color:#f59e0b}
@@ -161,7 +163,7 @@ button{font:inherit;cursor:pointer}
 .field input:focus{outline:none;border-color:#4b3fb0}
 .ins-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
 .ins-stats div{background:#101016;border:1px solid #1c1c25;border-radius:8px;padding:6px 8px}
-.ins-stats span{display:block;font-size:9.5px;color:#6f6f7e;text-transform:uppercase;letter-spacing:.04em}
+.ins-stats span{display:block;font-size:9.5px;color:#8a8a99;text-transform:uppercase;letter-spacing:.04em}
 .ins-stats b{font:600 12px ui-monospace,monospace;color:#e8e8ec}
 .note{font-size:10.5px;color:#8a8a99;line-height:1.45;margin:8px 0 0}
 .ok-note{color:#8fbfa8}
@@ -170,7 +172,7 @@ button{font:inherit;cursor:pointer}
 .del{margin-top:12px;width:100%;background:#1a1114;border:1px solid #3f1d24;color:#f0a8b4;
   border-radius:8px;padding:6px;font-size:11px}
 .del:hover{background:#25141a}
-.empty{font-size:11px;color:#6f6f7e;line-height:1.6}
+.empty{font-size:11px;color:#8a8a99;line-height:1.6}
 
 @media(max-width:1040px){
   .app{--pal:150px;--insp:200px;--h:560px}
@@ -185,8 +187,11 @@ button{font:inherit;cursor:pointer}
   .search{margin:0 8px 6px;font-size:10.5px}
 }
 @media(max-width:700px){
-  .app{--pal:104px;--insp:172px;--h:520px}
-  .actions{display:none}
+  .app{--insp:172px;--h:520px}
+  .top{gap:8px;padding:8px 10px;flex-wrap:wrap}
+  .brand span{display:none}
+  .actions{gap:4px}
+  .ghost{padding:4px 7px;font-size:10.5px}
 }
 
 </style>
@@ -206,7 +211,7 @@ button{font:inherit;cursor:pointer}
     <div class="actions">
       <button id="tog-pal" class="ghost on" title="Show or hide the component palette">Components</button>
       <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
-      <button id="reset" class="ghost">Reset</button>
+      <button id="reset" class="ghost" title="Reset time, spent and chaos; keeps the architecture">Reset sim</button>
       <button id="fit" class="ghost">Fit view</button>
     </div>
   </header>
@@ -220,7 +225,7 @@ button{font:inherit;cursor:pointer}
 
     <main class="stage">
       <div class="canvas-wrap">
-      <div class="alerts" id="alerts"></div>
+      <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
       <div class="canvas" id="canvas">
         <div class="world" id="world">
           <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
@@ -373,7 +378,7 @@ window.CATALOG = {
     },
     external: {
       name: 'Tiendanube API', group: 'external', icon: 'plug',
-      p: { concurrency: 1, latency: 300, price: 0, units: 1 },
+      p: { concurrency: 1, latency: 500, price: 0, units: 1 },
       fields: ['concurrency', 'latency'],
       verified: 'Leaky bucket of 2 req/s with burst of 40, per store and app. One shared server model = a hard wall.',
       doc: 'https://tiendanube.github.io/api-documentation/intro'
@@ -458,6 +463,7 @@ window.CATALOG = {
   }
 
   function compute() {
+    state.res = {};
     const inc = {}, out = {};
     state.nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
     state.edges.forEach(e => {
@@ -512,7 +518,7 @@ window.CATALOG = {
       }
       out[id].forEach(to => {
         lambda[to] += outLambda[id];
-        arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
+        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
       });
     });
 
@@ -534,16 +540,32 @@ window.CATALOG = {
     let rate = 0;
     Object.keys(state.res).forEach(k => { rate += state.res[k].cost || 0; });
     state.rate = rate;
-    state.pathLat = state.nodes.reduce((m, n) => Math.max(m, (state.res[n.id] || {}).lat || 0), 0);
+    state.pathLat = state.nodes.reduce((m, n) => {
+      const r = state.res[n.id] || {};
+      return r.lambda > 0 ? Math.max(m, (arrive[n.id] || 0) + (lat[n.id] || 0)) : m;
+    }, 0);
+  }
+
+  function addFromPalette(type) {
+    const rect = $('#canvas').getBoundingClientRect();
+    const gx = (rect.width / 2 - state.px) / state.zoom;
+    const gy = (rect.height / 2 - state.py) / state.zoom;
+    const n = addNode(type, gx - 37, gy - 37);
+    compute();
+    select(n.id);
+    render();
+    return n;
   }
 
   function renderPalette() {
     const q = ($('#search').value || '').toLowerCase();
     const wrap = $('#palette-list');
     wrap.innerHTML = '';
+    let shown = 0;
     GROUPS.forEach(g => {
       const items = Object.keys(TYPES).filter(k => TYPES[k].group === g.id && TYPES[k].name.toLowerCase().includes(q));
       if (!items.length) return;
+      shown += items.length;
       const sec = document.createElement('div');
       sec.className = 'pal-group';
       sec.innerHTML = '<div class="pal-title">' + g.label + '</div>';
@@ -555,22 +577,23 @@ window.CATALOG = {
         el.className = 'pal-item';
         el.title = def.note || def.name;
         el.innerHTML = '<span class="pal-ico" style="color:' + groupColor(k) + '">' + svg(k) + '</span><span>' + def.name + '</span>';
-        el.addEventListener('pointerdown', ev => ev.stopPropagation());
         el.addEventListener('pointerdown', ev => {
           ev.preventDefault();
-          const rect = $('#canvas').getBoundingClientRect();
-          const gx = (rect.width / 2 - state.px) / state.zoom;
-          const gy = (rect.height / 2 - state.py) / state.zoom;
-          const n = addNode(k, gx - 37, gy - 37);
-          select(n.id);
+          ev.stopPropagation();
+          const n = addFromPalette(k);
           drag = { id: n.id, sx: ev.clientX, sy: ev.clientY, ox: n.x, oy: n.y };
-          render();
+        });
+        el.addEventListener('keydown', ev => {
+          if (ev.key !== 'Enter' && ev.key !== ' ') return;
+          ev.preventDefault();
+          addFromPalette(k);
         });
         grid.appendChild(el);
       });
       sec.appendChild(grid);
       wrap.appendChild(sec);
     });
+    if (!shown) wrap.innerHTML = '<div class="pal-empty">No components match.</div>';
   }
 
   function svg(type) {
@@ -732,7 +755,23 @@ window.CATALOG = {
     if (errs.length) out.push({ t: 'ERROR BUDGET BURN', c: 'warn' });
     if (drops) out.push({ t: 'DATA LOSS RISK \u00b7 sync drops', c: 'warn' });
     if (spof && out.length < 3) out.push({ t: 'SPOF \u00b7 ' + nname(spof.n), c: 'warn' });
-    $('#alerts').innerHTML = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
+    const html = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
+    const box = $('#alerts');
+    if (box.innerHTML !== html) box.innerHTML = html;
+  }
+
+  function statsHtml(r) {
+    return '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
+      '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
+      '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
+      '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
+      '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>';
+  }
+
+  function renderInspectorStats() {
+    const el = $('#ins-stats');
+    if (!el || !state.sel) return;
+    el.innerHTML = statsHtml(state.res[state.sel] || {});
   }
 
   function renderInspector() {
@@ -762,13 +801,7 @@ window.CATALOG = {
       const L = labels[f] || [f, 0, 1e6, 1];
       html += '<label class="field"><span>' + L[0] + '</span><input type="number" data-f="' + f + '" min="' + L[1] + '" max="' + L[2] + '" step="' + L[3] + '" value="' + n.p[f] + '"></label>';
     });
-    html += '<div class="ins-stats">' +
-      '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
-      '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
-      '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
-      '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
-      '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>' +
-      '</div>';
+    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
     if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
     if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
@@ -776,9 +809,13 @@ window.CATALOG = {
     box.innerHTML = html;
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
-        const v = parseFloat(inp.value);
-        if (!isNaN(v)) { n.p[inp.dataset.f] = v; compute(); renderNodes(); renderCost(); }
+        const raw = parseFloat(inp.value);
+        if (isNaN(raw)) return;
+        const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
+        n.p[inp.dataset.f] = Math.min(hi, Math.max(lo, raw));
+        compute(); renderNodes(); renderCost(); renderInspectorStats();
       });
+      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f]; });
     });
     $('#delnode').addEventListener('click', () => {
       state.nodes = state.nodes.filter(x => x.id !== n.id);
@@ -962,7 +999,7 @@ window.CATALOG = {
       acc += dtReal;
       if (acc >= 0.22) {
         acc = 0;
-        renderCost(); renderNodes(); renderAlerts();
+        renderCost(); renderNodes(); renderAlerts(); renderInspectorStats();
       }
     }
     animateEdges(ts);
