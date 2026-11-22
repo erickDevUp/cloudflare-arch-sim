@@ -8,6 +8,9 @@
   const esc = v => String(v).replace(/[&<>"']/g, c => ESC[c]);
   const NODE_KEYS = ['id', 'type', 'x', 'y', 'alias', 'p'];
   const EDGE_KEYS = ['from', 'to', 'weight'];
+  // ponytail: the engine models rates, not people. One visible assumption turns
+  // the first monthly limit into a user estimate; surfaced in the tooltip.
+  const REQ_PER_USER_PER_MONTH = 100;
   const ROOT_KEYS = ['version', 'name', 'nodes', 'edges'];
   const hasType = n => Object.hasOwn(TYPES, n.type);
 
@@ -550,6 +553,30 @@
     ).join('');
   }
 
+  // An estimate, not a measured user count: convert the first monthly limit
+  // the current traffic would hit into requests, then apply the assumption.
+  // No traffic or no monthly limit means no number at all.
+  function capacityHtml(res, usage) {
+    if (state.plan === 'custom' || !(usage.workersRequests > 0)) return '';
+    const first = res.lines.filter(l => l.period !== 'per request' && l.used > 0)
+      .reduce((a, l) => {
+        const limit = l.limit != null ? l.limit : l.included;
+        const ratio = limit > 0 ? l.used / limit : 0;
+        return !a || ratio > a.ratio ? { label: l.label, limit, used: l.used, ratio } : a;
+      }, null);
+    if (!first || !(first.limit > 0)) return '';
+    const perReq = first.used / usage.workersRequests;
+    if (!(perReq > 0)) return '';
+    const n = Math.floor(first.limit / perReq / REQ_PER_USER_PER_MONTH);
+    if (!(n > 0)) return '';
+    const plan = state.plan === 'paid' ? 'Paid $5' : 'Free';
+    const tip = 'Estimación basada en ' + REQ_PER_USER_PER_MONTH +
+      ' requests por usuario al mes. Primer límite: ' + first.label +
+      ' (' + human(first.limit) + '/mo).';
+    return '~' + n.toLocaleString() + ' usuarios en ' + plan +
+      ' antes del primer límite <span class="info" title="' + esc(tip) + '">&#9432;</span>';
+  }
+
   function renderCost() {
     const rate = state.rate;
     const hours = state.t / 3600;
@@ -568,32 +595,58 @@
       baseFee: state.baseFee,
       rateMonthly: PRICING.monthlyUsage(rate)
     }));
-    $('#k-base').textContent = money(res.base);
-    $('#k-overage').textContent = money(res.overage);
+    $('#k-total').textContent = money(res.total) + '/mo';
     $('#k-proj').textContent = money(res.total) + '/mo';
 
-    let rawPct = 0, label = '', value = '\u2014';
-    if (state.plan === 'custom') {
-      rawPct = state.budget > 0 ? res.total / state.budget * 100 : 0;
-      label = 'budget used \u00b7 ' + pctText(rawPct) + '%';
-      value = '$' + state.budget.toLocaleString();
-    } else {
-      const peak = res.lines.reduce((a, l) => l.ratio > (a ? a.ratio : -1) ? l : a, null);
-      rawPct = peak ? peak.ratio * 100 : 0;
-      if (peak) {
-        label = peak.label + ' \u00b7 ' + pctText(peak.ratio * 100) + '% of ' + (state.plan === 'paid' ? 'included' : 'free limit');
-        value = peak.period === 'per request'
-          ? peak.limit + ' ms/req'
-          : state.plan === 'paid' ? human(peak.included) + '/mo' : human(peak.limit) + '/mo';
-      } else {
-        label = state.plan === 'paid' ? 'within included usage' : 'within free limits';
-      }
+    // One headline, one chip: every figure comes from the monthlyCost result
+    // above, never from a second pricing path.
+    const overMoney = res.overage > 0;
+    const overFree = state.plan === 'free' && res.exceeded.length > 0;
+    const overBudget = state.plan === 'custom' && res.total > state.budget;
+    const over = overMoney || overFree || overBudget;
+    const chip = $('#over-chip');
+    chip.textContent = overMoney ? '+ ' + money(res.overage) + ' extra'
+      : overFree ? 'Fuera de los límites Free'
+      : overBudget ? '+ ' + money(res.total - state.budget) + ' sobre presupuesto'
+      : 'Dentro del plan';
+    chip.className = 'chip' + (over ? ' over' : '');
+
+    // Included bar shows what the plan covers; the red Extra bar exists only
+    // when there is an overage, and always carries its own label.
+    const peak = res.lines.reduce((a, l) => l.ratio > (a ? a.ratio : -1) ? l : a, null);
+    let used, limit, pct = 0, extra = null;
+    if (state.plan === 'paid') {
+      used = Math.min(res.total, res.base);
+      limit = res.base;
+      pct = limit > 0 ? used / limit * 100 : 0;
+      if (overMoney) extra = { label: money(res.overage), pct: limit > 0 ? res.overage / limit * 100 : 100 };
+    } else if (state.plan === 'custom') {
+      used = Math.min(res.total, state.budget);
+      limit = state.budget;
+      pct = limit > 0 ? used / limit * 100 : 0;
+      if (overBudget) extra = { label: money(res.total - state.budget), pct: limit > 0 ? (res.total - state.budget) / limit * 100 : 100 };
+    } else if (peak) {
+      used = peak.used;
+      limit = peak.limit;
+      pct = peak.ratio * 100;
+      if (overFree) extra = { label: '+' + pctText((peak.ratio - 1) * 100) + '% sobre el límite', pct: 100 };
     }
+    $('#incl-label').textContent = used == null ? '\u2014'
+      : state.plan === 'free' && peak.period === 'per day' ? human(used) + ' / ' + human(limit) + '/mo'
+      : state.plan === 'free' && peak.period === 'per request' ? (Math.round(used * 10) / 10) + ' / ' + limit + ' ms/req'
+      : money(used) + ' / ' + money(limit);
     const bar = $('#budget-bar');
-    bar.style.width = Math.min(100, rawPct) + '%';
-    bar.className = rawPct > 100 ? 'bad' : rawPct > 70 ? 'warn' : '';
-    $('#bar-label').textContent = label;
-    $('#k-budget').textContent = value;
+    bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+    bar.className = pct > 100 ? 'bad' : pct > 70 ? 'warn' : '';
+    $('#extra-row').hidden = !extra;
+    if (extra) {
+      $('#extra-label').textContent = extra.label;
+      $('#extra-bar').style.width = Math.min(100, extra.pct) + '%';
+    }
+
+    const capacity = capacityHtml(res, usage);
+    $('#capacity').innerHTML = capacity;
+    $('#capacity').hidden = !capacity;
     $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
     $('#custom-fields').hidden = state.plan !== 'custom';
 
@@ -678,6 +731,7 @@
     state.sel = id;
     renderNodes();
     renderInspector();
+    setTab('components');
   }
 
   function fit() {
@@ -848,6 +902,20 @@
   $('#tog-pal').addEventListener('click', () => toggle($('#tog-pal'), 'no-pal'));
   $('#tog-insp').addEventListener('click', () => toggle($('#tog-insp'), 'no-insp'));
   if (window.innerWidth < 780) { app.classList.add('no-insp'); $('#tog-insp').classList.remove('on'); }
+
+  const tabCost = $('#tab-cost'), tabComponents = $('#tab-components');
+  function setTab(name) {
+    const cost = name === 'cost';
+    $('#cost').hidden = !cost;
+    $('#inspect').hidden = cost;
+    tabCost.classList.toggle('on', cost);
+    tabComponents.classList.toggle('on', !cost);
+    tabCost.setAttribute('aria-selected', String(cost));
+    tabComponents.setAttribute('aria-selected', String(!cost));
+  }
+  tabCost.addEventListener('click', () => setTab('cost'));
+  tabComponents.addEventListener('click', () => setTab('components'));
+  setTab('cost');
 
   // Scenario channel: scenario.json is the source of truth for humans and agents.
   function currentScenario() {

@@ -127,6 +127,32 @@ button{font:inherit;cursor:pointer}
   min-height:0;overflow:auto}
 .cost{padding:11px 12px;border-bottom:1px solid #17171d}
 .cost-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a99;margin-bottom:8px}
+.cost-tabs{display:flex;gap:5px;padding:11px 12px 0;border-bottom:1px solid #1f1f29}
+.tab{background:transparent;border:0;border-bottom:2px solid transparent;color:#8a8a99;
+  padding:5px 10px;margin-bottom:-1px;font-size:11.5px}
+.tab:hover{color:#e8e8ec}
+.tab.on{color:#fff;border-bottom-color:#7b6bff}
+.headline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.headline>span{font-size:12px;color:#8a8a99}
+.headline b{font:700 21px/1.1 ui-monospace,monospace;color:#fff;letter-spacing:-.02em;margin-left:5px}
+.chip{display:inline-block;margin-top:7px;font-size:10.5px;padding:3px 8px;border-radius:999px;
+  border:1px solid #1f4a3a;background:#0c2118;color:#34d399}
+.chip.over{border-color:#7f1d2b;background:#2a0d14;color:#ff8fa0}
+.realtime{margin-top:10px;font:10.5px/1.5 ui-monospace,monospace;color:#8a8a99}
+.realtime b{color:#e8e8ec;font-weight:600}
+.realtime .sep{color:#4a4a58;padding:0 2px}
+.realtime .muted{color:#6f6f7d}
+.bars{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.bar-head{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;color:#8a8a99}
+.bar-head b{color:#e8e8ec;font:600 10.5px/1.3 ui-monospace,monospace}
+.capacity{margin-top:11px;font-size:10.5px;color:#9d9daa;line-height:1.4}
+.capacity .info{cursor:help;color:#7b8cff;margin-left:2px}
+.breakdown{margin-top:12px;border-top:1px solid #1f1f29;padding-top:8px}
+.breakdown summary{cursor:pointer;font-size:10.5px;color:#8a8a99;list-style:none}
+.breakdown summary::-webkit-details-marker{display:none}
+.breakdown summary::before{content:'\25b8  ';color:#6f6f7d}
+.breakdown[open] summary::before{content:'\25be  '}
+.breakdown-body{padding-top:8px}
 .krow{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:#8a8a99;
   padding:2px 0}
 .krow b{color:#e8e8ec;font:600 12px/1.3 ui-monospace,monospace}
@@ -135,8 +161,7 @@ button{font:inherit;cursor:pointer}
 .v.good{color:#34d399}
 .v.warn{color:#f59e0b}
 .v.bad{color:#ef4444}
-.budget{margin-top:8px;border-top:1px dashed #1f1f29;padding-top:8px}
-.barmark{height:5px;border-radius:3px;background:#17171f;overflow:hidden;margin:6px 0}
+.barmark{height:5px;border-radius:3px;background:#17171f;overflow:hidden;margin:5px 0 0}
 .barmark i{display:block;height:100%;width:0;background:#34d399;transition:width .3s,background .3s}
 .barmark i.warn{background:#f59e0b}
 .barmark i.bad{background:#ef4444}
