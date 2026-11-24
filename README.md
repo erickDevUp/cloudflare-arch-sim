@@ -105,9 +105,12 @@ computed token bill; it never enters the Cloudflare total above it.*
 
 ## Install and run
 
-There is **no published npm package and no `npx` command** for this project. `package.json` only
-provides `npm test` and a build-time icon dependency (`lucide-static`); run the tools from a
-checkout with Node 18 or newer:
+**At this commit the npm package is not published yet** — there is no working `npx` command.
+Once it is published, install-free invocation will be `npx cloudflare-arch-sim`; until then,
+run the tools from a checkout with Node 18 or newer. `lucide-static` is a build-time icon
+dependency only; the published CLI has no runtime dependencies.
+
+### Local development
 
 ```bash
 npm install              # one-time: build-time icons only, no runtime dependencies
@@ -124,6 +127,22 @@ at `/scenario`, and an SSE stream at `/events`. Build trap: `node build.mjs --sc
 **pinned** scenario that outranks `GET /scenario`. Rebuild with plain `node build.mjs` before
 starting the shared channel, or point `serve.mjs --file` at the pinned build and accept that it is
 a snapshot. The server warns when the page it serves embeds a scenario.
+
+### npm CLI (after publication)
+
+```bash
+npx cloudflare-arch-sim                       # serve page + state channel on 127.0.0.1:8787
+npx cloudflare-arch-sim --port 8788           # choose another loopback port
+npx cloudflare-arch-sim --scenario ./my.json  # use a different scenario file
+npx cloudflare-arch-sim --path                # print the bundled HTML path (for Orca)
+npx cloudflare-arch-sim --help                # flag summary
+```
+
+The CLI is a thin wrapper over `serve.mjs`: it serves the bundled `dist/cloudflare-arch-sim.html`
+plus the same `/scenario` (GET/POST) and `/events` endpoints, with loopback-only Host/Origin
+checks. `--path` prints the absolute path to the bundled HTML so you can open it in Orca or pass
+it to `::orca-visual`; it does not start a server. The package ships only the CLI, server,
+scenario file, bundled HTML and the two `src` modules the server loads at runtime.
 
 ## State channel — humans and agents edit the same scenario
 
@@ -208,6 +227,7 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 | `src/scenario.js` | Pure schema shared by page, server and tests: validate, merge, `#s=` encode/decode, layout |
 | `src/app.js` | Queueing engine, rendering, chaos, UI events, `window.__SIM__` and the channel client |
 | `serve.mjs` | Local page, JSON endpoint, SSE broadcast, atomic writes and Host/Origin checks |
+| `cli.mjs` | npm `bin`: flag parsing and delegation to `serve.mjs`, or `--path` to print the bundled HTML |
 | `build.mjs` | Inlines CSS/JS/icons into `dist/cloudflare-arch-sim.html`; optional `--scenario` snapshot |
 | `scenario.json` | Live source of truth when served by `serve.mjs` |
 | `tests/` | `pricing`, `scenario` and `serve` test files (`node --test`) |
@@ -216,7 +236,9 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 ## Verification and known gaps
 
 `node --test` passes all 46 tests on this branch (pricing math, catalog/price parity, schema
-validation, merge rules and the HTTP channel). Prices are the values in `PRICING.dims` with
+validation, merge rules and the HTTP channel). `npm pack --dry-run` lists only the files the
+installed CLI needs; `prepublishOnly` runs the tests and rebuilds the bundle before publication.
+Prices are the values in `PRICING.dims` with
 `asOf: 2026-11-21`; adding a component or a price means updating `src/catalog.js` and
 `src/pricing.js` together. This README change is documentation only — no source behavior was
 modified.

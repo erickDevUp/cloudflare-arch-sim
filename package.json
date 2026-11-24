@@ -2,9 +2,23 @@
   "name": "cloudflare-arch-sim",
   "version": "1.0.0",
   "description": "A drag-and-drop Cloudflare architecture simulator that renders **inside an Orca chat**.",
-  "main": "index.js",
+  "bin": {
+    "cloudflare-arch-sim": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "serve.mjs",
+    "scenario.json",
+    "dist/cloudflare-arch-sim.html",
+    "src/scenario.js",
+    "src/catalog.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "node --test && node build.mjs"
   },
   "keywords": [],
   "author": "",
