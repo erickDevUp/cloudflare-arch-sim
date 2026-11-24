@@ -31,6 +31,13 @@ channel described below is an optional addition served by `serve.mjs`.
   (`mu = 1000 / latency`), `c` is `concurrency`, and `util = lambda / (mu * c)`. Erlang-C gives
   the wait; `util >= 1` pins the node at a 30 s wait and paints it red. A cache forwards only
   `1 - hit` of its input downstream.
+- **Queues throttle, they don't multiply.** A Queue node forwards `min(lambda, concurrency /
+  (latency/1000))` requests/s; the excess accumulates as a backlog. Backlog evolves with
+  **simulated time** (`backlog = capacity * FIFO wait`, Little's law), not wall-clock time. Messages
+  whose wait exceeds `retention` (default 4 days = 345600 s) expire and are counted as drops/s.
+  Assumption: strict FIFO and a single deterministic service rate — real Queues use retries and
+  variable batch sizes, so this models a smoothed average. Only Queue nodes are throttled; every
+  other node keeps the full fan-out semantics.
 - **Errors and alerts.** Above full utilization, `err = min(0.85, (util - 1) * 0.55)`; a store 402
   chaos pins the external node at `err = 1`. The canvas raises `HOT PATH BOTTLENECK`,
   `ERROR BUDGET BURN`, `DATA LOSS RISK` and `SPOF` alerts. The reported critical path is the

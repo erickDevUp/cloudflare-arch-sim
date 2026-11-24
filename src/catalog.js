@@ -12,6 +12,7 @@ window.CATALOG = {
     rate: [1, 100000, 1],
     concurrency: [1, 1000000, 1],
     latency: [0, 60000, 1],
+    retention: [0, 2592000, 3600],
     price: [0, 100, 0.001],
     units: [0, 100000, 1],
     hit: [0, 100, 1],
@@ -67,8 +68,9 @@ window.CATALOG = {
     },
     queues: {
       name: 'Queues', group: 'compute', icon: 'list-ordered',
-      p: { concurrency: 50, latency: 10, price: 0.4, units: 1 },
-      note: 'Absorbs bursts and retries. Price varies by operations: treat it as editable.'
+      p: { concurrency: 50, latency: 10, retention: 345600, price: 0.4, units: 1 },
+      fields: ['concurrency', 'latency', 'retention'],
+      note: 'Throttles downstream to concurrency / service time; the rest builds a backlog. Messages older than retention expire. Assumption: FIFO, so the oldest messages drop first.'
     },
     d1: {
       name: 'D1', group: 'data', icon: 'database',
