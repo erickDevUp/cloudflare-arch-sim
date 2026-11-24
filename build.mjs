@@ -22,6 +22,7 @@ html = html.replace('<script src="pricing.js"></script>', () => `<script>\n${rea
 html = html.replace('<script src="catalog.js"></script>',
   () => `<script>\nwindow.ICONS = ${JSON.stringify(icons)};\n</script>\n<script>\n${read('catalog.js')}\n</script>`);
 html = html.replace('<script src="scenario.js"></script>', () => `<script>\n${read('scenario.js')}\n</script>`);
+html = html.replace('<script src="engine.js"></script>', () => `<script>\n${read('engine.js')}\n</script>`);
 
 const flag = process.argv.indexOf('--scenario');
 const scenarioFile = flag >= 0 ? process.argv[flag + 1] : null;

@@ -1,6 +1,7 @@
 (function () {
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
+  const QE = window.QUEUE_ENGINE;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -18,7 +19,7 @@
     nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
     running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
     t: 0, spent: 0, reqs: 0, modelSpent: 0, chaos: {}, errors: 0,
-    res: {}, rate: 0, pathLat: 0
+    res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {}
   };
   let seq = 1;
   const uid = () => 'n' + seq++;
@@ -133,9 +134,16 @@
         lat[id] = latS;
         const hit = n.type === 'cache' ? Math.max(0, Math.min(100, p.hit)) / 100 : 0;
         outLambda[id] = lambda[id] * (1 - hit);
+        // A Queue cannot forward more than it can serve. The excess waits in
+        // the backlog; every other node keeps the full fan-out semantics.
+        if (n.type === 'queues') outLambda[id] = QE.forward(outLambda[id], p, true);
         const failing = n.type === 'external' && state.chaos.store402 > performance.now() / 1000;
         const err = failing ? 1 : util > 1 ? Math.min(0.85, (util - 1) * 0.55) : 0;
-        state.res[id] = { lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0, out: outLambda[id] };
+        state.res[id] = {
+          lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0, out: outLambda[id],
+          capacity: n.type === 'queues' ? QE.capacity(p) : undefined,
+          backlog: state.backlog[id] || 0, drops: state.drops[id] || 0
+        };
       }
       out[id].forEach(to => {
         lambda[to] += outLambda[id];
@@ -395,24 +403,35 @@
     if (over) out.push({ t: 'HOT PATH BOTTLENECK \u00b7 ' + esc(nname(over.n)), c: 'crit' });
     if (errs.length) out.push({ t: 'ERROR BUDGET BURN', c: 'warn' });
     if (drops) out.push({ t: 'DATA LOSS RISK \u00b7 sync drops', c: 'warn' });
-    if (spof && out.length < 3) out.push({ t: 'SPOF \u00b7 ' + esc(nname(spof.n)), c: 'warn' });
-    const html = out.slice(0, 3).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
+    const qDrops = rows.filter(x => x.n.type === 'queues' && (state.drops[x.n.id] || 0) > 0);
+    const qBacklog = rows.filter(x => x.n.type === 'queues' && (state.backlog[x.n.id] || 0) > 0 && !qDrops.includes(x));
+    if (qDrops.length) out.push({ t: 'QUEUE EXPIRY \u00b7 messages dropped', c: 'warn' });
+    else if (qBacklog.length) out.push({ t: 'QUEUE BACKLOG \u00b7 ' + esc(nname(qBacklog[0].n)), c: 'warn' });
+    if (spof && out.length < 4) out.push({ t: 'SPOF \u00b7 ' + esc(nname(spof.n)), c: 'warn' });
+    const html = out.slice(0, 4).map(a => '<span class="alert ' + a.c + '">' + a.t + '</span>').join('');
     const box = $('#alerts');
     if (box.innerHTML !== html) box.innerHTML = html;
   }
 
-  function statsHtml(r) {
-    return '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
+  function statsHtml(r, isQueue) {
+    let html = '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
       '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
       '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
       '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
       '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>';
+    if (isQueue) {
+      const b = r.backlog || 0;
+      html += '<div><span>backlog</span><b>' + (b ? Math.round(b).toLocaleString() : '0') + '</b></div>' +
+        '<div><span>drops</span><b>' + ((r.drops || 0) ? r.drops.toFixed(1) + '/s' : '0/s') + '</b></div>';
+    }
+    return html;
   }
 
   function renderInspectorStats() {
     const el = $('#ins-stats');
     if (!el || !state.sel) return;
-    el.innerHTML = statsHtml(state.res[state.sel] || {});
+    const n = nodeById(state.sel);
+    el.innerHTML = statsHtml(state.res[state.sel] || {}, !!n && n.type === 'queues');
   }
 
   function renderInspector() {
@@ -430,6 +449,7 @@
       rate: 'Requests / s',
       concurrency: 'Concurrency',
       latency: 'Service time (ms)',
+      retention: 'Retention (s)',
       price: '$ per million units',
       units: 'Units per request',
       hit: 'Cache hit %',
@@ -448,7 +468,7 @@
       const R = RANGES[f] || [0, 1e6, 1];
       html += '<label class="field"><span>' + L + '</span><input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
-    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r) + '</div>';
+    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n.type === 'queues') + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
     if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
     if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
@@ -752,6 +772,7 @@
     state.nodes = []; state.edges = []; seq = 1;
     state.name = 'Beauty store on Cloudflare';
     state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
+    state.backlog = {}; state.drops = {};
     const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
     const waf = addNode('waf', 160, 220);
     const cache = addNode('cache', 300, 220);
@@ -804,6 +825,20 @@
     toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
   }
 
+  // Advance every Queue's backlog with simulated time. Reads the previous
+  // compute() result for lambda, so the flow and the queue stay in agreement.
+  function stepQueues(dtSim) {
+    state.nodes.forEach(n => {
+      if (n.type !== 'queues' || !(dtSim > 0)) return;
+      const prev = state.res[n.id] || {};
+      const qp = eff(n).p;
+      const cap = QE.capacity(qp);
+      const b = QE.step(state.backlog[n.id] || 0, prev.lambda || 0, cap, dtSim, qp.retention);
+      state.backlog[n.id] = b.backlog;
+      state.drops[n.id] = b.drops;
+    });
+  }
+
   let lastReal = 0, acc = 0;
   function loop(ts) {
     if (!lastReal) lastReal = ts;
@@ -811,6 +846,7 @@
     lastReal = ts;
     if (state.running) {
       const dtSim = dtReal * state.speed;
+      stepQueues(dtSim);
       state.t += dtSim;
       state.spent += state.rate * dtSim;
       state.reqs += sourceRate() * dtSim;
@@ -839,6 +875,7 @@
   });
   $('#reset').addEventListener('click', () => {
     state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
+    state.backlog = {}; state.drops = {};
     compute(); render(); toast('Simulation reset');
   });
   function speedEq(v) {
@@ -945,7 +982,9 @@
       const r = state.res[n.id] || {};
       nodes[n.id] = {
         type: n.type, lambda: r.lambda || 0, util: r.util || 0,
-        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0
+        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
+        out: r.out || 0, capacity: r.capacity || 0,
+        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0
       };
     });
     return {
@@ -968,6 +1007,7 @@
     }
     state.name = s.name;
     state.nodes = known;
+    state.backlog = {}; state.drops = {};
     state.opaque = s.nodes.filter(n => !hasType(n));
     state.rootExtra = {};
     Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) state.rootExtra[k] = s[k]; });
