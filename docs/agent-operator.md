@@ -36,6 +36,8 @@ A node has `id`, `type`, optional finite `x`/`y`, optional `alias`, and optional
 
 Unknown node types are preserved as opaque data but are not rendered or simulated. A scenario containing only opaque nodes is rejected by `window.__SIM__.load()`. HTTP POST can preserve opaque nodes already in storage but cannot introduce a new unknown type. Edges touching opaque nodes are exported but ignored by the physics pass.
 
+Legacy `workers_ai` nodes carrying external `inPrice` or `outPrice` fields migrate to `external_model` during validation. Native `workers_ai` nodes keep their id and feed Cloudflare Neuron usage; `external_model` remains a separate non-Cloudflare token-spend bucket.
+
 `window.SCENARIO.validate(raw, window.CATALOG)` currently returns `{ scenario, error, dropped }`. `window.__SIM__.load()` and HTTP POST reject `dropped > 0`; warning-only results can be accepted. Errors are human-readable strings, not structured codes.
 
 Minimal shape:
@@ -154,7 +156,11 @@ Export captures architecture only. Persist with `POST /scenario` when other tabs
 | `rate` | Cloudflare usage rate in USD/s; excludes plan base fees and non-Cloudflare nodes. |
 | `spent` | Accumulated Cloudflare usage in USD; excludes plan base fees and model/external spend. |
 | `pathLat` | Longest active source-to-node latency chain in seconds. |
-| `nodes` | Object keyed by node id. |
+| `plan` | Current `free`, `paid`, or `custom` plan selection. |
+| `usage` | Current modeled monthly Cloudflare totals by pricing dimension. |
+| `monthly` | Current plan result: base, overage, total, lines, exceeded limits, and unverified dimensions. |
+| `modelSpend` | Current external-model monthly projection as `{ set, total }`; not accumulated spend. |
+| `nodes` | Object keyed by known node id; opaque nodes are omitted. |
 
 ### Per-node state
 
@@ -169,12 +175,18 @@ Export captures architecture only. Persist with `POST /scenario` when other tabs
 | `capacity` | Queue service capacity in requests/s; zero for non-Queue nodes. |
 | `backlog` | Queued messages, advanced with simulated time. |
 | `drops` | Retention-expiry drops in messages/s, not a cumulative count. |
+| `billedRequests` | Durable Object billed requests/s after transport and WebSocket message rules. |
+| `doGbS` | Durable Object monthly GB-s under the current active-duration model. |
+| `objects` | Durable Object count used for explicit sharding. |
+| `perObjectRate` | Durable Object arrivals/s divided by object count. |
+| `objectLimit` | Documented per-object soft request-rate limit used by the model. |
+| `overloaded` | Whether the Durable Object reaches its modeled service or per-object limit. |
 
 Flow follows edges with full fan-out; edge `weight` does not affect physics. Ordinary nodes use M/M/c with Erlang-C, caches forward only the miss fraction, and only Queue nodes throttle into backlog. See [src/app.js](../src/app.js) and [src/engine.js](../src/engine.js) for the model.
 
 ### Cloudflare, model, and external spend
 
-Cloudflare usage, accumulation, overage, and projections exclude nodes marked `cloudflare: false`. Model-token spend is a separate bucket and remains unset until all four model token fields are populated. The UI currently shows model projections in `#k-model` and `#k-modelreq`, but `getState()` does **not** expose accumulated or projected model spend. Treat UI text as provisional observation, not machine contract.
+Cloudflare usage, accumulation, overage, and projections exclude nodes marked `cloudflare: false`. Native `workers_ai` inference contributes Neuron usage to Cloudflare spend. External-model token spend is a separate bucket and remains unset until all four token fields are populated; `getState().modelSpend` exposes its current monthly projection, while accumulated model spend remains internal. The UI shows the projection in `#k-model` and accumulated per-request model spend in `#k-modelreq`.
 
 The external API node is non-Cloudflare and has no separate external-spend bucket; its reported cost is zero. Prices, plan math, `asOf`, and source links live only in [src/pricing.js](../src/pricing.js).
 
@@ -183,8 +195,9 @@ The external API node is non-Cloudflare and has no separate external-spend bucke
 - This is a rate model, not a load test or Cloudflare emulator. It does not model retries, variable batch sizes, distributed coordination, storage/egress, or real provider capacity.
 - Catalog `verified` notes and source links identify sourced claims; other values are editable assumptions. Record which inputs were assumptions.
 - Cycles are skipped by the topological pass, so nodes in a cycle receive zero traffic.
+- Durable Object arrivals are assumed evenly sharded; active duration is capped per object and does not model individual connection schedules or pending I/O.
 - `load()` changes architecture without resetting runtime counters; Reset keeps the architecture and running state.
-- Plan, budget, speed, chaos, model spend, request count, and CPU rate are absent from `getState()` and scenario export.
+- Base-fee/budget inputs, speed, chaos, accumulated model spend, request count, and CPU rate are absent from `getState()` and scenario export.
 - SSE synchronizes scenarios only. It does not synchronize run state, metrics, spend, or control changes.
 - Static HTML has no persistence; only `serve.mjs` provides the file-backed channel.
 - Unknown nodes are preserved but not fail-closed: they can be omitted from simulation while remaining in exported/stored data, and they are absent from `getState().nodes`.
