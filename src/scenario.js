@@ -89,7 +89,7 @@
       }
       let type = rn.type;
       const legacyModel = type === 'workers_ai' && rn.p &&
-        (rn.p.inPrice != null || rn.p.outPrice != null);
+        (Object.hasOwn(rn.p, 'inPrice') || Object.hasOwn(rn.p, 'outPrice'));
       if (legacyModel) type = 'external_model';
       if (typeof type !== 'string' || !isOwn(types, type)) {
         if (typeof type === 'string' && !isProtoName(type)) {

@@ -45,12 +45,11 @@
   function nodeById(id) { return state.nodes.find(n => n.id === id); }
 
   function eff(n) {
-    const p = Object.assign({}, n.p);
+    let p = Object.assign({}, n.p);
     const now = performance.now() / 1000;
     let slashed = false;
-    if (n.type === 'workers_ai' && state.chaos.model429 > now) {
-      p.latency *= 3; p.concurrency = Math.max(1, Math.round(p.concurrency * 0.4)); slashed = true;
-    }
+    const modelHit = QE.model429(n.type, p, state.chaos.model429 > now);
+    if (modelHit.slashed) { p = modelHit.p; slashed = true; }
     if (n.type === 'durable_objects' && state.chaos.doEvict > now) {
       p.latency *= 8; slashed = true;
     }

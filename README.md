@@ -137,7 +137,7 @@ node build.mjs           # -> dist/cloudflare-arch-sim.html (single offline file
 
 node serve.mjs --port 8788            # page + shared scenario channel on 127.0.0.1:8788
 node build.mjs --scenario scenario.json   # offline build with scenario.json embedded
-node --test                            # 67 tests: pricing, model, scenario and HTTP channel
+node --test                            # 72 tests: pricing, model, scenario and HTTP channel
 ```
 
 `node serve.mjs --port 8788` serves the page at `http://127.0.0.1:8788/`, the live `scenario.json`
@@ -254,7 +254,7 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 
 ## Verification and known gaps
 
-`node --test` passes all 67 tests on this branch (pricing math, catalog/price parity, P0 audit
+`node --test` passes all 72 tests on this branch (pricing math, catalog/price parity, P0 audit
 fixtures, queue and Durable Object physics, schema validation, merge rules and the HTTP channel).
 `npm pack --dry-run` lists only the files the installed CLI needs; `prepublishOnly` runs the tests
 and rebuilds the bundle before publication. Prices are the values in `PRICING.dims` with

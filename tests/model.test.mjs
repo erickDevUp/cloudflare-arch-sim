@@ -31,6 +31,10 @@ function run(input, plan = 'paid') {
   return { scenario: s, model, usage, monthly };
 }
 
+function rawMonthly(usage) {
+  return pricing.dims.reduce((sum, d) => sum + (usage[d.id] || 0) / d.unit * d.price, 0);
+}
+
 const base = {
   traffic: { rate: 1, concurrency: 1, latency: 0, price: 0, units: 1 },
   cache: { concurrency: 1000000, latency: 2, price: 0, units: 1, hit: 0 },
@@ -131,6 +135,80 @@ test('one Durable Object overloads at 1500/s while 100 objects do not', () => {
   const pool = run(input);
   assert.equal(pool.model.res.n2.perObjectRate, 15);
   assert.equal(pool.model.res.n2.overloaded, false);
+});
+
+test('Durable Object live duration cost uses monthly GB-second units', () => {
+  const { model, usage, monthly } = run(chain(
+    node('n1', 'traffic', Object.assign({}, base.traffic, { rate: 1500 })),
+    node('n2', 'durable_objects', Object.assign({}, base.durable_objects, {
+      transport: 'hibernatable', activeMs: 20
+    }))
+  ), 'custom');
+  const expected = usage.doRequests / 1e6 * 0.15 + usage.doGbS / 1e6 * 12.5;
+  assert.ok(Math.abs(model.res.n2.cost * pricing.monthlyUsage(1) - expected) < 1e-9);
+  assert.ok(Math.abs(monthly.rateMonthly - expected) < 1e-9);
+  assert.ok(Math.abs(monthly.total - expected) < 1e-9);
+});
+
+test('Durable Object WebSocket live request cost uses the 20:1 billed rate', () => {
+  const input = chain(
+    node('n1', 'traffic', Object.assign({}, base.traffic, { rate: 1000 })),
+    node('n2', 'durable_objects', Object.assign({}, base.durable_objects, {
+      objects: 100, transport: 'hibernatable', activeMs: 0, connections: 10
+    }))
+  );
+  const custom = run(input, 'custom');
+  assert.equal(custom.model.res.n2.billedRequests, 60);
+  assert.equal(custom.usage.doRequests, 60 * pricing.monthlyUsage(1));
+  const expected = custom.usage.doRequests / 1e6 * 0.15;
+  assert.ok(Math.abs(custom.model.res.n2.cost * pricing.monthlyUsage(1) - expected) < 1e-9);
+  assert.ok(Math.abs(custom.monthly.total - expected) < 1e-9);
+  const paid = run(input).monthly.lines.find(l => l.id === 'doRequests');
+  assert.equal(paid.cost.toFixed(2), '23.55');
+});
+
+test('live rate and Custom projection equal raw Cloudflare dimension charges', () => {
+  const fixtures = [
+    chain(
+      node('n1', 'traffic', Object.assign({}, base.traffic, { rate: 200 })),
+      node('n2', 'cache', Object.assign({}, base.cache, { hit: 80 })),
+      node('n3', 'workers', Object.assign({}, base.workers, { latency: 20, cpuMs: 5 })),
+      node('n4', 'r2', base.r2)
+    ),
+    chain(
+      node('n1', 'traffic', Object.assign({}, base.traffic, { rate: 100 })),
+      node('n2', 'workers', base.workers),
+      node('n3', 'queues', base.queues),
+      node('n4', 'workers', Object.assign({}, base.workers, { concurrency: 2, latency: 500, cpuMs: 5 })),
+      node('n5', 'r2', base.r2)
+    ),
+    chain(
+      node('n1', 'traffic', Object.assign({}, base.traffic, { rate: 1500 })),
+      node('n2', 'durable_objects', Object.assign({}, base.durable_objects, {
+        objects: 100, transport: 'hibernatable', activeMs: 20, rowsRead: 2, rowsWritten: 1, storedGb: 6
+      }))
+    )
+  ];
+  fixtures.forEach(input => {
+    const { model, usage, monthly } = run(input, 'custom');
+    const expected = rawMonthly(usage);
+    assert.ok(Math.abs(model.rate * pricing.monthlyUsage(1) - expected) < 1e-6);
+    assert.ok(Math.abs(monthly.rateMonthly - expected) < 1e-6);
+    assert.ok(Math.abs(monthly.total - expected) < 1e-6);
+  });
+});
+
+test('429 chaos applies to native and external models', () => {
+  ['workers_ai', 'external_model'].forEach(type => {
+    const hit = QE.model429(type, { latency: 900, concurrency: 24 }, true);
+    assert.equal(hit.slashed, true);
+    assert.equal(hit.p.latency, 2700);
+    assert.equal(hit.p.concurrency, 10);
+  });
+  const idle = QE.model429('external_model', { latency: 900, concurrency: 24 }, false);
+  assert.equal(idle.slashed, false);
+  assert.equal(idle.p.latency, 900);
+  assert.equal(QE.model429('workers', { latency: 10, concurrency: 24 }, true).slashed, false);
 });
 
 test('Durable Objects separate WebSocket request billing from shared duration', () => {

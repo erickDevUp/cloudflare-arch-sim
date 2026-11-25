@@ -356,6 +356,18 @@ test('legacy external workers_ai scenarios migrate without losing token fields',
   assert.deepEqual(scenario.decode(scenario.encode(s)), s);
 });
 
+test('the origin/main default scenario migrates its null external model fields', () => {
+  const raw = JSON.parse(fs.readFileSync(new URL('./legacy-default.json', import.meta.url), 'utf8'));
+  const { scenario: s, error, dropped } = scenario.validate(raw, catalog);
+  assert.equal(error, null);
+  assert.equal(dropped, 0);
+  assert.equal(s.nodes.length, 12);
+  assert.equal(s.edges.length, 10);
+  assert.equal(s.nodes.find(n => n.id === 'n7').type, 'external_model');
+  assert.equal(s.nodes.find(n => n.id === 'n7').p.inPrice, null);
+  assert.deepEqual(scenario.decode(scenario.encode(s)), s);
+});
+
 test('native Workers AI keeps token counts and fills Neuron rates', () => {
   const raw = minimal();
   raw.nodes.push({ id: 'm', type: 'workers_ai', p: { inTokens: 1000, outTokens: 500 } });

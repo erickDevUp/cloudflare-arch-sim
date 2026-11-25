@@ -86,6 +86,14 @@
     };
   }
 
+  function model429(type, p, active) {
+    if (!active || (type !== 'workers_ai' && type !== 'external_model')) return { p, slashed: false };
+    const next = Object.assign({}, p);
+    next.latency *= 3;
+    next.concurrency = Math.max(1, Math.round(next.concurrency * 0.4));
+    return { p: next, slashed: true };
+  }
+
   function emptyResult() {
     return { lambda: 0, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0, out: 0,
       backlog: 0, drops: 0, billedRequests: 0, doGbS: 0, objects: 0,
@@ -117,7 +125,8 @@
       cost += (p.storageGb || 0) * (p.priceStorage || 0) / monthSeconds;
     }
     if (n.type === 'durable_objects') {
-      cost += r.doGbS / monthSeconds * (p.priceGBs || 0);
+      cost = r.billedRequests * (p.units || 0) * (p.price || 0) / 1e6;
+      cost += r.doGbS / monthSeconds * (p.priceGBs || 0) / 1e6;
       cost += r.lambda * (p.rowsRead || 0) * (p.priceRowRead || 0) / 1e6;
       cost += r.lambda * (p.rowsWritten || 0) * (p.priceRowWritten || 0) / 1e6;
       cost += (p.storedGb || 0) * (p.priceStoredGb || 0) / monthSeconds;
@@ -268,5 +277,5 @@
   }
 
   return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, erlangC,
-    durableObject, compute, usage };
+    durableObject, model429, compute, usage };
 });
