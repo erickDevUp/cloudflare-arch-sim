@@ -17,7 +17,7 @@ Load this skill for repository changes or for using the simulator to design/eval
 - Preserve M/M/c, full fan-out, cache forwarding, simulated-time queue backlog, retention drops, and separate Cloudflare/model spend.
 - Never hand-edit `dist/`; rebuild it and keep it fresh.
 - Preserve unknown scenario data and lossless merge behavior.
-- Keep UI work in English and defer localization/copy changes to Phase 2 after P0.
+- Keep UI copy in English, Cloudflare totals distinct from external/model spend, and verified prices/limits distinct from editable assumptions.
 - Use Orca's browser for UI checks.
 - Treat `window.SIM_API` v1 as the stable browser agent contract; treat `window.__SIM__`, HTTP/SSE, and DOM controls as compatibility surfaces.
 - Treat MCP v1 as a local stdio adapter over the same semantics. It has no filesystem save, merge, network listener, or remote transport; stdout is protocol-only.
@@ -71,4 +71,5 @@ Return changed files or design findings, commands/results, request IDs/errors, r
 - `../../src/pricing.js`
 - `../../src/engine.js`
 - `../../src/app.js`
+- `../../src/ux.js`
 - `../../scenario.json`

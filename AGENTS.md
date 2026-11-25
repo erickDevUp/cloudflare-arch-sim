@@ -14,6 +14,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `src/agent-api.js` | Versioned browser API, pure validation/result helpers, provenance, and structured errors |
 | `src/headless-service.js` | Deterministic in-memory simulator host using the existing API, engine, catalog, scenario, and pricing modules |
 | `packages/mcp/mcp-server.mjs` | Local MCP stdio adapter, explicit tool schemas, resources, prompt, and bin entry |
+| `src/ux.js` | Pure UX state, tab navigation, field provenance, and keyboard connect helpers |
 | `src/engine.js` | Pure queue capacity, forwarding, backlog, and retention helpers |
 | `src/state-core.mjs` | Pure identity, persistence-status, and runtime snapshot helpers shared by UI, API, and headless hosts; build generates the Node 18 CommonJS companion `src/state-core.cjs` |
 | `src/catalog.js` | Node types, defaults, editable ranges, verified notes, and source links |
@@ -24,7 +25,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `cli.mjs` | npm `bin` wrapper and agent-facing flag validation |
 | `build.mjs` | Inlines CSS, JavaScript, and icons into one offline HTML file |
 | `dist/cloudflare-arch-sim.html` | Generated package payload; never hand-edit |
-| `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, scenario, server, CLI, browser/headless APIs, and MCP stdio |
+| `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, scenario, server, CLI, browser/headless APIs, MCP stdio, and UX helpers |
 | `docs/agent-operator.md` | Stable `window.SIM_API` v1 contract plus legacy HTTP/SSE operator behavior |
 | `docs/mcp.md` | MCP stdio configuration, tool/resource/prompt contract, examples, and v1 boundary |
 | `docs/images/` | README screenshots |
@@ -52,7 +53,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - MCP v1 is an adapter over the same semantics. Its workspace owns the MCP SDK and schema dependencies; the root package does not. It is local stdio only, reserves stdout for protocol frames, sends diagnostics to stderr, and has no filesystem save, merge, network listener, or remote transport.
 - Scenario persistence is revisioned and atomic: v1 `save()` returns revision/hash only after 2xx, uses `If-Match`, and clears dirty only when the saved snapshot is still current.
 - `dist/` is generated. Commit it with source changes; CI validates freshness against a clean temporary build.
-- UI language is English. UI localization/copy work belongs to Phase 2 after P0.
+- UI language is English. Keep Cloudflare totals distinct from external/model spend, and distinguish verified prices/limits from editable assumptions.
 
 ## Commands
 
@@ -129,8 +130,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 
 ### UI
 
-1. Treat `src/index.html`, `src/styles.css`, and `src/app.js` as the presentation layer; keep English copy.
-2. Run `npm run build` and the state-channel smoke test.
+1. Treat `src/index.html`, `src/styles.css`, `src/app.js`, and `src/ux.js` as the presentation layer; keep English copy.
+2. Run `npm test -- tests/ux.test.mjs`, `npm run build`, and the state-channel smoke test.
 3. Use Orca's browser, not a generic browser tool, for visual and console checks:
 
 ```sh
@@ -141,7 +142,7 @@ orca console --page <browserPageId> --limit 50 --json
 orca tab close --page <browserPageId> --json
 ```
 
-4. Replace `<browserPageId>` with the id returned by `tab create`; close the tab and stop the server when finished.
+4. Replace `<browserPageId>` with the id returned by `tab create`; check desktop and 390 px mobile layouts, keyboard node/tab interaction, closed-panel focus behavior, and the console. Close the tab and stop the server when finished.
 
 ### Docs and agent tooling
 
