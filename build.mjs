@@ -6,7 +6,8 @@ const src = path.join(root, 'src');
 const read = f => fs.readFileSync(path.join(src, f), 'utf8');
 
 const iconNames = ['activity', 'globe', 'shield', 'shield-check', 'layers', 'zap', 'box',
-  'list-ordered', 'database', 'key-round', 'archive', 'scan-search', 'route', 'sparkles', 'plug'];
+  'list-ordered', 'database', 'key-round', 'archive', 'scan-search', 'route', 'sparkles', 'plug',
+  'image', 'video'];
 
 const icons = {};
 for (const name of iconNames) {

@@ -45,6 +45,7 @@
     let dropped = 0; // genuinely unusable nodes/edges; writers reject these
     const types = (catalog && catalog.types) || {};
     const ranges = (catalog && catalog.ranges) || {};
+    const enums = (catalog && catalog.enums) || {};
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return { scenario: null, error: 'Scenario: expected a JSON object', dropped: 1 };
     }
@@ -86,7 +87,10 @@
         dropped++;
         return;
       }
-      const type = rn.type;
+      let type = rn.type;
+      const legacyModel = type === 'workers_ai' && rn.p &&
+        (Object.hasOwn(rn.p, 'inPrice') || Object.hasOwn(rn.p, 'outPrice'));
+      if (legacyModel) type = 'external_model';
       if (typeof type !== 'string' || !isOwn(types, type)) {
         if (typeof type === 'string' && !isProtoName(type)) {
           // Genuine unknown type: keep the raw node verbatim, render nothing.
@@ -138,6 +142,15 @@
           // (the external model token prices); every other param stays numeric.
           const nullable = v === null && def.p[k] === null;
           if (nullable) { p[k] = null; return; }
+          if (enums[k]) {
+            if (!enums[k].includes(v)) {
+              issues.push('invalid value for "' + k + '" on node "' + id + '"');
+              dropped++;
+              return;
+            }
+            p[k] = v;
+            return;
+          }
           if (!fin(v)) {
             issues.push('invalid value for "' + k + '" on node "' + id + '"');
             dropped++;

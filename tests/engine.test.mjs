@@ -28,22 +28,33 @@ test('backlog grows when lambda > capacity and drains when lambda < capacity', (
 
 test('messages drop once FIFO wait exceeds retention', () => {
   const cap = 2, retention = 100, dt = 10;
-  const first = QE.step(0, 5, cap, dt, retention); // wait reaches 15 s
+  const first = QE.step(0, 5, cap, dt, retention);
   assert.equal(first.backlog, 30);
   assert.equal(first.drops, 0);
-
-  // drive simulated time forward until wait would exceed retention
   let b = first.backlog, drops = 0;
   for (let i = 0; i < 10; i++) {
     const s = QE.step(b, 5, cap, dt, retention);
     b = s.backlog;
     drops = Math.max(drops, s.drops);
   }
-  // backlog is capped at capacity * retention
   assert.ok(b <= cap * retention + 1e-9);
-  assert.ok(drops > 0, 'expired messages are counted as drops/s');
-  // retention 0 disables expiry: backlog grows unbounded, nothing drops
-  const unlimited = QE.step(0, 5, cap, dt, 0);
+  assert.ok(drops > 0);
+});
+
+test('retention 0 disables expiry: backlog grows unbounded, nothing drops', () => {
+  const unlimited = QE.step(0, 5, 2, 10, 0);
   assert.equal(unlimited.backlog, 30);
   assert.equal(unlimited.drops, 0);
+});
+
+test('Erlang wait stays continuous across the 400-server cap', () => {
+  const wait = c => QE.erlangC(200, c) / (c - 200);
+  const below = wait(399);
+  const at = wait(400);
+  const above = wait(401);
+  assert.ok(Number.isFinite(at));
+  assert.ok(at > 0);
+  assert.ok(Math.abs(at - below) < 0.0001);
+  assert.ok(Math.abs(above - at) < 0.0001);
+  assert.ok(above < at && at < below);
 });

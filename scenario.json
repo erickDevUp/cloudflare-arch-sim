@@ -87,10 +87,10 @@
       "p": {
         "concurrency": 24,
         "latency": 900,
-        "inPrice": null,
-        "outPrice": null,
-        "inTokens": null,
-        "outTokens": null
+        "inTokens": 1000,
+        "outTokens": 500,
+        "neuronsIn": 4625,
+        "neuronsOut": 30475
       }
     },
     {

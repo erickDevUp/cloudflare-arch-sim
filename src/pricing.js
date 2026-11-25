@@ -6,7 +6,13 @@
 
   const SOURCES = {
     workers: 'https://developers.cloudflare.com/workers/platform/pricing/',
-    d1: 'https://developers.cloudflare.com/d1/platform/pricing/'
+    d1: 'https://developers.cloudflare.com/d1/platform/pricing/',
+    durableObjects: 'https://developers.cloudflare.com/durable-objects/platform/pricing/',
+    queues: 'https://developers.cloudflare.com/queues/platform/pricing/',
+    r2: 'https://developers.cloudflare.com/r2/pricing/',
+    images: 'https://developers.cloudflare.com/images/pricing/',
+    stream: 'https://developers.cloudflare.com/stream/pricing/',
+    workersAi: 'https://developers.cloudflare.com/workers-ai/platform/pricing/'
   };
 
   const PLANS = {
@@ -33,13 +39,28 @@
     },
     {
       id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
-      price: 0.15, paidIncluded: 1e6, freeDaily: 100000,
-      verified: true, source: SOURCES.workers
+      price: 0.15, paidIncluded: 1e6, freeDaily: 100000, roundUp: true,
+      verified: true, source: SOURCES.durableObjects
     },
     {
       id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
-      price: 12.5, paidIncluded: 4e5, freeDaily: 13000,
-      verified: true, source: SOURCES.workers
+      price: 12.5, paidIncluded: 4e5, freeDaily: 13000, roundUp: true,
+      verified: true, source: SOURCES.durableObjects
+    },
+    {
+      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6,
+      price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
+      verified: true, source: SOURCES.durableObjects
+    },
+    {
+      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6,
+      price: 1, paidIncluded: 50e6, freeDaily: 100000,
+      verified: true, source: SOURCES.durableObjects
+    },
+    {
+      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1,
+      price: 0.20, paidIncluded: 5, freeMonthly: 5,
+      verified: true, source: SOURCES.durableObjects
     },
     {
       id: 'kvReads', label: 'KV reads', unit: 1e6,
@@ -49,7 +70,52 @@
     {
       id: 'queueOps', label: 'Queues operations', unit: 1e6,
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
-      verified: true, source: SOURCES.workers
+      verified: true, source: SOURCES.queues
+    },
+    {
+      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6,
+      price: 4.50, paidIncluded: 1e6, freeMonthly: 1e6,
+      verified: true, source: SOURCES.r2
+    },
+    {
+      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6,
+      price: 0.36, paidIncluded: 1e7, freeMonthly: 1e7,
+      verified: true, source: SOURCES.r2
+    },
+    {
+      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1,
+      price: 0.015, paidIncluded: 10, freeMonthly: 10,
+      verified: true, source: SOURCES.r2
+    },
+    {
+      id: 'imagesTransformed', label: 'Images transformations', unit: 1000,
+      price: 0.50, paidIncluded: 5000, freeMonthly: 5000,
+      verified: true, source: SOURCES.images
+    },
+    {
+      id: 'imagesStored', label: 'Images stored', unit: 100000,
+      price: 5, paidIncluded: 0, freeMonthly: 0,
+      verified: true, source: SOURCES.images
+    },
+    {
+      id: 'imagesDelivered', label: 'Images delivered', unit: 100000,
+      price: 1, paidIncluded: 0, freeMonthly: 0,
+      verified: true, source: SOURCES.images
+    },
+    {
+      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000,
+      price: 5, paidIncluded: 0, freeMonthly: 0, roundUp: true,
+      verified: true, source: SOURCES.stream
+    },
+    {
+      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000,
+      price: 1, paidIncluded: 0, freeMonthly: 0,
+      verified: true, source: SOURCES.stream
+    },
+    {
+      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000,
+      price: 0.011, paidIncluded: 10000 * HOURS_PER_MONTH / 24, freeDaily: 10000,
+      verified: true, source: SOURCES.workersAi
     }
   ];
 
@@ -75,10 +141,10 @@
             period: 'per request', ratio: per / d.freePerRequest, over: per > d.freePerRequest, cost: 0
           };
         } else {
-          const limit = d.freeDaily * HOURS_PER_MONTH / 24;
+          const limit = d.freeDaily != null ? d.freeDaily * HOURS_PER_MONTH / 24 : d.freeMonthly;
           line = {
             id: d.id, label: d.label, used, limit, daily: d.freeDaily,
-            period: 'per day', ratio: used / limit, over: used > limit, cost: 0
+            period: d.freeDaily != null ? 'per day' : 'per month', ratio: limit > 0 ? used / limit : Infinity, over: used > limit, cost: 0
           };
         }
         lines.push(line);
@@ -93,11 +159,12 @@
         const used = +u[d.id] || 0;
         if (!used) return;
         const over = Math.max(0, used - d.paidIncluded);
-        const cost = over / d.unit * d.price;
+        const billable = d.roundUp && over > 0 ? Math.ceil(over / d.unit) * d.unit : over;
+        const cost = billable / d.unit * d.price;
         overage += cost;
         lines.push({
           id: d.id, label: d.label, used, included: d.paidIncluded,
-          over, cost, ratio: used / d.paidIncluded
+          over, billable, cost, ratio: d.paidIncluded > 0 ? used / d.paidIncluded : Infinity
         });
       });
       const base = PLANS.paid.base;
@@ -136,7 +203,7 @@
   }
 
   const api = {
-    asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
+    asOf: '2026-11-24', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
     plans: PLANS, dims: DIMS, monthlyCost, monthlyUsage, modelSpend
   };
   root.PRICING = api;
