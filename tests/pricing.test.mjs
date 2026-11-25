@@ -133,5 +133,7 @@ test('every verified dimension points at a declared source', () => {
   const declared = Object.values(sources);
   dims.filter(d => d.verified).forEach(d => {
     assert.ok(declared.includes(d.source), d.id + ' has an undeclared source');
+    assert.equal(typeof d.usageUnit, 'string');
+    assert.ok(d.usageUnit.length > 0);
   });
 });

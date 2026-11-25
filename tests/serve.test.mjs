@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -69,6 +70,45 @@ test('POST requires application/json (CORS-simple text/plain is refused)', async
     assert.equal(res.status, 415);
     assert.equal(fs.readFileSync(path.join(dir, 'scenario.json'), 'utf8'), before);
     assert.equal((await fetch(base + '/scenario')).status, 200);
+  } finally {
+    stop(server, dir);
+  }
+});
+
+const hashText = text => createHash('sha256').update(text).digest('hex');
+
+test('GET and POST expose revision/hash identity and stale saves conflict atomically', async () => {
+  const dir = makeDir();
+  const file = path.join(dir, 'scenario.json');
+  const { server, base } = await start(dir);
+  try {
+    const initial = await fetch(base + '/scenario');
+    const initialText = await initial.text();
+    const initialHash = hashText(initialText);
+    assert.equal(initial.headers.get('x-scenario-revision'), '1');
+    assert.equal(initial.headers.get('x-scenario-hash'), initialHash);
+    assert.equal(initial.headers.get('etag'), '"' + initialHash + '"');
+
+    const first = await post(base, { version: 1, name: 'Revision two', nodes: valid().nodes, edges: [] });
+    assert.equal(first.status, 200);
+    const firstPayload = await first.json();
+    assert.equal(firstPayload.revision, 2);
+    assert.equal(firstPayload.hash, hashText(fs.readFileSync(file, 'utf8')));
+    assert.equal(first.headers.get('etag'), '"' + firstPayload.hash + '"');
+
+    const before = fs.readFileSync(file, 'utf8');
+    const stale = await post(base, { version: 1, name: 'Stale write', nodes: valid().nodes, edges: [] }, {
+      'if-match': initial.headers.get('etag')
+    });
+    assert.equal(stale.status, 409);
+    assert.equal((await stale.json()).code, 'STORAGE_CONFLICT');
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+
+    const current = await post(base, { version: 1, name: 'Revision three', nodes: valid().nodes, edges: [] }, {
+      'if-match': first.headers.get('etag')
+    });
+    assert.equal(current.status, 200);
+    assert.equal((await current.json()).revision, 3);
   } finally {
     stop(server, dir);
   }

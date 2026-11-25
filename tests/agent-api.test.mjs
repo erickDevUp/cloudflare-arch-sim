@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import API from '../src/agent-api.js';
 import SCENARIO from '../src/scenario.js';
+import ENGINE from '../src/engine.js';
 import PRICING from '../src/pricing.js';
 
 const catalog = new Function('window',
@@ -32,6 +33,19 @@ function candidate() {
 function makeHost(input = candidate()) {
   let current = SCENARIO.validate(input, catalog).scenario;
   let loadCalls = 0;
+  let saveCalls = 0;
+  let storedRevision = 7;
+  let storedHash = 'sha256-initial';
+  let runSeq = 0;
+  const nextRunId = () => 'run-' + String(++runSeq).padStart(6, '0');
+  const identity = {
+    scenarioRevision: 7,
+    scenarioHash: 'sha256-initial',
+    runId: nextRunId(),
+    dirty: false,
+    saving: false,
+    saveError: null
+  };
   const simulation = {
     time: 0,
     running: false,
@@ -40,11 +54,12 @@ function makeHost(input = candidate()) {
     rate: 0,
     pathLat: 0,
     requests: 0,
+    requestCount: 0,
     modelSpent: 0,
     cpuRate: 0,
     baseFee: 0,
     budget: 5000,
-    chaos: [],
+    chaos: {},
     plan: 'paid',
     usage: { workersRequests: 1000, queueOps: 3000 },
     monthly: PRICING.monthlyCost('paid', { workersRequests: 1000, queueOps: 3000 }),
@@ -62,20 +77,40 @@ function makeHost(input = candidate()) {
       }
     }
   };
+  const resetRuntime = () => {
+    Object.assign(simulation, {
+      time: 0, running: false, spent: 0, requests: 0, requestCount: 0,
+      modelSpent: 0, chaos: {}
+    });
+    simulation.nodes.queue.backlog = 0;
+    simulation.nodes.queue.drops = 0;
+  };
   const host = {
     catalog,
     pricing: PRICING,
     scenario: SCENARIO,
+    runtime: simulation,
     getScenario: () => clone(current),
     getSimulation: () => clone(simulation),
-    getModel: () => ({ requestsPerUserPerMonth: 100, engine: {} }),
-    loadScenario: scenario => {
+    getIdentity: () => clone(identity),
+    getModel: () => ({ requestsPerUserPerMonth: 100, engine: Object.assign({}, ENGINE.MODEL) }),
+    loadScenario: (scenario, options) => {
       loadCalls++;
       current = clone(scenario);
+      identity.runId = nextRunId();
+      if (!options || options.resetRuntime !== false) resetRuntime();
+      identity.scenarioRevision = options && options.persisted ? storedRevision : null;
+      identity.scenarioHash = options && options.persisted ? storedHash : null;
+      identity.dirty = !(options && options.persisted);
+      identity.saveError = null;
     },
     setParams: (nodeId, patch) => {
       const node = current.nodes.find(item => item.id === nodeId);
       node.p = Object.assign({}, node.p, patch);
+      identity.dirty = true;
+      identity.scenarioRevision = null;
+      identity.scenarioHash = null;
+      identity.saveError = null;
       return { nodeId, params: clone(node.p) };
     },
     start: speed => {
@@ -84,12 +119,42 @@ function makeHost(input = candidate()) {
     },
     pause: () => { simulation.running = false; },
     reset: () => {
-      simulation.time = 0;
-      simulation.spent = 0;
-      simulation.requests = 0;
-      simulation.modelSpent = 0;
+      simulation.running = false;
+      resetRuntime();
+      identity.runId = nextRunId();
     },
-    loadCalls: () => loadCalls
+    run: seconds => {
+      simulation.running = false;
+      ENGINE.advanceClock(simulation, seconds, dt => {
+        const queue = simulation.nodes.queue;
+        const next = ENGINE.step(queue.backlog, 10, 1, dt, 100);
+        queue.backlog = next.backlog;
+        queue.drops = next.drops;
+        return { rate: simulation.rate, requests: 10, modelRate: 0 };
+      });
+      simulation.requestCount = simulation.requests;
+    },
+    setSpeed: speed => { simulation.speed = speed; },
+    saveScenario: async scenario => {
+      saveCalls++;
+      storedRevision++;
+      storedHash = 'sha256-' + saveCalls;
+      if (JSON.stringify(current) === JSON.stringify(scenario)) {
+        identity.scenarioRevision = storedRevision;
+        identity.scenarioHash = storedHash;
+        identity.dirty = false;
+        identity.saveError = null;
+      }
+      return { data: { revision: storedRevision, hash: storedHash, scenario: clone(scenario) } };
+    },
+    getChannelStatus: () => ({ available: true, saving: identity.saving, revision: identity.scenarioRevision, hash: identity.scenarioHash }),
+    failSave: error => {
+      identity.dirty = true;
+      identity.saveError = error;
+      return { error };
+    },
+    loadCalls: () => loadCalls,
+    saveCalls: () => saveCalls
   };
   return host;
 }
@@ -98,6 +163,7 @@ test('result helpers and request IDs are deterministic', () => {
   const host = makeHost();
   const sim = API.createAgentApi(host);
   assert.equal(sim.version, 1);
+  assert.equal(sim.apiVersion, 1);
   assert.deepEqual(API.success('sim-v1-000001', { value: 1 }), {
     ok: true, data: { value: 1 }, requestId: 'sim-v1-000001'
   });
@@ -109,6 +175,52 @@ test('result helpers and request IDs are deterministic', () => {
   const missing = sim.setParams('missing', { rate: 1 });
   assert.equal(missing.requestId, 'sim-v1-000003');
   assert.equal(missing.error.code, API.ERROR_CODES.UNKNOWN_NODE);
+});
+
+test('capabilities advertise versions, node types, limits, and deterministic clock', () => {
+  const host = makeHost();
+  const result = API.createAgentApi(host).capabilities();
+  assert.equal(result.ok, true);
+  assert.equal(result.data.apiVersion, 1);
+  assert.equal(result.data.schemaVersion, 1);
+  assert.equal(result.data.modelVersion, 'rate-v1');
+  assert.equal(result.data.deterministicClock, true);
+  assert.deepEqual(result.data.supportedNodeTypes, Object.keys(catalog.types).sort());
+  assert.equal(result.data.limits.maxSpeed, 7200);
+  assert.equal(result.data.limits.maxRunSeconds, 31536000);
+  assert.equal(result.data.persistence.available, true);
+});
+
+test('validate is strict, structured, and non-mutating', () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  const before = host.getScenario();
+  const raw = candidate();
+  raw.preview = true;
+  const original = clone(raw);
+  const result = sim.validate(raw);
+  assert.equal(result.ok, true);
+  assert.equal(result.data.valid, true);
+  assert.equal(result.data.scenario.preview, true);
+  assert.equal(result.data.warnings.length, 1);
+  assert.deepEqual(raw, original);
+  assert.deepEqual(host.getScenario(), before);
+  assert.equal(host.loadCalls(), 0);
+  result.data.scenario.nodes[0].p.rate = 999;
+  assert.equal(raw.nodes[0].p.rate, 10);
+
+  const cases = [
+    [{ version: 2, nodes: [] }, API.ERROR_CODES.UNSUPPORTED_SCHEMA_VERSION],
+    [{ version: 1, nodes: [{ id: 'q', type: 'quantum_lb' }], edges: [] }, API.ERROR_CODES.UNSUPPORTED_NODE_TYPE],
+    [{ version: 1, nodes: [{ id: 'a', type: 'traffic', p: { replicas: 3 } }], edges: [] }, API.ERROR_CODES.UNSUPPORTED_PARAMETER],
+    [{ version: 1, nodes: [{ id: 'a', type: 'traffic', p: { rate: 0 } }], edges: [] }, API.ERROR_CODES.PARAMETER_OUT_OF_RANGE]
+  ];
+  cases.forEach(([value, code]) => {
+    const invalid = sim.validate(value);
+    assert.equal(invalid.ok, false);
+    assert.equal(invalid.error.code, code);
+  });
+  assert.equal(host.loadCalls(), 0);
 });
 
 test('loadScenario normalizes valid input and reports preserved-field warnings', () => {
@@ -123,6 +235,8 @@ test('loadScenario normalizes valid input and reports preserved-field warnings',
   assert.equal(result.data.scenario.preview, true);
   assert.equal(result.data.warnings.length, 1);
   assert.match(result.data.warnings[0], /unknown field "preview"/);
+  assert.equal(result.data.runId, 'run-000002');
+  assert.equal(result.data.dirty, true);
   assert.equal(host.loadCalls(), 1);
 });
 
@@ -132,12 +246,12 @@ test('loadScenario fails closed without partial mutation', () => {
   const before = host.getScenario();
   const cases = [
     [null, API.ERROR_CODES.INVALID_SCENARIO],
-    [{ version: 2, nodes: [] }, API.ERROR_CODES.INVALID_SCENARIO],
+    [{ version: 2, nodes: [] }, API.ERROR_CODES.UNSUPPORTED_SCHEMA_VERSION],
     [{ version: 1, nodes: {} }, API.ERROR_CODES.INVALID_SCENARIO],
     [{ version: 1, nodes: [{ id: '__proto__', type: 'traffic' }], edges: [] }, API.ERROR_CODES.INVALID_SCENARIO],
-    [{ version: 1, nodes: [{ id: 'q', type: 'quantum_lb' }], edges: [] }, API.ERROR_CODES.UNSUPPORTED_NODE],
-    [{ version: 1, nodes: [{ id: 'a', type: 'traffic', p: { replicas: 3 } }], edges: [] }, API.ERROR_CODES.INVALID_PARAMS],
-    [{ version: 1, nodes: [{ id: 'a', type: 'traffic', p: { rate: 0 } }], edges: [] }, API.ERROR_CODES.INVALID_SCENARIO],
+    [{ version: 1, nodes: [{ id: 'q', type: 'quantum_lb' }], edges: [] }, API.ERROR_CODES.UNSUPPORTED_NODE_TYPE],
+    [{ version: 1, nodes: [{ id: 'a', type: 'traffic', p: { replicas: 3 } }], edges: [] }, API.ERROR_CODES.UNSUPPORTED_PARAMETER],
+    [{ version: 1, nodes: [{ id: 'a', type: 'traffic', p: { rate: 0 } }], edges: [] }, API.ERROR_CODES.PARAMETER_OUT_OF_RANGE],
     [{ version: 1, nodes: [{ id: 'a', type: 'traffic' }, { id: 'a', type: 'workers' }], edges: [] }, API.ERROR_CODES.INVALID_SCENARIO]
   ];
   cases.forEach(([raw, code]) => {
@@ -157,10 +271,86 @@ test('a later unsupported node prevents an earlier valid node from loading', () 
   raw.nodes[0].p.rate = 999;
   raw.nodes.push({ id: 'future', type: 'quantum_lb' });
   const result = sim.loadScenario(raw);
-  assert.equal(result.error.code, API.ERROR_CODES.UNSUPPORTED_NODE);
+  assert.equal(result.error.code, API.ERROR_CODES.UNSUPPORTED_NODE_TYPE);
   assert.deepEqual(result.error.details.nodes, [{ id: 'future', type: 'quantum_lb' }]);
   assert.deepEqual(host.getScenario(), before);
   assert.equal(host.loadCalls(), 0);
+});
+
+test('non-strict loads preserve unsupported content and invalid options fail closed', () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  const raw = {
+    version: 2,
+    nodes: [{ id: 'q', type: 'quantum_lb', p: { replicas: 3 } }],
+    edges: []
+  };
+  const loaded = sim.loadScenario(raw, { strict: false });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.data.scenario.version, 1);
+  assert.equal(loaded.data.unsupported.length, 1);
+  assert.equal(loaded.data.scenario.nodes[0].type, 'quantum_lb');
+  assert.equal(loaded.data.scenario.nodes[0].p.replicas, 3);
+
+  const before = host.getScenario();
+  [{ strict: 'yes' }, { persist: 1 }, { unknown: true }].forEach(options => {
+    const result = sim.loadScenario(candidate(), options);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, API.ERROR_CODES.INVALID_OPTIONS);
+    assert.deepEqual(host.getScenario(), before);
+  });
+});
+
+test('loadScenario resetRuntime defaults on and false preserves runtime only', () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  Object.assign(host.runtime, {
+    time: 42, running: true, speed: 99, plan: 'custom', budget: 123, baseFee: 7,
+    spent: 2, requests: 4, requestCount: 4, modelSpent: 1, chaos: { m429: 50 }
+  });
+  host.runtime.nodes.queue.backlog = 12;
+  host.runtime.nodes.queue.drops = 3;
+  const before = host.getSimulation();
+  const raw = candidate();
+  raw.name = 'Runtime preserved';
+  const loaded = sim.loadScenario(raw, { resetRuntime: false });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.data.runId, 'run-000002');
+  const after = host.getSimulation();
+  ['time', 'running', 'speed', 'plan', 'budget', 'baseFee', 'spent', 'requests', 'requestCount', 'modelSpent', 'chaos', 'nodes']
+    .forEach(key => assert.deepEqual(after[key], before[key], key));
+  assert.equal(host.getScenario().name, 'Runtime preserved');
+
+  const reset = sim.loadScenario(candidate());
+  assert.equal(reset.ok, true);
+  assert.equal(reset.data.runId, 'run-000003');
+  assert.equal(host.getSimulation().running, false);
+  assert.equal(host.getSimulation().time, 0);
+  assert.equal(host.getSimulation().requests, 0);
+  assert.deepEqual(host.getSimulation().chaos, {});
+  assert.equal(host.getSimulation().nodes.queue.backlog, 0);
+  assert.equal(host.getSimulation().speed, 99);
+});
+
+test('persisted loads install only after a successful save', async () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  const raw = candidate();
+  raw.name = 'Persisted candidate';
+  const loaded = await sim.loadScenario(raw, { persist: true });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.data.save.revision, 8);
+  assert.equal(loaded.data.dirty, false);
+  assert.equal(host.getScenario().name, 'Persisted candidate');
+
+  const before = host.getScenario();
+  host.saveScenario = async () => ({
+    error: { code: 'SAVE_FAILED', message: 'disk full', details: { status: 500 } }
+  });
+  const failed = await sim.loadScenario(raw, { persist: true });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.error.code, 'SAVE_FAILED');
+  assert.deepEqual(host.getScenario(), before);
 });
 
 test('legacy external Workers AI migration remains valid', () => {
@@ -188,8 +378,8 @@ test('setParams validates the whole patch before updating one node', () => {
     ['__proto__', { rate: 1 }, API.ERROR_CODES.UNKNOWN_NODE],
     ['source', {}, API.ERROR_CODES.INVALID_PARAMS],
     ['source', null, API.ERROR_CODES.INVALID_PARAMS],
-    ['source', { rate: 20, unsupported: 1 }, API.ERROR_CODES.INVALID_PARAMS],
-    ['source', { rate: 20, concurrency: -1 }, API.ERROR_CODES.INVALID_PARAMS],
+    ['source', { rate: 20, unsupported: 1 }, API.ERROR_CODES.UNSUPPORTED_PARAMETER],
+    ['source', { rate: 20, concurrency: -1 }, API.ERROR_CODES.PARAMETER_OUT_OF_RANGE],
     ['source', { rate: Number.NaN }, API.ERROR_CODES.INVALID_PARAMS],
     ['state', { transport: 'carrier-pigeon' }, API.ERROR_CODES.INVALID_PARAMS]
   ];
@@ -201,49 +391,186 @@ test('setParams validates the whole patch before updating one node', () => {
   });
 });
 
-test('start options and controls validate before mutating state', () => {
+test('start, setSpeed, pause, and invalid controls validate before mutating state', () => {
   const host = makeHost();
   const sim = API.createAgentApi(host);
   const started = sim.start({ speed: 120 });
-  assert.deepEqual(started.data, { running: true, speed: 120, time: 0 });
+  assert.deepEqual(started.data, {
+    running: true, speed: 120, time: 0, runId: 'run-000001', scenarioRevision: 7,
+    scenarioHash: 'sha256-initial', dirty: false, saving: false, saveError: null
+  });
   const before = sim.getState().data.simulation;
   [0, 7201, 1.5, { speed: 60, reset: true }, 'fast'].forEach(options => {
     const result = sim.start(options);
     assert.equal(result.ok, false);
-    assert.equal(result.error.code, API.ERROR_CODES.INVALID_PARAMS);
+    assert.equal(result.error.code, API.ERROR_CODES.INVALID_OPTIONS);
     assert.deepEqual(sim.getState().data.simulation, before);
   });
+  assert.equal(sim.setSpeed(240).data.speed, 240);
+  assert.equal(sim.setSpeed(0).error.code, API.ERROR_CODES.INVALID_PARAMS);
   assert.equal(sim.pause().data.running, false);
   assert.equal(sim.reset().data.time, 0);
 });
 
-test('getState includes simulation, billing, Queue/DO fields, assumptions, provenance, and warnings', () => {
+test('run advances exact simulated time and produces identical state for equal inputs', () => {
+  const first = makeHost();
+  const second = makeHost();
+  const a = API.createAgentApi(first);
+  const b = API.createAgentApi(second);
+  a.loadScenario(candidate());
+  b.loadScenario(candidate());
+  const beforeA = a.getState().data;
+  const beforeB = b.getState().data;
+  assert.deepEqual(beforeA, beforeB);
+  assert.equal(a.run({ seconds: 10 }).data.time, 10);
+  assert.equal(b.run({ seconds: 10 }).data.time, 10);
+  assert.deepEqual(a.getState().data, b.getState().data);
+  const state = a.getState().data;
+  const expected = ENGINE.step(0, 10, 1, 10, 100);
+  assert.equal(state.requestCount, 100);
+  assert.equal(state.nodes.queue.backlog, expected.backlog);
+  assert.equal(state.nodes.queue.drops, expected.drops);
+  assert.equal(state.running, false);
+
+  const beforeInvalid = a.getState().data;
+  [{}, { seconds: 0 }, { seconds: -1 }, { seconds: Infinity }, { seconds: 31536001 }, { seconds: 1, extra: true }]
+    .forEach(options => {
+      const result = a.run(options);
+      assert.equal(result.ok, false);
+      assert.equal(result.error.code, API.ERROR_CODES.INVALID_OPTIONS);
+      assert.deepEqual(a.getState().data, beforeInvalid);
+    });
+});
+
+test('reset changes run identity and clears runtime without changing architecture or storage state', () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  sim.setSpeed(180);
+  sim.start();
+  sim.run({ seconds: 5 });
+  const scenario = sim.exportScenario().data;
+  const identity = sim.getState().data;
+  const reset = sim.reset();
+  assert.equal(reset.ok, true);
+  assert.notEqual(reset.data.runId, identity.runId);
+  assert.equal(reset.data.running, false);
+  assert.equal(reset.data.time, 0);
+  assert.equal(reset.data.speed, 180);
+  assert.deepEqual(sim.exportScenario().data, scenario);
+  const state = sim.getState().data;
+  assert.equal(state.requestCount, 0);
+  assert.equal(state.nodes.queue.backlog, 0);
+  assert.equal(state.nodes.queue.drops, 0);
+  assert.equal(state.dirty, identity.dirty);
+  assert.equal(state.saveError, identity.saveError);
+});
+
+test('save clears dirty only after a successful response', async () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  sim.setParams('source', { rate: 20 });
+  assert.equal(sim.getState().data.dirty, true);
+  let resolveSave;
+  const save = host.saveScenario;
+  host.saveScenario = scenario => new Promise(resolve => {
+    resolveSave = async () => resolve(await save(scenario));
+  });
+  const pending = sim.save();
+  assert.equal(sim.getState().data.dirty, true);
+  resolveSave();
+  const saved = await pending;
+  assert.equal(saved.ok, true);
+  assert.equal(saved.data.revision, 8);
+  assert.equal(saved.data.hash, 'sha256-1');
+  assert.equal(sim.getState().data.dirty, false);
+  assert.equal(sim.getState().data.scenarioRevision, 8);
+  assert.equal(sim.getState().data.saveError, null);
+});
+
+test('a save cannot clear a newer dirty edit', async () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  sim.setParams('source', { rate: 20 });
+  let resolveSave;
+  const save = host.saveScenario;
+  host.saveScenario = scenario => new Promise(resolve => {
+    resolveSave = async () => resolve(await save(scenario));
+  });
+  const pending = sim.save();
+  sim.setParams('source', { rate: 30 });
+  resolveSave();
+  assert.equal((await pending).ok, true);
+  assert.equal(sim.getState().data.dirty, true);
+  assert.equal(sim.exportScenario().data.nodes[0].p.rate, 30);
+});
+
+test('save failures keep dirty state and expose structured errors', async () => {
+  const codes = ['SAVE_FAILED', 'CHANNEL_UNAVAILABLE', 'STORAGE_CONFLICT'];
+  for (const code of codes) {
+    const host = makeHost();
+    const sim = API.createAgentApi(host);
+    sim.setParams('source', { rate: 20 });
+    const error = { code, message: code.toLowerCase(), details: { status: code === 'STORAGE_CONFLICT' ? 409 : 500 } };
+    host.saveScenario = async () => host.failSave(error);
+    const result = await sim.save();
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, code);
+    const state = sim.getState().data;
+    assert.equal(state.dirty, true);
+    assert.equal(state.saveError.code, code);
+  }
+});
+
+test('getState includes complete identity, runtime, billing, model, node, and diagnostic fields', () => {
   const host = makeHost();
   const result = API.createAgentApi(host).getState();
   assert.equal(result.ok, true);
   const state = result.data;
-  assert.equal(state.version, 1);
+  ['apiVersion', 'schemaVersion', 'modelVersion', 'scenarioRevision', 'runId', 'time', 'running', 'speed',
+    'plan', 'budget', 'baseFee', 'requestCount', 'dirty', 'saving', 'saveError'].forEach(key => {
+    assert.ok(Object.hasOwn(state, key), key);
+  });
+  assert.equal(state.apiVersion, 1);
+  assert.equal(state.schemaVersion, 1);
+  assert.equal(state.modelVersion, 'rate-v1');
   assert.equal(state.scenario.name, 'Agent candidate');
   assert.equal(state.simulation.speed, 60);
   assert.equal(state.plan, 'paid');
   assert.deepEqual(state.usage, { workersRequests: 1000, queueOps: 3000 });
   assert.equal(state.monthly.plan, 'paid');
-  assert.deepEqual(state.modelSpend, { set: false, total: 0 });
+  assert.equal(state.units.time, 'simulated seconds');
+  assert.equal(state.cloudflare.units.workersRequests.unit, 'requests/month');
+  assert.equal(state.cloudflare.allowances.length, PRICING.dims.length);
+  assert.ok(Array.isArray(state.cloudflare.exceeded));
+  assert.ok(Array.isArray(state.cloudflare.unverified));
+  assert.equal(state.cloudflare.overage, state.monthly.overage);
+  assert.deepEqual(Object.keys(state.model).sort(), ['accumulated', 'monthly', 'perRequest', 'priceInputs', 'set', 'units'].sort());
+  assert.equal(state.model.monthly, 0);
+  assert.equal(state.model.accumulated, 0);
+  assert.equal(state.model.perRequest, null);
+  assert.equal(state.model.priceInputs.length, 1);
   assert.equal(state.nodes.queue.backlog, 900);
   assert.equal(state.nodes.queue.drops, 9);
+  assert.equal(state.nodes.queue.units.drops, 'messages/s');
+  assert.equal(Object.hasOwn(state.nodes.queue, 'billedRequests'), false);
   assert.equal(state.nodes.state.billedRequests, 1);
   assert.equal(state.nodes.state.doGbS, 100);
   assert.equal(state.nodes.state.objects, 1);
   assert.equal(state.nodes.state.perObjectRate, 1);
   assert.equal(state.nodes.state.objectLimit, 1000);
   assert.equal(state.nodes.state.overloaded, true);
-  assert.equal(state.assumptions.find(item => item.id === 'requestsPerUserPerMonth').classification,
-    'editable_model_assumption');
+  assert.equal(Object.hasOwn(state.nodes.state, 'backlog'), false);
+  assert.ok(state.assumptions.find(item => item.id === 'requestsPerUserPerMonth').classification.includes('assumption'));
   assert.equal(state.provenance.pricing.asOf, PRICING.asOf);
-  assert.equal(state.provenance.pricing.dimensions.every(item => item.verified), true);
-  assert.ok(state.provenance.nodes.api.verified);
+  assert.equal(state.provenance.pricing.hoursPerMonth, PRICING.hoursPerMonth);
+  assert.deepEqual(state.provenance.pricing.sources, PRICING.sources);
+  assert.equal(state.provenance.nodes.api.verified, true);
   assert.equal(state.provenance.nodes.api.source, catalog.types.workers.doc);
   assert.equal(state.provenance.nodes.api.params.latency.classification, 'editable_model_assumption');
+  assert.ok(Array.isArray(state.diagnostics.warnings));
+  assert.ok(Array.isArray(state.unsupported));
+  assert.ok(Array.isArray(state.assumptions));
+  assert.ok(Array.isArray(state.limitations));
   const codes = state.warnings.map(item => item.code);
   ['QUEUE_BACKLOG', 'QUEUE_EXPIRY', 'DURABLE_OBJECT_OVERLOAD', 'MODEL_SPEND_UNSET'].forEach(code => {
     assert.ok(codes.includes(code), code);
@@ -263,10 +590,10 @@ test('getState warns about cycles and unsupported boot data', () => {
   const state = API.createAgentApi(host).getState().data;
   const codes = state.warnings.map(item => item.code);
   assert.ok(codes.includes('CYCLE_DETECTED'));
-  assert.ok(codes.includes('UNSUPPORTED_NODE'));
+  assert.ok(codes.includes('UNSUPPORTED_CONTENT'));
 });
 
-test('exportScenario is canonical and returns an isolated copy', () => {
+test('exportScenario is canonical, isolated, and can include assessment and provenance', () => {
   const host = makeHost();
   const sim = API.createAgentApi(host);
   const first = sim.exportScenario();
@@ -276,13 +603,25 @@ test('exportScenario is canonical and returns an isolated copy', () => {
   assert.equal(JSON.stringify(sim.exportScenario().data), canonical);
   const loaded = sim.loadScenario(sim.exportScenario().data);
   assert.equal(JSON.stringify(loaded.data.scenario), canonical);
+  const assessment = sim.exportScenario({ assessment: true, provenance: true });
+  assert.equal(assessment.ok, true);
+  assert.equal(assessment.data.assessment.cloudflare.allowances.length, PRICING.dims.length);
+  assert.equal(assessment.data.assessment.model.priceInputs.length, 1);
+  assert.equal(assessment.data.provenance.asOf, PRICING.asOf);
 });
 
-test('invalid host state and unexpected failures use structured errors', () => {
+test('invalid host state, oversized scenarios, and unexpected failures use structured errors', () => {
   const host = makeHost();
   host.getScenario = () => null;
   const invalid = API.createAgentApi(host).getState();
   assert.equal(invalid.error.code, API.ERROR_CODES.INVALID_STATE);
+
+  const oversized = { version: 1, nodes: [], edges: [], padding: 'x'.repeat(API.LIMITS.maxScenarioBytes) };
+  const tooBig = API.createAgentApi(makeHost()).validate(oversized);
+  assert.equal(tooBig.error.code, API.ERROR_CODES.INVALID_SCENARIO);
+  const circular = { version: 1, nodes: [], edges: [] };
+  circular.self = circular;
+  assert.equal(API.createAgentApi(makeHost()).validate(circular).error.code, API.ERROR_CODES.INVALID_SCENARIO);
 
   const broken = makeHost();
   broken.getScenario = () => { throw new Error('host exploded'); };

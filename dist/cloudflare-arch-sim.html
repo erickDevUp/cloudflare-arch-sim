@@ -387,97 +387,97 @@ button{font:inherit;cursor:pointer}
 
   const DIMS = [
     {
-      id: 'workersRequests', label: 'Workers requests', unit: 1e6,
+      id: 'workersRequests', label: 'Workers requests', unit: 1e6, usageUnit: 'requests/month',
       price: 0.30, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6,
+      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6, usageUnit: 'CPU-ms/month',
       price: 0.02, paidIncluded: 3e7, freePerRequest: 10,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'd1Rows', label: 'D1 rows read', unit: 1e6,
+      id: 'd1Rows', label: 'D1 rows read', unit: 1e6, usageUnit: 'rows read/month',
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.d1
     },
     {
-      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
+      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6, usageUnit: 'requests/month',
       price: 0.15, paidIncluded: 1e6, freeDaily: 100000, roundUp: true,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
+      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6, usageUnit: 'GB-s/month',
       price: 12.5, paidIncluded: 4e5, freeDaily: 13000, roundUp: true,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6,
+      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6, usageUnit: 'rows read/month',
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6,
+      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6, usageUnit: 'rows written/month',
       price: 1, paidIncluded: 50e6, freeDaily: 100000,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1,
+      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1, usageUnit: 'GB-month',
       price: 0.20, paidIncluded: 5, freeMonthly: 5,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'kvReads', label: 'KV reads', unit: 1e6,
+      id: 'kvReads', label: 'KV reads', unit: 1e6, usageUnit: 'reads/month',
       price: 0.50, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'queueOps', label: 'Queues operations', unit: 1e6,
+      id: 'queueOps', label: 'Queues operations', unit: 1e6, usageUnit: 'operations/month',
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
       verified: true, source: SOURCES.queues
     },
     {
-      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6,
+      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6, usageUnit: 'Class A operations/month',
       price: 4.50, paidIncluded: 1e6, freeMonthly: 1e6,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6,
+      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6, usageUnit: 'Class B operations/month',
       price: 0.36, paidIncluded: 1e7, freeMonthly: 1e7,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1,
+      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1, usageUnit: 'GB-month',
       price: 0.015, paidIncluded: 10, freeMonthly: 10,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'imagesTransformed', label: 'Images transformations', unit: 1000,
+      id: 'imagesTransformed', label: 'Images transformations', unit: 1000, usageUnit: 'transformations/month',
       price: 0.50, paidIncluded: 5000, freeMonthly: 5000,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'imagesStored', label: 'Images stored', unit: 100000,
+      id: 'imagesStored', label: 'Images stored', unit: 100000, usageUnit: 'images/month',
       price: 5, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'imagesDelivered', label: 'Images delivered', unit: 100000,
+      id: 'imagesDelivered', label: 'Images delivered', unit: 100000, usageUnit: 'images/month',
       price: 1, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000,
+      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000, usageUnit: 'minutes stored/month',
       price: 5, paidIncluded: 0, freeMonthly: 0, roundUp: true,
       verified: true, source: SOURCES.stream
     },
     {
-      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000,
+      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000, usageUnit: 'minutes delivered/month',
       price: 1, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.stream
     },
     {
-      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000,
+      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000, usageUnit: 'Neurons/month',
       price: 0.011, paidIncluded: 10000 * HOURS_PER_MONTH / 24, freeDaily: 10000,
       verified: true, source: SOURCES.workersAi
     }
@@ -1233,6 +1233,27 @@ window.CATALOG = {
     return { backlog: keptWait * cap, drops: expiredMsgs / dt };
   }
 
+  function advanceClock(runtime, seconds, step, settle) {
+    let remaining = seconds;
+    while (remaining > 0) {
+      const deadlines = Object.values(runtime.chaos || {})
+        .filter(value => typeof value === 'number' && isFinite(value) && value > runtime.time);
+      const until = deadlines.length ? Math.min.apply(null, deadlines) - runtime.time : Infinity;
+      const dt = Math.min(remaining, until);
+      const sample = step(dt, runtime.time) || {};
+      runtime.time += dt;
+      runtime.spent = (runtime.spent || 0) + (+sample.rate || 0) * dt;
+      runtime.requests = (runtime.requests || 0) + (+sample.requests || 0) * dt;
+      runtime.modelSpent = (runtime.modelSpent || 0) + (+sample.modelRate || 0) * dt;
+      Object.keys(runtime.chaos || {}).forEach(key => {
+        if (runtime.chaos[key] <= runtime.time) delete runtime.chaos[key];
+      });
+      remaining -= dt;
+      if (settle) settle(runtime.time);
+    }
+    return runtime;
+  }
+
   function erlangC(a, c) {
     const servers = Math.max(1, Math.round(c));
     if (servers <= 1) return Math.min(1, a);
@@ -1459,7 +1480,7 @@ window.CATALOG = {
     return u;
   }
 
-  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, erlangC,
+  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, advanceClock, erlangC,
     durableObject, model429, compute, usage };
 });
 
@@ -1473,14 +1494,37 @@ window.CATALOG = {
   'use strict';
 
   const VERSION = 1;
+  const SCHEMA_VERSION = 1;
+  const MODEL_VERSION = 'rate-v1';
+  const LIMITS = Object.freeze({
+    maxSpeed: 7200,
+    maxRunSeconds: 31536000,
+    maxScenarioBytes: 1048576,
+    maxHashChars: 8000
+  });
   const ERROR_CODES = Object.freeze({
     INVALID_SCENARIO: 'INVALID_SCENARIO',
-    UNSUPPORTED_NODE: 'UNSUPPORTED_NODE',
+    UNSUPPORTED_SCHEMA_VERSION: 'UNSUPPORTED_SCHEMA_VERSION',
+    UNSUPPORTED_NODE_TYPE: 'UNSUPPORTED_NODE_TYPE',
+    UNSUPPORTED_PARAMETER: 'UNSUPPORTED_PARAMETER',
+    PARAMETER_OUT_OF_RANGE: 'PARAMETER_OUT_OF_RANGE',
     UNKNOWN_NODE: 'UNKNOWN_NODE',
     INVALID_PARAMS: 'INVALID_PARAMS',
+    INVALID_OPTIONS: 'INVALID_OPTIONS',
     INVALID_STATE: 'INVALID_STATE',
+    SAVE_FAILED: 'SAVE_FAILED',
+    CHANNEL_UNAVAILABLE: 'CHANNEL_UNAVAILABLE',
+    STORAGE_CONFLICT: 'STORAGE_CONFLICT',
     INTERNAL_ERROR: 'INTERNAL_ERROR'
   });
+  const LIMITATIONS = Object.freeze([
+    'Rate model only; not a load test or Cloudflare emulator.',
+    'Retries, variable batches, distributed coordination, storage/egress, and real provider capacity are not modeled.',
+    'Cycles and their dependent nodes receive zero traffic in the topological pass.',
+    'Durable Object arrivals are evenly sharded and active duration is capped per object.',
+    'Chaos events are limited to the predefined catalog scenarios.',
+    'HTTP v1, subscriptions, MCP, and CLI JSON interfaces are not provided.'
+  ]);
   const hasOwn = (value, key) => Object.hasOwn(value, key);
   const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
   const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -1497,31 +1541,102 @@ window.CATALOG = {
     return { ok: false, error, requestId };
   }
 
+  function finish(requestId, result) {
+    if (result && result.error) return failure(requestId, result.error.code, result.error.message, result.error.details);
+    return success(requestId, result.data);
+  }
+
+  function internalFailure(requestId, err) {
+    return failure(requestId, ERROR_CODES.INTERNAL_ERROR, 'SIM_API request failed', {
+      message: String((err && err.message) || err).split('\n')[0]
+    });
+  }
+
   function request(seq, run) {
     const requestId = 'sim-v1-' + String(seq).padStart(6, '0');
     try {
       const result = run();
-      if (result && result.error) return failure(requestId, result.error.code, result.error.message, result.error.details);
-      return success(requestId, result.data);
+      if (result && typeof result.then === 'function') {
+        return result.then(value => finish(requestId, value), err => internalFailure(requestId, err));
+      }
+      return finish(requestId, result);
     } catch (err) {
-      return failure(requestId, ERROR_CODES.INTERNAL_ERROR, 'SIM_API request failed', {
-        message: String((err && err.message) || err).split('\n')[0]
-      });
+      return internalFailure(requestId, err);
     }
   }
 
-  function validateScenario(raw, host) {
+  function effectiveType(node) {
+    if (node && node.type === 'workers_ai' && isObject(node.p) &&
+        (hasOwn(node.p, 'inPrice') || hasOwn(node.p, 'outPrice'))) return 'external_model';
+    return node && node.type;
+  }
+
+  function inspectParams(raw, catalog) {
+    const unsupported = [];
+    const invalid = [];
+    const outOfRange = [];
+    (raw.nodes || []).forEach((node, index) => {
+      if (!isObject(node) || !isObject(node.p)) return;
+      const type = effectiveType(node);
+      const def = hasOwn(catalog.types, type) ? catalog.types[type] : null;
+      if (!def) return;
+      const nodeId = typeof node.id === 'string' && node.id ? node.id : 'nodes[' + index + ']';
+      Object.keys(node.p).forEach(param => {
+        const value = node.p[param];
+        if (!hasOwn(def.p || {}, param)) {
+          unsupported.push({ nodeId, param });
+          return;
+        }
+        if (value === null && def.p[param] === null) return;
+        if (catalog.enums[param]) {
+          if (!catalog.enums[param].includes(value)) invalid.push({ nodeId, param, reason: 'not an allowed value' });
+          return;
+        }
+        if (!finite(value)) {
+          invalid.push({ nodeId, param, reason: 'expected a finite number' });
+          return;
+        }
+        const range = catalog.ranges[param];
+        if (range && (value < range[0] || value > range[1])) {
+          outOfRange.push({ nodeId, param, min: range[0], max: range[1] });
+        }
+      });
+    });
+    return { unsupported, invalid, outOfRange };
+  }
+
+  function validateScenario(raw, host, options) {
+    const strict = !options || options.strict !== false;
     if (!isObject(raw)) {
       return { error: { code: ERROR_CODES.INVALID_SCENARIO, message: 'Scenario must be an object' } };
     }
-    if (raw.version !== undefined && raw.version !== VERSION) {
+    let bytes;
+    try {
+      bytes = new TextEncoder().encode(JSON.stringify(raw)).length;
+    } catch (err) {
+      return { error: { code: ERROR_CODES.INVALID_SCENARIO, message: 'Scenario must be JSON-serializable' } };
+    }
+    if (bytes > LIMITS.maxScenarioBytes) {
       return {
         error: {
           code: ERROR_CODES.INVALID_SCENARIO,
-          message: 'Unsupported scenario version',
-          details: { expected: VERSION, received: raw.version }
+          message: 'Scenario exceeds the size limit',
+          details: { maxBytes: LIMITS.maxScenarioBytes, receivedBytes: bytes }
         }
       };
+    }
+    const warnings = [];
+    if (raw.version !== undefined && raw.version !== SCHEMA_VERSION) {
+      if (strict) {
+        return {
+          error: {
+            code: ERROR_CODES.UNSUPPORTED_SCHEMA_VERSION,
+            message: 'Unsupported scenario schema version',
+            details: { expected: SCHEMA_VERSION, received: raw.version }
+          }
+        };
+      }
+      warnings.push('Unsupported schema version normalized to ' + SCHEMA_VERSION);
     }
     if (!Array.isArray(raw.nodes)) {
       return {
@@ -1529,6 +1644,34 @@ window.CATALOG = {
           code: ERROR_CODES.INVALID_SCENARIO,
           message: 'Scenario nodes must be an array',
           details: { field: 'nodes' }
+        }
+      };
+    }
+    const params = inspectParams(raw, host.catalog);
+    if (params.unsupported.length && strict) {
+      return {
+        error: {
+          code: ERROR_CODES.UNSUPPORTED_PARAMETER,
+          message: 'Scenario contains unsupported node params',
+          details: { params: params.unsupported }
+        }
+      };
+    }
+    if (params.invalid.length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Scenario contains invalid node params',
+          details: { params: params.invalid }
+        }
+      };
+    }
+    if (params.outOfRange.length) {
+      return {
+        error: {
+          code: ERROR_CODES.PARAMETER_OUT_OF_RANGE,
+          message: 'Scenario contains out-of-range node params',
+          details: { params: params.outOfRange }
         }
       };
     }
@@ -1542,7 +1685,7 @@ window.CATALOG = {
         }
       };
     }
-    const scenario = validated.scenario;
+    const scenario = clone(validated.scenario);
     const unsafeIds = scenario.nodes.filter(node => unsafeName(node.id)).map(node => node.id);
     if (unsafeIds.length) {
       return {
@@ -1553,35 +1696,23 @@ window.CATALOG = {
         }
       };
     }
-    const unsupported = scenario.nodes.filter(node => !hasOwn(host.catalog.types, node.type));
-    if (unsupported.length) {
+    const unsupportedNodes = scenario.nodes.filter(node => !hasOwn(host.catalog.types, node.type));
+    if (unsupportedNodes.length && strict) {
       return {
         error: {
-          code: ERROR_CODES.UNSUPPORTED_NODE,
+          code: ERROR_CODES.UNSUPPORTED_NODE_TYPE,
           message: 'Scenario contains unsupported node types',
-          details: {
-            nodes: unsupported.map(node => ({ id: node.id || null, type: node.type }))
-          }
+          details: { nodes: unsupportedNodes.map(node => ({ id: node.id || null, type: node.type })) }
         }
       };
     }
-    const invalidParams = [];
-    scenario.nodes.forEach(node => {
-      const allowed = ((host.catalog.types[node.type] || {}).p) || {};
-      Object.keys(node.p || {}).forEach(key => {
-        if (!hasOwn(allowed, key)) invalidParams.push({ nodeId: node.id, param: key });
-      });
-    });
-    if (invalidParams.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Scenario contains unsupported node params',
-          details: { params: invalidParams }
-        }
-      };
-    }
-    return { scenario, warnings: validated.error ? [validated.error] : [] };
+    if (validated.error) warnings.push(validated.error);
+    const unsupported = [
+      ...unsupportedNodes.map(node => ({ kind: 'node_type', nodeId: node.id || null, type: node.type })),
+      ...params.unsupported.map(item => Object.assign({ kind: 'parameter' }, item))
+    ];
+    if (unsupported.length) warnings.push('Unsupported content preserved in non-strict mode');
+    return { scenario, warnings, unsupported };
   }
 
   function validateParamPatch(nodeId, patch, scenario, catalog) {
@@ -1610,11 +1741,13 @@ window.CATALOG = {
     const def = catalog.types[node.type];
     const allowed = def.p || {};
     const invalid = [];
+    const outOfRange = [];
+    const unsupported = [];
     const safe = {};
     Object.keys(patch).forEach(key => {
       const value = patch[key];
       if (!hasOwn(allowed, key)) {
-        invalid.push({ param: key, reason: 'unsupported' });
+        unsupported.push(key);
         return;
       }
       if (value === null && allowed[key] === null) {
@@ -1632,11 +1765,20 @@ window.CATALOG = {
       }
       const range = catalog.ranges[key];
       if (range && (value < range[0] || value > range[1])) {
-        invalid.push({ param: key, reason: 'outside range', min: range[0], max: range[1] });
+        outOfRange.push({ param: key, min: range[0], max: range[1] });
         return;
       }
       safe[key] = value;
     });
+    if (unsupported.length) {
+      return {
+        error: {
+          code: ERROR_CODES.UNSUPPORTED_PARAMETER,
+          message: 'Unsupported node params',
+          details: { nodeId, params: unsupported }
+        }
+      };
+    }
     if (invalid.length) {
       return {
         error: {
@@ -1646,41 +1788,80 @@ window.CATALOG = {
         }
       };
     }
+    if (outOfRange.length) {
+      return {
+        error: {
+          code: ERROR_CODES.PARAMETER_OUT_OF_RANGE,
+          message: 'Node params are outside catalog ranges',
+          details: { nodeId, params: outOfRange }
+        }
+      };
+    }
     return { patch: safe };
   }
 
-  function validateStartOptions(options) {
+  function validateBooleanOptions(options, allowed) {
     if (options === undefined) return { options: {} };
     if (!isObject(options)) {
-      return { error: { code: ERROR_CODES.INVALID_PARAMS, message: 'Start options must be an object' } };
+      return { error: { code: ERROR_CODES.INVALID_OPTIONS, message: 'Options must be an object' } };
     }
-    const unknown = Object.keys(options).filter(key => key !== 'speed');
+    const unknown = Object.keys(options).filter(key => !allowed.includes(key));
     if (unknown.length) {
       return {
         error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Unsupported start options',
+          code: ERROR_CODES.INVALID_OPTIONS,
+          message: 'Unsupported options',
           details: { options: unknown }
         }
       };
     }
-    if (options.speed !== undefined && (!Number.isInteger(options.speed) || options.speed < 1 || options.speed > 7200)) {
+    const invalid = allowed.filter(key => options[key] !== undefined && typeof options[key] !== 'boolean');
+    if (invalid.length) {
       return {
         error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Speed must be an integer from 1 through 7200',
-          details: { speed: options.speed }
+          code: ERROR_CODES.INVALID_OPTIONS,
+          message: 'Boolean options required',
+          details: { options: invalid }
         }
       };
     }
-    return { options: { speed: options.speed } };
+    return { options: Object.fromEntries(allowed.map(key => [key, options[key]])) };
+  }
+
+  function validateSpeed(speed) {
+    if (!Number.isInteger(speed) || speed < 1 || speed > LIMITS.maxSpeed) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Speed must be an integer from 1 through ' + LIMITS.maxSpeed,
+          details: { speed }
+        }
+      };
+    }
+    return { speed };
+  }
+
+  function validateRunOptions(options) {
+    if (!isObject(options) || Object.keys(options).some(key => key !== 'seconds')) {
+      return { error: { code: ERROR_CODES.INVALID_OPTIONS, message: 'Run requires a seconds option' } };
+    }
+    if (!finite(options.seconds) || options.seconds <= 0 || options.seconds > LIMITS.maxRunSeconds) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_OPTIONS,
+          message: 'Seconds must be finite and greater than zero',
+          details: { min: 0, max: LIMITS.maxRunSeconds, seconds: options.seconds }
+        }
+      };
+    }
+    return { seconds: options.seconds };
   }
 
   function cycleNodes(scenario) {
     const nodes = new Map(scenario.nodes.map(node => [node.id, node]));
     const indegree = new Map(scenario.nodes.map(node => [node.id, 0]));
     const outgoing = new Map(scenario.nodes.map(node => [node.id, []]));
-    scenario.edges.forEach(edge => {
+    (scenario.edges || []).forEach(edge => {
       if (!nodes.has(edge.from) || !nodes.has(edge.to)) return;
       indegree.set(edge.to, indegree.get(edge.to) + 1);
       outgoing.get(edge.from).push(edge.to);
@@ -1700,29 +1881,29 @@ window.CATALOG = {
     return scenario.nodes.filter(node => !visited.has(node.id)).map(node => node.id);
   }
 
-  function stateWarnings(scenario, simulation, catalog) {
-    const warnings = [];
-    const unsupported = scenario.nodes.filter(node => !hasOwn(catalog.types, node.type));
-    if (unsupported.length) {
-      warnings.push({
-        code: 'UNSUPPORTED_NODE',
-        message: 'Unsupported nodes are excluded from simulation',
-        details: { nodes: unsupported.map(node => ({ id: node.id || null, type: node.type })) }
-      });
-    }
-    const unknownParams = [];
+  function unsupportedContent(scenario, catalog) {
+    const unsupported = [];
     scenario.nodes.forEach(node => {
-      const def = catalog.types[node.type];
-      if (!def) return;
-      Object.keys(node.p || {}).forEach(key => {
-        if (!hasOwn(def.p || {}, key)) unknownParams.push({ nodeId: node.id, param: key });
+      const def = hasOwn(catalog.types, node.type) ? catalog.types[node.type] : null;
+      if (!def) {
+        unsupported.push({ kind: 'node_type', nodeId: node.id || null, type: node.type });
+        return;
+      }
+      Object.keys(node.p || {}).forEach(param => {
+        if (!hasOwn(def.p || {}, param)) unsupported.push({ kind: 'parameter', nodeId: node.id, param });
       });
     });
-    if (unknownParams.length) {
+    return unsupported;
+  }
+
+  function stateWarnings(scenario, simulation, catalog) {
+    const warnings = [];
+    const unsupported = unsupportedContent(scenario, catalog);
+    if (unsupported.length) {
       warnings.push({
-        code: 'UNKNOWN_PARAMS',
-        message: 'Unknown params are preserved but not modeled',
-        details: { params: unknownParams }
+        code: 'UNSUPPORTED_CONTENT',
+        message: 'Unsupported content is excluded from simulation',
+        details: { unsupported }
       });
     }
     const cyclic = cycleNodes(scenario);
@@ -1756,15 +1937,56 @@ window.CATALOG = {
     return warnings;
   }
 
+  function nodeMetrics(node) {
+    const metrics = {
+      type: node.type,
+      lambda: node.lambda || 0,
+      out: node.out || 0,
+      util: node.util || 0,
+      err: node.err || 0,
+      lat: node.lat || 0,
+      cost: node.cost || 0,
+      units: {
+        lambda: 'requests/s', out: 'requests/s', util: 'fraction', err: 'fraction',
+        lat: 'seconds', cost: 'USD/s'
+      }
+    };
+    if (node.type === 'queues') {
+      metrics.capacity = node.capacity || 0;
+      metrics.backlog = node.backlog || 0;
+      metrics.drops = node.drops || 0;
+      metrics.units.capacity = 'requests/s';
+      metrics.units.backlog = 'messages';
+      metrics.units.drops = 'messages/s';
+    }
+    if (node.type === 'durable_objects') {
+      metrics.billedRequests = node.billedRequests || 0;
+      metrics.doGbS = node.doGbS || 0;
+      metrics.objects = node.objects || 0;
+      metrics.perObjectRate = node.perObjectRate || 0;
+      metrics.objectLimit = node.objectLimit || 0;
+      metrics.overloaded = !!node.overloaded;
+      metrics.units.billedRequests = 'requests/s';
+      metrics.units.doGbS = 'GB-s/month';
+      metrics.units.objects = 'count';
+      metrics.units.perObjectRate = 'requests/s';
+      metrics.units.objectLimit = 'requests/s';
+    }
+    return metrics;
+  }
+
   function buildSnapshot(simulation, scenario, host) {
     const catalog = host.catalog;
     const pricing = host.pricing;
     const model = host.getModel();
-    const nodes = Object.fromEntries(scenario.nodes.map(node => {
-      const def = catalog.types[node.type] || {};
+    const identity = host.getIdentity();
+    const provenanceNodes = Object.fromEntries(scenario.nodes.map(node => {
+      const def = hasOwn(catalog.types, node.type) ? catalog.types[node.type] : {};
       return [node.id, {
         type: node.type,
-        verified: def.verified || null,
+        verified: !!def.verified,
+        verifiedNote: def.verified || null,
+        classification: def.verified ? 'verified_platform_fact' : 'unverified_model_assumption',
         source: def.doc || null,
         note: def.note || null,
         params: Object.fromEntries(Object.entries(node.p || {}).map(([key, value]) => [
@@ -1772,9 +1994,130 @@ window.CATALOG = {
         ]))
       }];
     }));
+    const assumptions = [
+      {
+        id: 'requestsPerUserPerMonth',
+        value: model.requestsPerUserPerMonth,
+        unit: 'requests/user/month',
+        classification: 'editable_model_assumption'
+      },
+      {
+        id: 'hoursPerMonth',
+        value: pricing.hoursPerMonth,
+        unit: 'hours/month',
+        classification: 'verified_pricing_convention',
+        source: 'src/pricing.js'
+      },
+      ...scenario.nodes.flatMap(node => Object.keys(node.p || {}).map(param => ({
+        id: 'node.' + node.id + '.' + param,
+        value: node.p[param],
+        classification: 'editable_model_assumption'
+      })))
+    ];
+    const units = Object.fromEntries(pricing.dims.map(dim => [dim.id, {
+      unit: dim.freePerRequest != null ? dim.usageUnit.replace('/month', '/request') : dim.usageUnit,
+      billingUnit: dim.unit,
+      period: dim.freePerRequest != null ? 'per request' : dim.freeDaily != null ? 'per day' : 'per month',
+      price: dim.price,
+      currency: 'USD',
+      verified: dim.verified,
+      source: dim.source
+    }]));
+    const nodes = Object.fromEntries(Object.entries(simulation.nodes || {}).map(([id, node]) => [id, nodeMetrics(node)]));
+    const warnings = stateWarnings(scenario, simulation, catalog);
+    const modelSpend = simulation.modelSpend || { set: false, total: 0 };
+    const requestCount = simulation.requestCount == null ? simulation.requests || 0 : simulation.requestCount;
+    const modelAssessment = {
+      set: !!modelSpend.set,
+      monthly: modelSpend.total || 0,
+      accumulated: simulation.modelSpent || 0,
+      perRequest: modelSpend.set && requestCount > 0 ? (simulation.modelSpent || 0) / requestCount : null,
+      priceInputs: scenario.nodes.filter(node => node.type === 'external_model').map(node => ({
+        nodeId: node.id,
+        inPrice: node.p.inPrice,
+        outPrice: node.p.outPrice,
+        inTokens: node.p.inTokens,
+        outTokens: node.p.outTokens
+      })),
+      units: { monthly: 'USD/month', accumulated: 'USD', perRequest: 'USD/request' }
+    };
+    const monthly = simulation.monthly || {};
+    const exceededIds = new Set((monthly.exceeded || []).map(line => line.id));
+    const allowances = pricing.dims.map(dim => {
+      const line = (monthly.lines || []).find(item => item.id === dim.id);
+      const included = simulation.plan === 'paid'
+        ? dim.paidIncluded
+        : simulation.plan === 'free'
+          ? dim.freePerRequest != null ? dim.freePerRequest
+            : dim.freeDaily != null ? dim.freeDaily * pricing.hoursPerMonth / 24 : dim.freeMonthly
+          : null;
+      return {
+        id: dim.id,
+        label: dim.label,
+        unit: units[dim.id].unit,
+        period: units[dim.id].period,
+        used: line ? line.used : (simulation.usage || {})[dim.id] || 0,
+        included: included == null ? null : included,
+        over: line ? line.over : false,
+        exceeded: exceededIds.has(dim.id),
+        billable: line ? line.billable || 0 : 0,
+        cost: line ? line.cost || 0 : 0,
+        verified: dim.verified
+      };
+    });
+    const cloudflare = {
+      rate: simulation.rate || 0,
+      spent: simulation.spent || 0,
+      usage: simulation.usage || {},
+      monthly,
+      allowances,
+      overage: monthly.overage || 0,
+      exceeded: monthly.exceeded || [],
+      unverified: monthly.unverified || [],
+      units
+    };
+    const diagnostics = {
+      warnings,
+      unsupported: unsupportedContent(scenario, catalog),
+      assumptions,
+      limitations: LIMITATIONS.slice()
+    };
+    const provenance = {
+      asOf: pricing.asOf,
+      hoursPerMonth: pricing.hoursPerMonth,
+      sources: pricing.sources,
+      dimensions: pricing.dims,
+      pricing: {
+        asOf: pricing.asOf,
+        hoursPerMonth: pricing.hoursPerMonth,
+        sources: pricing.sources,
+        dimensions: pricing.dims
+      },
+      nodes: provenanceNodes
+    };
     return clone({
+      apiVersion: VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      modelVersion: MODEL_VERSION,
+      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
+      scenarioHash: identity.scenarioHash || null,
+      runId: identity.runId == null ? null : identity.runId,
+      dirty: !!identity.dirty,
+      saving: !!identity.saving,
+      saveError: identity.saveError || null,
       version: VERSION,
       scenario,
+      time: simulation.time,
+      running: simulation.running,
+      speed: simulation.speed,
+      plan: simulation.plan,
+      budget: simulation.budget,
+      baseFee: simulation.baseFee,
+      requestCount,
+      units: {
+        time: 'simulated seconds', spent: 'USD', rate: 'USD/s', pathLat: 'seconds',
+        requestCount: 'requests', budget: 'USD/month', baseFee: 'USD/month', speed: 'simulated seconds/real second'
+      },
       simulation: {
         time: simulation.time,
         running: simulation.running,
@@ -1782,84 +2125,137 @@ window.CATALOG = {
         spent: simulation.spent,
         rate: simulation.rate,
         pathLat: simulation.pathLat,
-        requests: simulation.requests,
+        requestCount,
+        requests: simulation.requests == null ? requestCount : simulation.requests,
         modelSpent: simulation.modelSpent,
         cpuRate: simulation.cpuRate,
         baseFee: simulation.baseFee,
         budget: simulation.budget,
         chaos: simulation.chaos
       },
-      plan: simulation.plan,
-      usage: simulation.usage,
-      monthly: simulation.monthly,
-      modelSpend: simulation.modelSpend,
-      nodes: simulation.nodes,
-      assumptions: [
-        {
-          id: 'requestsPerUserPerMonth',
-          value: model.requestsPerUserPerMonth,
-          unit: 'requests/user/month',
-          classification: 'editable_model_assumption'
-        },
-        {
-          id: 'hoursPerMonth',
-          value: pricing.hoursPerMonth,
-          unit: 'hours/month',
-          classification: 'verified_pricing_convention',
-          source: 'src/pricing.js'
-        }
-      ],
-      provenance: {
-        pricing: {
-          asOf: pricing.asOf,
-          sources: pricing.sources,
-          dimensions: pricing.dims
-        },
-        nodes
-      },
-      warnings: stateWarnings(scenario, simulation, catalog)
+      cloudflare,
+      model: modelAssessment,
+      nodes,
+      diagnostics,
+      unsupported: diagnostics.unsupported,
+      limitations: diagnostics.limitations,
+      provenance,
+      usage: cloudflare.usage,
+      monthly: cloudflare.monthly,
+      modelSpend: { set: modelAssessment.set, total: modelAssessment.monthly },
+      warnings,
+      assumptions
     });
   }
 
   function controlState(host) {
     const state = host.getSimulation();
-    return { running: state.running, speed: state.speed, time: state.time };
+    const identity = host.getIdentity();
+    return {
+      running: state.running,
+      speed: state.speed,
+      time: state.time,
+      runId: identity.runId == null ? null : identity.runId,
+      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
+      scenarioHash: identity.scenarioHash || null,
+      dirty: !!identity.dirty,
+      saving: !!identity.saving,
+      saveError: identity.saveError || null
+    };
+  }
+
+  function capabilities(host) {
+    return clone({
+      apiVersion: VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      modelVersion: MODEL_VERSION,
+      deterministicClock: true,
+      clock: 'simulated-seconds',
+      supportedNodeTypes: Object.keys(host.catalog.types).sort(),
+      limits: LIMITS,
+      persistence: host.getChannelStatus(),
+      methods: ['capabilities', 'validate', 'loadScenario', 'setParams', 'start', 'pause', 'reset',
+        'run', 'setSpeed', 'getState', 'exportScenario', 'save', 'load', 'set', 'state', 'export']
+    });
   }
 
   function createAgentApi(host) {
     if (!host || !host.scenario || !host.catalog || !host.pricing || !host.getScenario ||
-        !host.getSimulation || !host.getModel || !host.loadScenario || !host.setParams ||
-        !host.start || !host.pause || !host.reset) {
+        !host.getSimulation || !host.getIdentity || !host.getModel || !host.loadScenario ||
+        !host.setParams || !host.start || !host.pause || !host.reset || !host.run ||
+        !host.setSpeed || !host.saveScenario || !host.getChannelStatus) {
       throw new Error('SIM_API host is incomplete');
     }
     let seq = 0;
-    return {
+    const loadedData = (validated, saved) => {
+      const identity = host.getIdentity();
+      return {
+        scenario: host.getScenario(),
+        warnings: validated.warnings,
+        unsupported: validated.unsupported,
+        scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
+        scenarioHash: identity.scenarioHash || null,
+        runId: identity.runId == null ? null : identity.runId,
+        dirty: !!identity.dirty,
+        save: saved
+      };
+    };
+    const api = {
       version: VERSION,
-      loadScenario(raw) {
+      apiVersion: VERSION,
+      capabilities() {
+        return request(++seq, () => ({ data: capabilities(host) }));
+      },
+      validate(raw) {
         return request(++seq, () => {
-          const validated = validateScenario(raw, host);
+          const validated = validateScenario(raw, host, { strict: true });
           if (validated.error) return { error: validated.error };
-          host.loadScenario(validated.scenario);
-          return { data: { scenario: host.getScenario(), warnings: validated.warnings } };
+          return { data: { valid: true, scenario: validated.scenario, warnings: validated.warnings, unsupported: validated.unsupported } };
         });
       },
-      setParams(nodeId, patch) {
+      loadScenario(raw, options) {
+        return request(++seq, () => {
+          const checked = validateBooleanOptions(options, ['resetRuntime', 'persist', 'strict']);
+          if (checked.error) return { error: checked.error };
+          const resetRuntime = checked.options.resetRuntime !== false;
+          const persist = checked.options.persist === true;
+          const strict = checked.options.strict !== false;
+          const validated = validateScenario(raw, host, { strict });
+          if (validated.error) return { error: validated.error };
+          const install = saved => {
+            if (saved && saved.scenario) validated.scenario = saved.scenario;
+            host.loadScenario(validated.scenario, { resetRuntime, persisted: persist });
+            return { data: loadedData(validated, saved) };
+          };
+          if (!persist) return install(null);
+          return Promise.resolve(host.saveScenario(validated.scenario)).then(result => {
+            if (result.error) return { error: result.error };
+            return install(result.data);
+          });
+        });
+      },
+      setParams(nodeId, params) {
         return request(++seq, () => {
           const scenario = host.getScenario();
           if (!isObject(scenario) || !Array.isArray(scenario.nodes)) {
             return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current scenario is invalid' } };
           }
-          const validated = validateParamPatch(nodeId, patch, scenario, host.catalog);
+          const validated = validateParamPatch(nodeId, params, scenario, host.catalog);
           if (validated.error) return { error: validated.error };
-          const result = host.setParams(nodeId, validated.patch);
-          return { data: result };
+          return { data: host.setParams(nodeId, validated.patch) };
         });
       },
-      start(options) {
+      reset() {
         return request(++seq, () => {
-          const validated = validateStartOptions(options);
+          host.reset();
+          return { data: controlState(host) };
+        });
+      },
+      run(options) {
+        return request(++seq, () => {
+          const validated = validateRunOptions(options);
           if (validated.error) return { error: validated.error };
-          host.start(validated.options.speed);
+          host.run(validated.seconds);
           return { data: controlState(host) };
         });
       },
@@ -1869,9 +2265,25 @@ window.CATALOG = {
           return { data: controlState(host) };
         });
       },
-      reset() {
+      setSpeed(speed) {
         return request(++seq, () => {
-          host.reset();
+          const validated = validateSpeed(speed);
+          if (validated.error) return { error: validated.error };
+          host.setSpeed(validated.speed);
+          return { data: controlState(host) };
+        });
+      },
+      start(options) {
+        return request(++seq, () => {
+          if (options !== undefined && (!isObject(options) || Object.keys(options).some(key => key !== 'speed'))) {
+            return { error: { code: ERROR_CODES.INVALID_OPTIONS, message: 'Start only accepts an optional speed' } };
+          }
+          const speed = options && options.speed;
+          if (speed !== undefined) {
+            const validated = validateSpeed(speed);
+            if (validated.error) return { error: validated.error };
+          }
+          host.start(speed);
           return { data: controlState(host) };
         });
       },
@@ -1885,19 +2297,52 @@ window.CATALOG = {
           return { data: buildSnapshot(simulation, scenario, host) };
         });
       },
-      exportScenario() {
+      exportScenario(options) {
+        return request(++seq, () => {
+          const checked = validateBooleanOptions(options, ['assessment', 'provenance']);
+          if (checked.error) return { error: checked.error };
+          const scenario = host.getScenario();
+          const validated = validateScenario(scenario, host, { strict: true });
+          if (validated.error) return { error: validated.error };
+          if (!checked.options.assessment && !checked.options.provenance) return { data: clone(validated.scenario) };
+          const snapshot = buildSnapshot(host.getSimulation(), validated.scenario, host);
+          const data = { scenario: snapshot.scenario };
+          if (checked.options.assessment) {
+            data.assessment = {
+              cloudflare: snapshot.cloudflare,
+              model: snapshot.model,
+              nodes: snapshot.nodes,
+              diagnostics: snapshot.diagnostics
+            };
+          }
+          if (checked.options.provenance) data.provenance = snapshot.provenance;
+          return { data };
+        });
+      },
+      save() {
         return request(++seq, () => {
           const scenario = host.getScenario();
-          const validated = validateScenario(scenario, host);
+          const validated = validateScenario(scenario, host, { strict: true });
           if (validated.error) return { error: validated.error };
-          return { data: clone(validated.scenario) };
+          return Promise.resolve(host.saveScenario(validated.scenario)).then(result => {
+            if (result.error) return { error: result.error };
+            return { data: result.data };
+          });
         });
       }
     };
+    api.load = (raw, options) => api.loadScenario(raw, options);
+    api.set = (nodeId, params) => api.setParams(nodeId, params);
+    api.state = () => api.getState();
+    api.export = options => api.exportScenario(options);
+    return api;
   }
 
-  return { VERSION, ERROR_CODES, success, failure, validateScenario, validateParamPatch,
-    validateStartOptions, buildSnapshot, createAgentApi };
+  return {
+    VERSION, SCHEMA_VERSION, MODEL_VERSION, LIMITS, ERROR_CODES,
+    success, failure, validateScenario, validateParamPatch, validateRunOptions,
+    buildSnapshot, createAgentApi
+  };
 });
 
 </script>
@@ -1911,6 +2356,7 @@ window.CATALOG = {
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = v => String(v).replace(/[&<>"']/g, c => ESC[c]);
+  const cloneJson = value => JSON.parse(JSON.stringify(value));
   const NODE_KEYS = ['id', 'type', 'x', 'y', 'alias', 'p'];
   const EDGE_KEYS = ['from', 'to', 'weight'];
   // ponytail: the engine models rates, not people. One visible assumption turns
@@ -1919,11 +2365,15 @@ window.CATALOG = {
   const ROOT_KEYS = ['version', 'name', 'nodes', 'edges'];
   const hasType = n => Object.hasOwn(TYPES, n.type);
 
+  let runSeq = 0;
+  function nextRunId() { return 'run-' + String(++runSeq).padStart(6, '0'); }
+
   const state = {
     nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
     running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
-    t: 0, spent: 0, reqs: 0, modelSpent: 0, chaos: {}, errors: 0,
-    res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {}
+    time: 0, spent: 0, requests: 0, modelSpent: 0, chaos: {}, errors: 0,
+    res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {},
+    runId: nextRunId(), scenarioRevision: null, scenarioHash: null, dirty: false, saving: false, saveError: null
   };
   let seq = 1;
   const uid = () => 'n' + seq++;
@@ -1948,36 +2398,38 @@ window.CATALOG = {
 
   function nodeById(id) { return state.nodes.find(n => n.id === id); }
 
-  function eff(n) {
+  function eff(n, clock) {
+    const current = clock || state;
     let p = Object.assign({}, n.p);
-    const now = performance.now() / 1000;
+    const now = current.time;
     let slashed = false;
-    const modelHit = QE.model429(n.type, p, state.chaos.model429 > now);
+    const modelHit = QE.model429(n.type, p, current.chaos.model429 > now);
     if (modelHit.slashed) { p = modelHit.p; slashed = true; }
-    if (n.type === 'durable_objects' && state.chaos.doEvict > now) {
+    if (n.type === 'durable_objects' && current.chaos.doEvict > now) {
       p.latency *= 8; slashed = true;
     }
-    if (n.type === 'd1' && state.chaos.d1Write > now) {
+    if (n.type === 'd1' && current.chaos.d1Write > now) {
       p.latency *= 20; slashed = true;
     }
-    if (n.type === 'cache' && state.chaos.cacheStorm > now) {
+    if (n.type === 'cache' && current.chaos.cacheStorm > now) {
       p.hit = 0; slashed = true;
     }
-    if (n.type === 'external' && state.chaos.store402 > now) {
+    if (n.type === 'external' && current.chaos.store402 > now) {
       p.latency *= 100; slashed = true;
     }
-    if (n.type === 'queues' && state.chaos.webhook > now) {
+    if (n.type === 'queues' && current.chaos.webhook > now) {
       p.latency *= 2; slashed = true;
     }
     return { p, slashed };
   }
 
-  function modelFor(nodes, edges, backlog, drops) {
+  function modelFor(nodes, edges, backlog, drops, clock) {
+    const current = clock || state;
     const params = {};
-    nodes.forEach(n => { params[n.id] = eff(n).p; });
+    nodes.forEach(n => { params[n.id] = eff(n, current).p; });
     const model = QE.compute(nodes, edges, TYPES, params, backlog, drops, PRICING.hoursPerMonth);
     nodes.forEach(n => {
-      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) model.res[n.id].err = 1;
+      if (n.type === 'external' && current.chaos.store402 > current.time) model.res[n.id].err = 1;
     });
     return model;
   }
@@ -2332,7 +2784,11 @@ window.CATALOG = {
         const f = inp.dataset.f;
         const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
         if (inp.value.trim() === '') {
-          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); }
+          if (nullable) {
+            n.p[f] = null;
+            compute(); renderNodes(); renderCost(); renderInspectorStats();
+            pushScenario();
+          }
           return;
         }
         const raw = parseFloat(inp.value);
@@ -2437,10 +2893,10 @@ window.CATALOG = {
 
   function renderCost() {
     const rate = state.rate;
-    const hours = state.t / 3600;
+    const hours = state.time / 3600;
     $('#k-rate').textContent = money(rate * 3600) + '/h';
     $('#k-spent').textContent = '$' + state.spent.toFixed(2);
-    $('#k-time').textContent = hours < 1 ? Math.round(state.t) + 's' : hours.toFixed(2) + 'h';
+    $('#k-time').textContent = hours < 1 ? Math.round(state.time) + 's' : hours.toFixed(2) + 'h';
     $('#k-lat').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
     $('#k-cpu').textContent = Math.round(state.cpuRate || 0) + ' ms/s';
     const anyErr = state.nodes.some(n => (state.res[n.id] || {}).err > 0);
@@ -2512,9 +2968,9 @@ window.CATALOG = {
     const mdl = $('#k-model');
     mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
     mdl.className = ms.set ? 'v good' : '';
-    $('#k-reqs').textContent = Math.round(state.reqs).toLocaleString();
-    $('#k-perreq').textContent = state.reqs > 0 ? perReq(state.spent / state.reqs) : '\u2014';
-    $('#k-modelreq').textContent = !ms.set ? 'unset' : state.reqs > 0 ? perReq(state.modelSpent / state.reqs) : '\u2014';
+    $('#k-reqs').textContent = Math.round(state.requests).toLocaleString();
+    $('#k-perreq').textContent = state.requests > 0 ? perReq(state.spent / state.requests) : '\u2014';
+    $('#k-modelreq').textContent = !ms.set ? 'unset' : state.requests > 0 ? perReq(state.modelSpent / state.requests) : '\u2014';
   }
 
   let drag = null, link = null, pan = null;
@@ -2609,7 +3065,7 @@ window.CATALOG = {
   function loadTemplate() {
     state.nodes = []; state.edges = []; seq = 1;
     state.name = 'Beauty store on Cloudflare';
-    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
+    state.time = 0; state.spent = 0; state.requests = 0; state.modelSpent = 0; state.chaos = {};
     state.backlog = {}; state.drops = {};
     const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
     const waf = addNode('waf', 160, 220);
@@ -2646,7 +3102,7 @@ window.CATALOG = {
       cacheStorm: ['cacheStorm', 12], store402: ['store402', 12], webhook: ['webhook', 10]
     };
     const [k, dur] = map[key];
-    state.chaos[k] = performance.now() / 1000 + dur;
+    state.chaos[k] = state.time + dur;
     toast(label(key) + ' for ' + dur + ' seconds');
     compute(); render();
   }
@@ -2677,20 +3133,26 @@ window.CATALOG = {
     });
   }
 
+  function advanceSimulation(seconds) {
+    if (!(seconds > 0)) return;
+    QE.advanceClock(state, seconds, dt => {
+      stepQueues(dt);
+      const ms = modelBucket();
+      return {
+        rate: state.rate,
+        requests: sourceRate(),
+        modelRate: ms.set ? ms.total / (3600 * PRICING.hoursPerMonth) : 0
+      };
+    }, compute);
+  }
+
   let lastReal = 0, acc = 0;
   function loop(ts) {
     if (!lastReal) lastReal = ts;
     const dtReal = Math.min(0.5, (ts - lastReal) / 1000);
     lastReal = ts;
     if (state.running) {
-      const dtSim = dtReal * state.speed;
-      stepQueues(dtSim);
-      state.t += dtSim;
-      state.spent += state.rate * dtSim;
-      state.reqs += sourceRate() * dtSim;
-      const ms = modelBucket();
-      if (ms.set) state.modelSpent += ms.total / (3600 * PRICING.hoursPerMonth) * dtSim;
-      compute();
+      advanceSimulation(dtReal * state.speed);
       acc += dtReal;
       if (acc >= 0.22) {
         acc = 0;
@@ -2705,17 +3167,39 @@ window.CATALOG = {
   document.addEventListener('pointerup', onUp);
 
   $('#search').addEventListener('input', renderPalette);
-  function setRunning(running) {
-    state.running = !!running;
+  function syncRunControl() {
     $('#start').textContent = state.running ? 'Pause simulation' : 'Start simulation';
     $('#start').classList.toggle('on', state.running);
+  }
+
+  function setRunning(running) {
+    state.running = !!running;
+    syncRunControl();
     compute(); render();
   }
 
-  function resetSim() {
-    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
+  function clearRuntime() {
+    state.time = 0; state.spent = 0; state.requests = 0; state.modelSpent = 0; state.chaos = {};
     state.backlog = {}; state.drops = {}; lastReal = 0; acc = 0;
+  }
+
+  function resetSim() {
+    clearRuntime();
     compute(); render(); toast('Simulation reset');
+  }
+
+  function resetApiRuntime() {
+    state.running = false;
+    clearRuntime();
+    state.runId = nextRunId();
+    syncRunControl();
+    compute(); render();
+  }
+
+  function runSimulation(seconds) {
+    setRunning(false);
+    advanceSimulation(seconds);
+    renderCost(); renderNodes(); renderAlerts(); renderInspectorStats();
   }
 
   $('#start').addEventListener('click', () => setRunning(!state.running));
@@ -2839,18 +3323,30 @@ window.CATALOG = {
       baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
     }));
     return {
-      time: state.t, spent: state.spent, rate: state.rate,
+      time: state.time, spent: state.spent, rate: state.rate,
       pathLat: state.pathLat, running: state.running, speed: state.speed, plan: state.plan,
-      baseFee: state.baseFee, budget: state.budget, requests: state.reqs,
+      baseFee: state.baseFee, budget: state.budget, requests: state.requests, requestCount: state.requests,
       modelSpent: state.modelSpent, cpuRate: state.cpuRate,
-      chaos: Object.keys(state.chaos).filter(k => state.chaos[k] > performance.now() / 1000),
+      scenarioRevision: state.scenarioRevision, scenarioHash: state.scenarioHash,
+      runId: state.runId, dirty: state.dirty, saving: state.saving, saveError: state.saveError,
+      chaos: Object.keys(state.chaos).filter(k => state.chaos[k] > state.time),
       usage, monthly, modelSpend: modelBucket(), nodes
     };
   }
 
-  function installScenario(s, doFit, warning) {
+  function installScenario(s, doFit, warning, options) {
+    const settings = Object.assign({ resetRuntime: true, persisted: false, newRunId: true }, options || {});
     const known = s.nodes.filter(hasType);
-    const model = modelFor(known, s.edges, {}, {});
+    const backlog = {};
+    const drops = {};
+    if (!settings.resetRuntime) {
+      known.filter(n => n.type === 'queues').forEach(n => {
+        backlog[n.id] = state.backlog[n.id] || 0;
+        drops[n.id] = state.drops[n.id] || 0;
+      });
+    }
+    const clock = settings.resetRuntime ? { time: 0, chaos: {} } : state;
+    const model = modelFor(known, s.edges, backlog, drops, clock);
     const rootExtra = {};
     Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) rootExtra[k] = s[k]; });
     const previousState = Object.assign({}, state);
@@ -2859,7 +3355,6 @@ window.CATALOG = {
       const keep = state.sel;
       state.name = s.name;
       state.nodes = known;
-      state.backlog = {}; state.drops = {};
       state.opaque = s.nodes.filter(n => !hasType(n));
       state.rootExtra = rootExtra;
       state.edges = s.edges;
@@ -2867,7 +3362,23 @@ window.CATALOG = {
       drag = null;
       link = null;
       seq = window.SCENARIO.nextNodeSeq(s.nodes);
+      if (settings.resetRuntime) {
+        clearRuntime();
+        state.running = false;
+      }
+      state.backlog = backlog;
+      state.drops = drops;
+      if (settings.newRunId !== false) state.runId = nextRunId();
+      if (settings.persisted) {
+        state.scenarioRevision = storedRevision;
+        state.scenarioHash = storedHash;
+        state.dirty = false;
+        state.saveError = null;
+      } else {
+        markDirty();
+      }
       applyModel(model);
+      syncRunControl();
       render();
       if (doFit) fit();
       if (warning) toast(warning);
@@ -2877,12 +3388,13 @@ window.CATALOG = {
       drag = previousDrag;
       link = previousLink;
       seq = previousSeq;
+      syncRunControl();
       render();
       throw err;
     }
   }
 
-  function applyScenario(raw, doFit) {
+  function applyScenario(raw, doFit, storage) {
     const res = window.SCENARIO.validate(raw, window.CATALOG);
     if (!res.scenario || res.dropped > 0) {
       toast(res.error || 'Invalid scenario');
@@ -2894,7 +3406,12 @@ window.CATALOG = {
       toast(res.error || 'Scenario has no renderable nodes');
       return false;
     }
-    return installScenario(s, doFit, res.error);
+    if (storage) setStoredIdentity(storage);
+    return installScenario(s, doFit, res.error, {
+      resetRuntime: !storage,
+      persisted: !!storage,
+      newRunId: !!storage
+    });
   }
 
   function setNodeParams(nodeId, patch) {
@@ -2905,12 +3422,18 @@ window.CATALOG = {
     const nodes = state.nodes.map(n => n.id === nodeId ? Object.assign({}, n, { p: nextParams }) : n);
     const model = modelFor(nodes, state.edges, state.backlog, state.drops);
     const previousModel = { res: state.res, cpuRate: state.cpuRate, rate: state.rate, pathLat: state.pathLat };
+    const previousIdentity = {
+      scenarioRevision: state.scenarioRevision, scenarioHash: state.scenarioHash,
+      dirty: state.dirty, saveError: state.saveError
+    };
     try {
       node.p = nextParams;
+      markDirty();
       applyModel(model);
       render();
     } catch (err) {
       node.p = previousParams;
+      Object.assign(state, previousIdentity);
       Object.assign(state, previousModel);
       render();
       throw err;
@@ -2921,19 +3444,103 @@ window.CATALOG = {
   const http = /^https?:$/.test(location.protocol);
   const clientId = Math.random().toString(36).slice(2);
   let saveTimer = null;
-  let channel = null; // set when the /scenario probe proves serve.mjs is behind the page
+  let channel = null;
+  let storedRevision = null;
+  let storedHash = null;
+  let storedEtag = null;
+  let saveQueue = Promise.resolve();
+  let resolveChannelReady;
+  const channelReady = new Promise(resolve => { resolveChannelReady = resolve; });
+  if (!http) resolveChannelReady(false);
+
+  function setStoredIdentity(storage) {
+    const revision = storage && Number(storage.revision);
+    storedRevision = Number.isInteger(revision) ? revision : null;
+    storedHash = storage && typeof storage.hash === 'string' ? storage.hash : null;
+    storedEtag = storage && storage.etag || (storedHash ? '"' + storedHash + '"' : null);
+  }
+
+  function markDirty() {
+    state.dirty = true;
+    state.scenarioRevision = null;
+    state.scenarioHash = null;
+    state.saveError = null;
+  }
+
+  function saveFailure(error) {
+    state.dirty = true;
+    state.saveError = error;
+    return { error };
+  }
+
+  async function postScenario(scenario, body) {
+    state.saving = true;
+    try {
+      const available = http ? await channelReady : false;
+      if (!available || !channel) {
+        return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: 'Scenario channel is unavailable' });
+      }
+      const headers = { 'content-type': 'application/json', 'x-client-id': clientId };
+      if (storedEtag) headers['if-match'] = storedEtag;
+      let response;
+      try {
+        response = await fetch('/scenario', { method: 'POST', headers, body });
+      } catch (err) {
+        return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: String((err && err.message) || err).split('\n')[0] });
+      }
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        const code = response.status === 409 || payload.code === 'STORAGE_CONFLICT'
+          ? 'STORAGE_CONFLICT'
+          : 'SAVE_FAILED';
+        return saveFailure({
+          code,
+          message: payload.error || 'Scenario save failed',
+          details: { status: response.status }
+        });
+      }
+      if (!Number.isInteger(payload.revision) || typeof payload.hash !== 'string' || !payload.scenario) {
+        return saveFailure({ code: 'SAVE_FAILED', message: 'Scenario channel returned an invalid save result' });
+      }
+      setStoredIdentity({ revision: payload.revision, hash: payload.hash, etag: response.headers.get('etag') });
+      if (JSON.stringify(currentScenario()) === body) {
+        installScenario(payload.scenario, false, null, { resetRuntime: false, persisted: true, newRunId: false });
+        state.scenarioRevision = storedRevision;
+        state.scenarioHash = storedHash;
+        state.dirty = false;
+        state.saveError = null;
+      }
+      return {
+        data: {
+          revision: payload.revision,
+          eventId: payload.eventId,
+          hash: payload.hash,
+          scenario: payload.scenario
+        }
+      };
+    } catch (err) {
+      return saveFailure({ code: 'SAVE_FAILED', message: String((err && err.message) || err).split('\n')[0] });
+    } finally {
+      state.saving = false;
+    }
+  }
+
+  function saveScenario(scenario) {
+    const payload = cloneJson(scenario || currentScenario());
+    const body = JSON.stringify(payload);
+    const task = saveQueue.then(() => postScenario(payload, body));
+    saveQueue = task.catch(() => {});
+    return task;
+  }
 
   function pushScenario() {
+    markDirty();
     if (!http || !channel) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      fetch('/scenario', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-client-id': clientId },
-        body: JSON.stringify(currentScenario())
-      }).then(r => {
-        if (r.status === 400) return r.json().then(j => toast(j.error || 'Scenario rejected'), () => {});
-      }).catch(() => {});
+      saveScenario().then(result => {
+        if (result.error) toast(result.error.message);
+      });
     }, 400);
   }
 
@@ -2971,15 +3578,35 @@ window.CATALOG = {
     pricing: PRICING,
     getScenario: currentScenario,
     getSimulation: simState,
+    getIdentity: () => ({
+      scenarioRevision: state.scenarioRevision,
+      scenarioHash: state.scenarioHash,
+      runId: state.runId,
+      dirty: state.dirty,
+      saving: state.saving,
+      saveError: state.saveError
+    }),
     getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
-    loadScenario: s => installScenario(s, true),
+    loadScenario: (s, options) => installScenario(s, true, null, options),
     setParams: setNodeParams,
     start: speed => {
       if (speed !== undefined) setSpeed(speed);
       setRunning(true);
     },
     pause: () => setRunning(false),
-    reset: resetSim
+    reset: resetApiRuntime,
+    run: runSimulation,
+    setSpeed,
+    saveScenario: scenario => {
+      clearTimeout(saveTimer);
+      return saveScenario(scenario);
+    },
+    getChannelStatus: () => ({
+      available: !!channel,
+      saving: state.saving,
+      revision: storedRevision,
+      hash: storedHash
+    })
   });
 
   renderPalette();
@@ -3003,13 +3630,22 @@ window.CATALOG = {
     const subscribe = () => {
       if (channel) return;
       channel = new EventSource('/events');
+      resolveChannelReady(true);
       channel.onmessage = ev => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
-        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) return;
+        const storage = { revision: msg.revision, hash: msg.hash, etag: msg.hash ? '"' + msg.hash + '"' : null };
+        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) {
+          setStoredIdentity(storage);
+          state.scenarioRevision = storedRevision;
+          state.scenarioHash = storedHash;
+          state.dirty = false;
+          state.saveError = null;
+          return;
+        }
         const before = state.nodes.map(n => n.id).join('|');
-        if (applyScenario(msg.scenario, false)) {
+        if (applyScenario(msg.scenario, false, storage)) {
           booted = true;
           if (state.nodes.map(n => n.id).join('|') !== before) fit();
           toast('Scenario updated from the server');
@@ -3024,7 +3660,18 @@ window.CATALOG = {
         const type = r.headers.get('content-type') || '';
         const json = type.indexOf('json') >= 0;
         if (json) subscribe();
-        if (r.ok) return r.json();
+        if (r.ok) {
+          const storage = {
+            revision: r.headers.get('x-scenario-revision'),
+            hash: r.headers.get('x-scenario-hash'),
+            etag: r.headers.get('etag')
+          };
+          return r.json().then(s => {
+            if (!s) return;
+            if (!booted) booted = applyScenario(s, true, storage);
+            else setStoredIdentity(storage);
+          });
+        }
         if (json) {
           return r.json().then(
             j => { toast(j.error || 'Scenario unavailable (HTTP ' + r.status + ')'); throw 0; },
@@ -3033,8 +3680,8 @@ window.CATALOG = {
         }
         throw 0;
       })
-      .then(s => { if (s && !booted) applyScenario(s, true); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => resolveChannelReady(!!channel));
   }
 
   window.addEventListener('hashchange', () => {
