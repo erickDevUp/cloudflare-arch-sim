@@ -68,17 +68,25 @@
     return { p, slashed };
   }
 
-  function compute() {
+  function modelFor(nodes, edges, backlog, drops) {
     const params = {};
-    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
-    const model = QE.compute(state.nodes, state.edges, TYPES, params, state.backlog, state.drops, PRICING.hoursPerMonth);
+    nodes.forEach(n => { params[n.id] = eff(n).p; });
+    const model = QE.compute(nodes, edges, TYPES, params, backlog, drops, PRICING.hoursPerMonth);
+    nodes.forEach(n => {
+      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) model.res[n.id].err = 1;
+    });
+    return model;
+  }
+
+  function applyModel(model) {
     state.res = model.res;
     state.cpuRate = model.cpuRate;
     state.rate = model.rate;
     state.pathLat = model.pathLat;
-    state.nodes.forEach(n => {
-      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) state.res[n.id].err = 1;
-    });
+  }
+
+  function compute() {
+    applyModel(modelFor(state.nodes, state.edges, state.backlog, state.drops));
   }
 
   function addFromPalette(type) {
@@ -793,27 +801,33 @@
   document.addEventListener('pointerup', onUp);
 
   $('#search').addEventListener('input', renderPalette);
-  $('#start').addEventListener('click', () => {
-    state.running = !state.running;
+  function setRunning(running) {
+    state.running = !!running;
     $('#start').textContent = state.running ? 'Pause simulation' : 'Start simulation';
     $('#start').classList.toggle('on', state.running);
     compute(); render();
-  });
-  $('#reset').addEventListener('click', () => {
+  }
+
+  function resetSim() {
     state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
-    state.backlog = {}; state.drops = {};
+    state.backlog = {}; state.drops = {}; lastReal = 0; acc = 0;
     compute(); render(); toast('Simulation reset');
-  });
+  }
+
+  $('#start').addEventListener('click', () => setRunning(!state.running));
+  $('#reset').addEventListener('click', resetSim);
   function speedEq(v) {
     if (v < 60) return '1s = ' + v + 's';
     if (v < 3600) return '1s = ' + (Math.round(v / 6) / 10) + 'm';
     return '1s = ' + (Math.round(v / 360) / 10) + 'h';
   }
-  $('#speed').addEventListener('input', e => {
-    const v = parseInt(e.target.value, 10);
+  function setSpeed(value) {
+    const v = parseInt(value, 10);
     if (!isNaN(v)) state.speed = Math.max(1, Math.min(7200, v));
+    $('#speed').value = state.speed;
     $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
-  });
+  }
+  $('#speed').addEventListener('input', e => setSpeed(e.target.value));
   $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
   $$('.chaos-btn').forEach(b => b.addEventListener('click', () => chaos(b.dataset.c)));
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
@@ -903,7 +917,7 @@
   function simState() {
     // Units: time is simulated seconds, spent/rate are USD and USD/s,
     // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
-    const nodes = {};
+    const nodes = Object.create(null);
     state.nodes.forEach(n => {
       const r = state.res[n.id] || {};
       nodes[n.id] = {
@@ -922,9 +936,46 @@
     }));
     return {
       time: state.t, spent: state.spent, rate: state.rate,
-      pathLat: state.pathLat, running: state.running, plan: state.plan,
+      pathLat: state.pathLat, running: state.running, speed: state.speed, plan: state.plan,
+      baseFee: state.baseFee, budget: state.budget, requests: state.reqs,
+      modelSpent: state.modelSpent, cpuRate: state.cpuRate,
+      chaos: Object.keys(state.chaos).filter(k => state.chaos[k] > performance.now() / 1000),
       usage, monthly, modelSpend: modelBucket(), nodes
     };
+  }
+
+  function installScenario(s, doFit, warning) {
+    const known = s.nodes.filter(hasType);
+    const model = modelFor(known, s.edges, {}, {});
+    const rootExtra = {};
+    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) rootExtra[k] = s[k]; });
+    const previousState = Object.assign({}, state);
+    const previousDrag = drag, previousLink = link, previousSeq = seq;
+    try {
+      const keep = state.sel;
+      state.name = s.name;
+      state.nodes = known;
+      state.backlog = {}; state.drops = {};
+      state.opaque = s.nodes.filter(n => !hasType(n));
+      state.rootExtra = rootExtra;
+      state.edges = s.edges;
+      state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
+      drag = null;
+      link = null;
+      seq = window.SCENARIO.nextNodeSeq(s.nodes);
+      applyModel(model);
+      render();
+      if (doFit) fit();
+      if (warning) toast(warning);
+      return true;
+    } catch (err) {
+      Object.assign(state, previousState);
+      drag = previousDrag;
+      link = previousLink;
+      seq = previousSeq;
+      render();
+      throw err;
+    }
   }
 
   function applyScenario(raw, doFit) {
@@ -939,24 +990,28 @@
       toast(res.error || 'Scenario has no renderable nodes');
       return false;
     }
-    state.name = s.name;
-    state.nodes = known;
-    state.backlog = {}; state.drops = {};
-    state.opaque = s.nodes.filter(n => !hasType(n));
-    state.rootExtra = {};
-    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) state.rootExtra[k] = s[k]; });
-    state.edges = s.edges;
-    const keep = state.sel;
-    state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
-    drag = null;
-    link = null;
-    // Opaque ids count too: a palette node must never reuse a preserved id.
-    seq = window.SCENARIO.nextNodeSeq(s.nodes);
-    compute();
-    render();
-    if (doFit) fit();
-    if (res.error) toast(res.error);
-    return true;
+    return installScenario(s, doFit, res.error);
+  }
+
+  function setNodeParams(nodeId, patch) {
+    const node = nodeById(nodeId);
+    if (!node) throw new Error('Unknown node');
+    const previousParams = node.p;
+    const nextParams = Object.assign({}, previousParams, patch);
+    const nodes = state.nodes.map(n => n.id === nodeId ? Object.assign({}, n, { p: nextParams }) : n);
+    const model = modelFor(nodes, state.edges, state.backlog, state.drops);
+    const previousModel = { res: state.res, cpuRate: state.cpuRate, rate: state.rate, pathLat: state.pathLat };
+    try {
+      node.p = nextParams;
+      applyModel(model);
+      render();
+    } catch (err) {
+      node.p = previousParams;
+      Object.assign(state, previousModel);
+      render();
+      throw err;
+    }
+    return { nodeId, params: Object.assign({}, nextParams) };
   }
 
   const http = /^https?:$/.test(location.protocol);
@@ -1005,6 +1060,23 @@
     export: currentScenario,
     getState: simState
   };
+
+  window.SIM_API = window.SIM_API_FACTORY.createAgentApi({
+    scenario: window.SCENARIO,
+    catalog: window.CATALOG,
+    pricing: PRICING,
+    getScenario: currentScenario,
+    getSimulation: simState,
+    getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
+    loadScenario: s => installScenario(s, true),
+    setParams: setNodeParams,
+    start: speed => {
+      if (speed !== undefined) setSpeed(speed);
+      setRunning(true);
+    },
+    pause: () => setRunning(false),
+    reset: resetSim
+  });
 
   renderPalette();
   loadTemplate();

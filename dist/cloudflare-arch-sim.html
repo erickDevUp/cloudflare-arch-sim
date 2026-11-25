@@ -1465,6 +1465,443 @@ window.CATALOG = {
 
 </script>
 <script>
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.SIM_API_FACTORY = api;
+})(typeof window !== 'undefined' ? window : null, function () {
+  'use strict';
+
+  const VERSION = 1;
+  const ERROR_CODES = Object.freeze({
+    INVALID_SCENARIO: 'INVALID_SCENARIO',
+    UNSUPPORTED_NODE: 'UNSUPPORTED_NODE',
+    UNKNOWN_NODE: 'UNKNOWN_NODE',
+    INVALID_PARAMS: 'INVALID_PARAMS',
+    INVALID_STATE: 'INVALID_STATE',
+    INTERNAL_ERROR: 'INTERNAL_ERROR'
+  });
+  const hasOwn = (value, key) => Object.hasOwn(value, key);
+  const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
+  const finite = value => typeof value === 'number' && Number.isFinite(value);
+  const unsafeName = value => typeof value === 'string' && (value === '__proto__' || value in Object.prototype);
+  const clone = value => JSON.parse(JSON.stringify(value));
+
+  function success(requestId, data) {
+    return { ok: true, data, requestId };
+  }
+
+  function failure(requestId, code, message, details) {
+    const error = { code, message };
+    if (details !== undefined) error.details = details;
+    return { ok: false, error, requestId };
+  }
+
+  function request(seq, run) {
+    const requestId = 'sim-v1-' + String(seq).padStart(6, '0');
+    try {
+      const result = run();
+      if (result && result.error) return failure(requestId, result.error.code, result.error.message, result.error.details);
+      return success(requestId, result.data);
+    } catch (err) {
+      return failure(requestId, ERROR_CODES.INTERNAL_ERROR, 'SIM_API request failed', {
+        message: String((err && err.message) || err).split('\n')[0]
+      });
+    }
+  }
+
+  function validateScenario(raw, host) {
+    if (!isObject(raw)) {
+      return { error: { code: ERROR_CODES.INVALID_SCENARIO, message: 'Scenario must be an object' } };
+    }
+    if (raw.version !== undefined && raw.version !== VERSION) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_SCENARIO,
+          message: 'Unsupported scenario version',
+          details: { expected: VERSION, received: raw.version }
+        }
+      };
+    }
+    if (!Array.isArray(raw.nodes)) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_SCENARIO,
+          message: 'Scenario nodes must be an array',
+          details: { field: 'nodes' }
+        }
+      };
+    }
+    const validated = host.scenario.validate(raw, host.catalog);
+    if (!validated.scenario || validated.dropped > 0) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_SCENARIO,
+          message: validated.error || 'Scenario validation failed',
+          details: { dropped: validated.dropped || 0 }
+        }
+      };
+    }
+    const scenario = validated.scenario;
+    const unsafeIds = scenario.nodes.filter(node => unsafeName(node.id)).map(node => node.id);
+    if (unsafeIds.length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_SCENARIO,
+          message: 'Scenario contains unsafe node ids',
+          details: { nodeIds: unsafeIds }
+        }
+      };
+    }
+    const unsupported = scenario.nodes.filter(node => !hasOwn(host.catalog.types, node.type));
+    if (unsupported.length) {
+      return {
+        error: {
+          code: ERROR_CODES.UNSUPPORTED_NODE,
+          message: 'Scenario contains unsupported node types',
+          details: {
+            nodes: unsupported.map(node => ({ id: node.id || null, type: node.type }))
+          }
+        }
+      };
+    }
+    const invalidParams = [];
+    scenario.nodes.forEach(node => {
+      const allowed = ((host.catalog.types[node.type] || {}).p) || {};
+      Object.keys(node.p || {}).forEach(key => {
+        if (!hasOwn(allowed, key)) invalidParams.push({ nodeId: node.id, param: key });
+      });
+    });
+    if (invalidParams.length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Scenario contains unsupported node params',
+          details: { params: invalidParams }
+        }
+      };
+    }
+    return { scenario, warnings: validated.error ? [validated.error] : [] };
+  }
+
+  function validateParamPatch(nodeId, patch, scenario, catalog) {
+    if (typeof nodeId !== 'string' || !nodeId || unsafeName(nodeId)) {
+      return { error: { code: ERROR_CODES.UNKNOWN_NODE, message: 'Node id must be a safe non-empty string' } };
+    }
+    const node = (scenario.nodes || []).find(item => item.id === nodeId);
+    if (!node || !hasOwn(catalog.types, node.type)) {
+      return {
+        error: {
+          code: ERROR_CODES.UNKNOWN_NODE,
+          message: 'Unknown node',
+          details: { nodeId }
+        }
+      };
+    }
+    if (!isObject(patch) || !Object.keys(patch).length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Params patch must be a non-empty object',
+          details: { nodeId }
+        }
+      };
+    }
+    const def = catalog.types[node.type];
+    const allowed = def.p || {};
+    const invalid = [];
+    const safe = {};
+    Object.keys(patch).forEach(key => {
+      const value = patch[key];
+      if (!hasOwn(allowed, key)) {
+        invalid.push({ param: key, reason: 'unsupported' });
+        return;
+      }
+      if (value === null && allowed[key] === null) {
+        safe[key] = null;
+        return;
+      }
+      if (catalog.enums[key]) {
+        if (!catalog.enums[key].includes(value)) invalid.push({ param: key, reason: 'not an allowed value' });
+        else safe[key] = value;
+        return;
+      }
+      if (!finite(value)) {
+        invalid.push({ param: key, reason: 'expected a finite number' });
+        return;
+      }
+      const range = catalog.ranges[key];
+      if (range && (value < range[0] || value > range[1])) {
+        invalid.push({ param: key, reason: 'outside range', min: range[0], max: range[1] });
+        return;
+      }
+      safe[key] = value;
+    });
+    if (invalid.length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Invalid node params',
+          details: { nodeId, params: invalid }
+        }
+      };
+    }
+    return { patch: safe };
+  }
+
+  function validateStartOptions(options) {
+    if (options === undefined) return { options: {} };
+    if (!isObject(options)) {
+      return { error: { code: ERROR_CODES.INVALID_PARAMS, message: 'Start options must be an object' } };
+    }
+    const unknown = Object.keys(options).filter(key => key !== 'speed');
+    if (unknown.length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Unsupported start options',
+          details: { options: unknown }
+        }
+      };
+    }
+    if (options.speed !== undefined && (!Number.isInteger(options.speed) || options.speed < 1 || options.speed > 7200)) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Speed must be an integer from 1 through 7200',
+          details: { speed: options.speed }
+        }
+      };
+    }
+    return { options: { speed: options.speed } };
+  }
+
+  function cycleNodes(scenario) {
+    const nodes = new Map(scenario.nodes.map(node => [node.id, node]));
+    const indegree = new Map(scenario.nodes.map(node => [node.id, 0]));
+    const outgoing = new Map(scenario.nodes.map(node => [node.id, []]));
+    scenario.edges.forEach(edge => {
+      if (!nodes.has(edge.from) || !nodes.has(edge.to)) return;
+      indegree.set(edge.to, indegree.get(edge.to) + 1);
+      outgoing.get(edge.from).push(edge.to);
+    });
+    const queue = scenario.nodes.filter(node => indegree.get(node.id) === 0).map(node => node.id);
+    const visited = new Set(queue);
+    while (queue.length) {
+      const id = queue.shift();
+      outgoing.get(id).forEach(to => {
+        indegree.set(to, indegree.get(to) - 1);
+        if (indegree.get(to) === 0) {
+          visited.add(to);
+          queue.push(to);
+        }
+      });
+    }
+    return scenario.nodes.filter(node => !visited.has(node.id)).map(node => node.id);
+  }
+
+  function stateWarnings(scenario, simulation, catalog) {
+    const warnings = [];
+    const unsupported = scenario.nodes.filter(node => !hasOwn(catalog.types, node.type));
+    if (unsupported.length) {
+      warnings.push({
+        code: 'UNSUPPORTED_NODE',
+        message: 'Unsupported nodes are excluded from simulation',
+        details: { nodes: unsupported.map(node => ({ id: node.id || null, type: node.type })) }
+      });
+    }
+    const unknownParams = [];
+    scenario.nodes.forEach(node => {
+      const def = catalog.types[node.type];
+      if (!def) return;
+      Object.keys(node.p || {}).forEach(key => {
+        if (!hasOwn(def.p || {}, key)) unknownParams.push({ nodeId: node.id, param: key });
+      });
+    });
+    if (unknownParams.length) {
+      warnings.push({
+        code: 'UNKNOWN_PARAMS',
+        message: 'Unknown params are preserved but not modeled',
+        details: { params: unknownParams }
+      });
+    }
+    const cyclic = cycleNodes(scenario);
+    if (cyclic.length) {
+      warnings.push({
+        code: 'CYCLE_DETECTED',
+        message: 'Cycle-dependent nodes receive zero traffic in the topological model',
+        details: { nodeIds: cyclic }
+      });
+    }
+    ((simulation.monthly && simulation.monthly.unverified) || []).forEach(id => {
+      warnings.push({ code: 'UNVERIFIED_PRICING', message: 'Pricing dimension is unverified', details: { dimension: id } });
+    });
+    if (scenario.nodes.some(node => node.type === 'external_model') && simulation.modelSpend && !simulation.modelSpend.set) {
+      warnings.push({
+        code: 'MODEL_SPEND_UNSET',
+        message: 'External model spend is unset until all token prices and counts are provided'
+      });
+    }
+    Object.entries(simulation.nodes || {}).forEach(([id, node]) => {
+      if (node.type === 'queues' && node.backlog > 0) {
+        warnings.push({ code: 'QUEUE_BACKLOG', message: 'Queue has a backlog', details: { nodeId: id, backlog: node.backlog } });
+      }
+      if (node.type === 'queues' && node.drops > 0) {
+        warnings.push({ code: 'QUEUE_EXPIRY', message: 'Queue is dropping expired messages', details: { nodeId: id, drops: node.drops } });
+      }
+      if (node.type === 'durable_objects' && node.overloaded) {
+        warnings.push({ code: 'DURABLE_OBJECT_OVERLOAD', message: 'Durable Object is overloaded', details: { nodeId: id } });
+      }
+    });
+    return warnings;
+  }
+
+  function buildSnapshot(simulation, scenario, host) {
+    const catalog = host.catalog;
+    const pricing = host.pricing;
+    const model = host.getModel();
+    const nodes = Object.fromEntries(scenario.nodes.map(node => {
+      const def = catalog.types[node.type] || {};
+      return [node.id, {
+        type: node.type,
+        verified: def.verified || null,
+        source: def.doc || null,
+        note: def.note || null,
+        params: Object.fromEntries(Object.entries(node.p || {}).map(([key, value]) => [
+          key, { value, classification: 'editable_model_assumption' }
+        ]))
+      }];
+    }));
+    return clone({
+      version: VERSION,
+      scenario,
+      simulation: {
+        time: simulation.time,
+        running: simulation.running,
+        speed: simulation.speed,
+        spent: simulation.spent,
+        rate: simulation.rate,
+        pathLat: simulation.pathLat,
+        requests: simulation.requests,
+        modelSpent: simulation.modelSpent,
+        cpuRate: simulation.cpuRate,
+        baseFee: simulation.baseFee,
+        budget: simulation.budget,
+        chaos: simulation.chaos
+      },
+      plan: simulation.plan,
+      usage: simulation.usage,
+      monthly: simulation.monthly,
+      modelSpend: simulation.modelSpend,
+      nodes: simulation.nodes,
+      assumptions: [
+        {
+          id: 'requestsPerUserPerMonth',
+          value: model.requestsPerUserPerMonth,
+          unit: 'requests/user/month',
+          classification: 'editable_model_assumption'
+        },
+        {
+          id: 'hoursPerMonth',
+          value: pricing.hoursPerMonth,
+          unit: 'hours/month',
+          classification: 'verified_pricing_convention',
+          source: 'src/pricing.js'
+        }
+      ],
+      provenance: {
+        pricing: {
+          asOf: pricing.asOf,
+          sources: pricing.sources,
+          dimensions: pricing.dims
+        },
+        nodes
+      },
+      warnings: stateWarnings(scenario, simulation, catalog)
+    });
+  }
+
+  function controlState(host) {
+    const state = host.getSimulation();
+    return { running: state.running, speed: state.speed, time: state.time };
+  }
+
+  function createAgentApi(host) {
+    if (!host || !host.scenario || !host.catalog || !host.pricing || !host.getScenario ||
+        !host.getSimulation || !host.getModel || !host.loadScenario || !host.setParams ||
+        !host.start || !host.pause || !host.reset) {
+      throw new Error('SIM_API host is incomplete');
+    }
+    let seq = 0;
+    return {
+      version: VERSION,
+      loadScenario(raw) {
+        return request(++seq, () => {
+          const validated = validateScenario(raw, host);
+          if (validated.error) return { error: validated.error };
+          host.loadScenario(validated.scenario);
+          return { data: { scenario: host.getScenario(), warnings: validated.warnings } };
+        });
+      },
+      setParams(nodeId, patch) {
+        return request(++seq, () => {
+          const scenario = host.getScenario();
+          if (!isObject(scenario) || !Array.isArray(scenario.nodes)) {
+            return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current scenario is invalid' } };
+          }
+          const validated = validateParamPatch(nodeId, patch, scenario, host.catalog);
+          if (validated.error) return { error: validated.error };
+          const result = host.setParams(nodeId, validated.patch);
+          return { data: result };
+        });
+      },
+      start(options) {
+        return request(++seq, () => {
+          const validated = validateStartOptions(options);
+          if (validated.error) return { error: validated.error };
+          host.start(validated.options.speed);
+          return { data: controlState(host) };
+        });
+      },
+      pause() {
+        return request(++seq, () => {
+          host.pause();
+          return { data: controlState(host) };
+        });
+      },
+      reset() {
+        return request(++seq, () => {
+          host.reset();
+          return { data: controlState(host) };
+        });
+      },
+      getState() {
+        return request(++seq, () => {
+          const scenario = host.getScenario();
+          const simulation = host.getSimulation();
+          if (!isObject(scenario) || !Array.isArray(scenario.nodes) || !isObject(simulation) || !isObject(simulation.nodes)) {
+            return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current simulation state is invalid' } };
+          }
+          return { data: buildSnapshot(simulation, scenario, host) };
+        });
+      },
+      exportScenario() {
+        return request(++seq, () => {
+          const scenario = host.getScenario();
+          const validated = validateScenario(scenario, host);
+          if (validated.error) return { error: validated.error };
+          return { data: clone(validated.scenario) };
+        });
+      }
+    };
+  }
+
+  return { VERSION, ERROR_CODES, success, failure, validateScenario, validateParamPatch,
+    validateStartOptions, buildSnapshot, createAgentApi };
+});
+
+</script>
+<script>
 (function () {
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
@@ -1535,17 +1972,25 @@ window.CATALOG = {
     return { p, slashed };
   }
 
-  function compute() {
+  function modelFor(nodes, edges, backlog, drops) {
     const params = {};
-    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
-    const model = QE.compute(state.nodes, state.edges, TYPES, params, state.backlog, state.drops, PRICING.hoursPerMonth);
+    nodes.forEach(n => { params[n.id] = eff(n).p; });
+    const model = QE.compute(nodes, edges, TYPES, params, backlog, drops, PRICING.hoursPerMonth);
+    nodes.forEach(n => {
+      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) model.res[n.id].err = 1;
+    });
+    return model;
+  }
+
+  function applyModel(model) {
     state.res = model.res;
     state.cpuRate = model.cpuRate;
     state.rate = model.rate;
     state.pathLat = model.pathLat;
-    state.nodes.forEach(n => {
-      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) state.res[n.id].err = 1;
-    });
+  }
+
+  function compute() {
+    applyModel(modelFor(state.nodes, state.edges, state.backlog, state.drops));
   }
 
   function addFromPalette(type) {
@@ -2260,27 +2705,33 @@ window.CATALOG = {
   document.addEventListener('pointerup', onUp);
 
   $('#search').addEventListener('input', renderPalette);
-  $('#start').addEventListener('click', () => {
-    state.running = !state.running;
+  function setRunning(running) {
+    state.running = !!running;
     $('#start').textContent = state.running ? 'Pause simulation' : 'Start simulation';
     $('#start').classList.toggle('on', state.running);
     compute(); render();
-  });
-  $('#reset').addEventListener('click', () => {
+  }
+
+  function resetSim() {
     state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
-    state.backlog = {}; state.drops = {};
+    state.backlog = {}; state.drops = {}; lastReal = 0; acc = 0;
     compute(); render(); toast('Simulation reset');
-  });
+  }
+
+  $('#start').addEventListener('click', () => setRunning(!state.running));
+  $('#reset').addEventListener('click', resetSim);
   function speedEq(v) {
     if (v < 60) return '1s = ' + v + 's';
     if (v < 3600) return '1s = ' + (Math.round(v / 6) / 10) + 'm';
     return '1s = ' + (Math.round(v / 360) / 10) + 'h';
   }
-  $('#speed').addEventListener('input', e => {
-    const v = parseInt(e.target.value, 10);
+  function setSpeed(value) {
+    const v = parseInt(value, 10);
     if (!isNaN(v)) state.speed = Math.max(1, Math.min(7200, v));
+    $('#speed').value = state.speed;
     $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
-  });
+  }
+  $('#speed').addEventListener('input', e => setSpeed(e.target.value));
   $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
   $$('.chaos-btn').forEach(b => b.addEventListener('click', () => chaos(b.dataset.c)));
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
@@ -2370,7 +2821,7 @@ window.CATALOG = {
   function simState() {
     // Units: time is simulated seconds, spent/rate are USD and USD/s,
     // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
-    const nodes = {};
+    const nodes = Object.create(null);
     state.nodes.forEach(n => {
       const r = state.res[n.id] || {};
       nodes[n.id] = {
@@ -2389,9 +2840,46 @@ window.CATALOG = {
     }));
     return {
       time: state.t, spent: state.spent, rate: state.rate,
-      pathLat: state.pathLat, running: state.running, plan: state.plan,
+      pathLat: state.pathLat, running: state.running, speed: state.speed, plan: state.plan,
+      baseFee: state.baseFee, budget: state.budget, requests: state.reqs,
+      modelSpent: state.modelSpent, cpuRate: state.cpuRate,
+      chaos: Object.keys(state.chaos).filter(k => state.chaos[k] > performance.now() / 1000),
       usage, monthly, modelSpend: modelBucket(), nodes
     };
+  }
+
+  function installScenario(s, doFit, warning) {
+    const known = s.nodes.filter(hasType);
+    const model = modelFor(known, s.edges, {}, {});
+    const rootExtra = {};
+    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) rootExtra[k] = s[k]; });
+    const previousState = Object.assign({}, state);
+    const previousDrag = drag, previousLink = link, previousSeq = seq;
+    try {
+      const keep = state.sel;
+      state.name = s.name;
+      state.nodes = known;
+      state.backlog = {}; state.drops = {};
+      state.opaque = s.nodes.filter(n => !hasType(n));
+      state.rootExtra = rootExtra;
+      state.edges = s.edges;
+      state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
+      drag = null;
+      link = null;
+      seq = window.SCENARIO.nextNodeSeq(s.nodes);
+      applyModel(model);
+      render();
+      if (doFit) fit();
+      if (warning) toast(warning);
+      return true;
+    } catch (err) {
+      Object.assign(state, previousState);
+      drag = previousDrag;
+      link = previousLink;
+      seq = previousSeq;
+      render();
+      throw err;
+    }
   }
 
   function applyScenario(raw, doFit) {
@@ -2406,24 +2894,28 @@ window.CATALOG = {
       toast(res.error || 'Scenario has no renderable nodes');
       return false;
     }
-    state.name = s.name;
-    state.nodes = known;
-    state.backlog = {}; state.drops = {};
-    state.opaque = s.nodes.filter(n => !hasType(n));
-    state.rootExtra = {};
-    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) state.rootExtra[k] = s[k]; });
-    state.edges = s.edges;
-    const keep = state.sel;
-    state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
-    drag = null;
-    link = null;
-    // Opaque ids count too: a palette node must never reuse a preserved id.
-    seq = window.SCENARIO.nextNodeSeq(s.nodes);
-    compute();
-    render();
-    if (doFit) fit();
-    if (res.error) toast(res.error);
-    return true;
+    return installScenario(s, doFit, res.error);
+  }
+
+  function setNodeParams(nodeId, patch) {
+    const node = nodeById(nodeId);
+    if (!node) throw new Error('Unknown node');
+    const previousParams = node.p;
+    const nextParams = Object.assign({}, previousParams, patch);
+    const nodes = state.nodes.map(n => n.id === nodeId ? Object.assign({}, n, { p: nextParams }) : n);
+    const model = modelFor(nodes, state.edges, state.backlog, state.drops);
+    const previousModel = { res: state.res, cpuRate: state.cpuRate, rate: state.rate, pathLat: state.pathLat };
+    try {
+      node.p = nextParams;
+      applyModel(model);
+      render();
+    } catch (err) {
+      node.p = previousParams;
+      Object.assign(state, previousModel);
+      render();
+      throw err;
+    }
+    return { nodeId, params: Object.assign({}, nextParams) };
   }
 
   const http = /^https?:$/.test(location.protocol);
@@ -2472,6 +2964,23 @@ window.CATALOG = {
     export: currentScenario,
     getState: simState
   };
+
+  window.SIM_API = window.SIM_API_FACTORY.createAgentApi({
+    scenario: window.SCENARIO,
+    catalog: window.CATALOG,
+    pricing: PRICING,
+    getScenario: currentScenario,
+    getSimulation: simState,
+    getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
+    loadScenario: s => installScenario(s, true),
+    setParams: setNodeParams,
+    start: speed => {
+      if (speed !== undefined) setSpeed(speed);
+      setRunning(true);
+    },
+    pause: () => setRunning(false),
+    reset: resetSim
+  });
 
   renderPalette();
   loadTemplate();

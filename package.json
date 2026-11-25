@@ -11,7 +11,8 @@
     "scenario.json",
     "dist/cloudflare-arch-sim.html",
     "src/scenario.js",
-    "src/catalog.js"
+    "src/catalog.js",
+    "src/agent-api.js"
   ],
   "engines": {
     "node": ">=18"

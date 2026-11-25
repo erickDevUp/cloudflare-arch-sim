@@ -1,10 +1,10 @@
 # Agent operator guide
 
-Use this guide when an agent uses the simulator to design or evaluate an architecture rather than change its code. The browser API, HTTP channel, and controls are **experimental and unversioned**; verify them against the linked source before relying on them.
+Use `window.SIM_API` version 1 to load, edit, run, inspect, and export architectures without driving DOM controls. It is the stable browser-facing agent contract. `window.__SIM__`, HTTP `/scenario`, SSE, and DOM controls remain available for compatibility but are not part of the v1 stability promise.
 
 ## Quick path
 
-1. Build and start the live channel:
+Build and start the live channel:
 
 ```sh
 npm ci
@@ -12,94 +12,173 @@ npm run build
 npm run dev -- --port 8788
 ```
 
-2. Open `http://127.0.0.1:8788/` in Orca's browser.
-3. Load a validated scenario with `window.__SIM__.load()` or persist one through `POST /scenario`.
-4. Start, pause, reset, and set speed through the existing DOM controls; they are not `window.__SIM__` methods.
-5. Inspect `window.__SIM__.getState()`, then export with `window.__SIM__.export()`.
-6. Record assumptions, pricing provenance, simulated time, and limitations with the result.
+Open `http://127.0.0.1:8788/` in Orca's browser, then run:
 
-For repository changes, use [AGENTS.md](../AGENTS.md) and [the agent playbook](agent-playbook.md) instead.
+```js
+const api = window.SIM_API;
 
-## Scenario schema and validation
+api.pause();
+api.reset();
 
-The current schema version is `1`. The authoritative implementation is [src/scenario.js](../src/scenario.js); defaults and editable bounds come from [src/catalog.js](../src/catalog.js).
-
-| Field | Current behavior |
-|---|---|
-| `version` | Missing or unsupported versions normalize to `1` with a warning. |
-| `name` | Optional non-empty string; otherwise `Untitled scenario`. |
-| `nodes` | Array of node objects. HTTP POST requires it; browser validation treats a missing array as empty. |
-| `edges` | Array of `{ from, to, weight? }`; both endpoints must identify nodes in the scenario. |
-| Unknown root fields | Preserved in validation, export, merge, and storage. |
-
-A node has `id`, `type`, optional finite `x`/`y`, optional `alias`, and optional `p` parameters. Missing positions receive a deterministic layout. Missing ids are generated; duplicate ids count as dropped data. Aliases are limited to 80 characters without control characters. Known nodes receive catalog defaults, numeric params are range-checked, and unknown params are preserved. Prototype names such as `constructor` and `__proto__` are rejected.
-
-Unknown node types are preserved as opaque data but are not rendered or simulated. A scenario containing only opaque nodes is rejected by `window.__SIM__.load()`. HTTP POST can preserve opaque nodes already in storage but cannot introduce a new unknown type. Edges touching opaque nodes are exported but ignored by the physics pass.
-
-Legacy `workers_ai` nodes carrying external `inPrice` or `outPrice` fields migrate to `external_model` during validation. Native `workers_ai` nodes keep their id and feed Cloudflare Neuron usage; `external_model` remains a separate non-Cloudflare token-spend bucket.
-
-`window.SCENARIO.validate(raw, window.CATALOG)` currently returns `{ scenario, error, dropped }`. `window.__SIM__.load()` and HTTP POST reject `dropped > 0`; warning-only results can be accepted. Errors are human-readable strings, not structured codes.
-
-Minimal shape:
-
-```json
-{
-  "version": 1,
-  "name": "Agent candidate",
-  "nodes": [
-    { "id": "source", "type": "traffic", "x": 20, "y": 20, "p": { "rate": 10 } },
-    { "id": "api", "type": "workers", "x": 220, "y": 20 }
+const loaded = api.loadScenario({
+  version: 1,
+  name: 'Static site candidate',
+  nodes: [
+    { id: 'traffic', type: 'traffic', p: { rate: 200 } },
+    { id: 'cache', type: 'cache', p: { hit: 80 } },
+    { id: 'workers', type: 'workers', p: { latency: 20, cpuMs: 5 } },
+    { id: 'assets', type: 'r2' }
   ],
-  "edges": [{ "from": "source", "to": "api" }]
-}
+  edges: [
+    { from: 'traffic', to: 'cache' },
+    { from: 'cache', to: 'workers' },
+    { from: 'workers', to: 'assets' }
+  ]
+});
+
+if (!loaded.ok) throw new Error(loaded.error.message);
+
+const patched = api.setParams('cache', { hit: 90 });
+if (!patched.ok) throw new Error(patched.error.message);
+
+api.start({ speed: 60 });
+await new Promise(resolve => setTimeout(resolve, 250));
+api.pause();
+
+const state = api.getState().data;
+const scenario = api.exportScenario().data;
 ```
 
-## Browser contract
+Record `state.warnings`, `state.assumptions`, and `state.provenance` with any design conclusion. API mutations are local to the page; use the legacy HTTP channel when the scenario must be persisted or shared.
+
+## v1 contract
+
+`window.SIM_API.version` is `1`. Every method is synchronous and returns one envelope:
+
+```js
+{ ok: true, data, requestId }
+{ ok: false, error: { code, message, details? }, requestId }
+```
+
+Request IDs are deterministic within a page instance: `sim-v1-000001`, `sim-v1-000002`, and so on. Every call consumes an ID, including failed validation. Reloading the page restarts the sequence; IDs are not globally unique.
+
+| Method | Success `data` | Behavior |
+|---|---|---|
+| `loadScenario(scenario)` | `{ scenario, warnings }` | Validates the whole scenario, rejects unsupported nodes/params, computes a candidate model, then installs it atomically. Fits the view. |
+| `setParams(nodeId, patch)` | `{ nodeId, params }` | Validates the entire patch before updating one node. Recomputes metrics and preserves all other nodes. |
+| `start(options?)` | `{ running, speed, time }` | Starts the loop. Optional `{ speed }` accepts an integer from 1 through 7200. |
+| `pause()` | `{ running, speed, time }` | Stops advancement without resetting counters. |
+| `reset()` | `{ running, speed, time }` | Clears time, spend, requests, model spend, chaos, backlog, and drops. Keeps architecture, running state, and speed. |
+| `getState()` | Structured snapshot | Returns scenario, simulation, billing, node metrics, assumptions, provenance, and warnings without mutating state. |
+| `exportScenario()` | Canonical scenario | Returns an isolated, normalized scenario object. Does not persist or POST. |
+
+### Error codes
+
+| Code | Meaning |
+|---|---|
+| `INVALID_SCENARIO` | Root shape, version, node/edge data, defaults, ranges, or lossy normalization failed. |
+| `UNSUPPORTED_NODE` | A node type is not in the supported catalog. |
+| `UNKNOWN_NODE` | `setParams` targeted a missing or unsupported node id. |
+| `INVALID_PARAMS` | A scenario param or patch is unknown, missing, non-finite, out of range, or outside an enum. |
+| `INVALID_STATE` | The current scenario or simulation snapshot is not usable. |
+| `INTERNAL_ERROR` | The host threw unexpectedly. The message is included without a stack. |
+
+### Atomicity and fail-closed rules
+
+- Validate before mutation. A failure leaves the previous scenario, params, runtime counters, and metrics unchanged.
+- Unknown node types are rejected by v1 even though the lossless storage layer can preserve them.
+- Unknown node params are rejected by v1. Unknown root, node, and edge fields remain preserved and appear as load warnings.
+- Node ids that collide with `Object.prototype` names are rejected.
+- A supplied scenario `version` must be `1`; an omitted version normalizes to `1`.
+- `nodes` must be an array. Empty scenarios are valid.
+- `loadScenario` resets Queue backlog/drops but does not reset time, spend, running state, speed, plan, budget, base fee, or chaos.
+- `setParams`, `loadScenario`, and `exportScenario` do not write to `/scenario`.
+- Pause before `reset()` when a zero-time snapshot is required; reset preserves the current running state.
+
+The authoritative schema remains [src/scenario.js](../src/scenario.js). Defaults, editable ranges, enums, verified notes, and source links come from [src/catalog.js](../src/catalog.js). Legacy `workers_ai` nodes with external token prices still migrate to `external_model`.
+
+## State snapshot
+
+`getState().data` contains:
+
+| Field | Meaning |
+|---|---|
+| `version` | API contract version. |
+| `scenario` | Canonical architecture currently loaded. |
+| `simulation` | `time`, `running`, `speed`, `spent`, `rate`, `pathLat`, `requests`, `modelSpent`, `cpuRate`, `baseFee`, `budget`, and active chaos keys. |
+| `plan` | Current `free`, `paid`, or `custom` plan. |
+| `usage` | Modeled monthly Cloudflare totals by pricing dimension. |
+| `monthly` | Plan base, overage, total, lines, exceeded limits, and unverified dimensions. |
+| `modelSpend` | External-model monthly projection `{ set, total }`; never part of Cloudflare spend. |
+| `nodes` | Known nodes keyed by id, including Queue and Durable Object fields. |
+| `assumptions` | Explicit editable/model conventions such as requests per user per month. |
+| `provenance` | Pricing `asOf`, sources and dimensions, plus each node's verified note, source, model note, and param classifications. |
+| `warnings` | Structured warnings for unsupported boot data, unknown params, cycles, unverified pricing, unset model spend, Queue backlog/expiry, and Durable Object overload. |
+
+### Per-node metrics
+
+| Field | Meaning |
+|---|---|
+| `lambda`, `out` | Input and forwarded request rates in requests/s. |
+| `util`, `err` | Utilization fraction and modeled error fraction, both 0–1. |
+| `lat`, `cost` | Service plus queue wait in seconds and Cloudflare usage in USD/s. |
+| `capacity`, `backlog`, `drops` | Queue service capacity, queued messages, and retention-expiry drops/s. |
+| `billedRequests`, `doGbS` | Durable Object billed requests/s and monthly GB-s. |
+| `objects`, `perObjectRate`, `objectLimit`, `overloaded` | Durable Object sharding and limit state. |
+
+Flow follows graph edges with full fan-out; edge `weight` does not affect physics. Ordinary nodes use M/M/c with Erlang-C, caches forward only misses, and only Queue nodes throttle into backlog. See [src/app.js](../src/app.js) and [src/engine.js](../src/engine.js).
+
+### Assumptions and provenance
+
+V1 labels every scenario param as an `editable_model_assumption`, including sourced price defaults, because agents can edit them. Verified platform facts are exposed separately through:
+
+- `provenance.pricing.dimensions`, including verified flags, prices, allowances, and source links from [src/pricing.js](../src/pricing.js).
+- `provenance.nodes[id].verified` and `.source` from the catalog.
+- `provenance.nodes[id].note` for modeling assumptions and limits.
+
+This separation prevents a sourced product price from being mistaken for a measured workload or capacity result.
+
+## Workflow patterns
+
+### Static site
+
+Model `traffic -> cache -> workers -> r2`. Vary cache hit ratio, Worker latency/CPU, and R2 Class B units. Compare monthly totals and critical-path latency after pausing.
+
+### Event-driven Queue
+
+Model `traffic -> workers -> queues -> workers -> r2`. Set Queue concurrency/latency below arrival rate, start at a known speed, then pause and inspect `capacity`, `backlog`, `drops`, and `QUEUE_BACKLOG`/`QUEUE_EXPIRY` warnings.
+
+### AI retrieval
+
+Model `traffic -> workers -> ai_gateway -> workers_ai` with a `workers -> vectorize` branch. Native Workers AI contributes Neuron usage to Cloudflare spend. Use `external_model` only for third-party token spend, and populate all four token fields before treating `modelSpend` as set.
+
+The loop uses `requestAnimationFrame` and wall-clock deltas. Equal wall-clock waits do not guarantee equal simulated time, and chaos expiries also use real time. V1 controls are independent of DOM refs, but they are not a deterministic clock or time-travel interface.
+
+## Legacy compatibility
 
 ### `window.__SIM__`
 
-| Method | Returns | Current behavior and limits |
+| Method | Legacy return | Compatibility |
 |---|---|---|
-| `load(raw)` | `boolean` | Validates and applies locally, then fits the view. Resets backlog/drops but does not reset time, spend, running state, speed, plan, budget, or chaos. Does not POST to the server. Failures surface as a toast and `false`, without a structured error. |
-| `export()` | Scenario object | Returns normalized current scenario data, including preserved unknown fields and opaque nodes. Does not persist or POST. Runtime metrics, plan, budget, and model spend are not included. |
-| `getState()` | State snapshot | Returns the fields described below. It does not mutate the simulation. |
+| `load(raw)` | `boolean` | Still validates and applies locally. Retains permissive opaque-node behavior for existing callers. |
+| `export()` | Scenario object | Same canonical architecture export. |
+| `getState()` | State snapshot | Existing top-level fields remain; speed, counters, plan inputs, and chaos were added additively. |
 
-There are currently no `start`, `pause`, `reset`, `setSpeed`, `post`, or `subscribe` methods on `window.__SIM__`.
+New agents should use `window.SIM_API` for structured errors and atomic fail-closed behavior. Existing DOM controls remain wired to the same shared run/reset/speed functions.
 
-### Existing controls
+### HTTP scenario channel and SSE
 
-| Selector | Effect |
-|---|---|
-| `#start` | Toggles running; label changes between `Start simulation` and `Pause simulation`. |
-| `#reset` | Resets simulated time, Cloudflare spend, request count, internal model spend, chaos, backlog, and drops. Keeps architecture and does not change running state or speed. |
-| `#speed` | Number input for simulated seconds per real second, clamped to 1–7200. |
-| `.chaos-btn` | Applies temporary chaos using real time, not simulated time. |
-
-Use Orca's browser snapshot and refs to operate these controls. Treat selectors and labels as implementation details, not a stable automation API.
-
-### Boot order
-
-The page tries a valid `#s=` hash, then embedded `window.__SCENARIO__`, then `GET /scenario`, then its built-in template. A plain `npm run build` keeps the live channel authoritative. `node build.mjs --scenario scenario.json` embeds a pinned snapshot that outranks `GET /scenario`.
-
-`window.SCENARIO.encode(scenario)` creates a `#s=` payload and returns `null` above the current 8,000-character limit. This is a share-link helper, not persistence.
-
-## HTTP scenario channel and SSE
-
-[serve.mjs](../serve.mjs) implements the loopback channel.
+[serve.mjs](../serve.mjs) still implements the unversioned loopback channel:
 
 | Endpoint | Behavior |
 |---|---|
-| `GET /scenario` | Returns stored bytes untouched. Missing or invalid JSON returns 500. Schema problems are logged as warnings but do not replace the stored response. |
-| `POST /scenario` | Requires `application/json`, a JSON object with a `nodes` array, and a body no larger than 1 MB. Validates, rejects dropped data/new unknown types/conflicts, merges stored unknown data, writes atomically, then broadcasts. |
-| `GET /events` | SSE stream. Sends an initial comment, then a `data` event after each successful POST. |
+| `GET /scenario` | Returns stored bytes untouched. Missing or invalid JSON returns 500. |
+| `POST /scenario` | Requires JSON with a `nodes` array and a body no larger than 1 MB. Validates, preserves stored unknown data, writes atomically, and broadcasts. |
+| `GET /events` | SSE stream with `{ clientId, scenario }` after successful POSTs. |
 
-A successful POST returns `{ "ok": true, "warning": ... }`. Validation failures return 400, unsupported content type returns 415, oversized bodies return 413, and write failures return 500. Omitted known nodes are deletions; omitted unknown data is restored from storage. Round-trip the full stored scenario before editing.
+A successful POST returns `{ "ok": true, "warning": ... }`. Validation failures return 400, unsupported content type returns 415, oversized bodies return 413, and write failures return 500. SSE has no replay, event id, heartbeat, or run-state synchronization.
 
-SSE payloads contain `{ clientId, scenario }`, not simulation metrics or run state. The browser ignores events whose `clientId` matches its own random id. There is no event replay, event id, heartbeat, or run-state synchronization; reconnecting clients should bootstrap with `GET /scenario`.
-
-The server pins allowed loopback `Host` values and rejects foreign or `null` origins. It is not authenticated. Do not expose it to an untrusted network.
-
-Read, edit, and persist a candidate:
+There is no HTTP v1 endpoint. A full HTTP contract would need page-local simulation state, controls, and request identity that the current stateless scenario channel does not own. Keep HTTP v1 as a follow-up rather than adding a generic server framework.
 
 ```sh
 curl --fail --silent --show-error http://127.0.0.1:8788/scenario -o candidate.json
@@ -109,117 +188,25 @@ curl --fail --silent --show-error -X POST http://127.0.0.1:8788/scenario \
   --data-binary @candidate.json
 ```
 
-## Operate a scenario
+The server pins allowed loopback `Host` values and rejects foreign or `null` origins. It is not authenticated; do not expose it to an untrusted network.
 
-### Load without persisting
+## Known limitations
 
-Run in the page console or an approved browser-evaluation context:
-
-```js
-const response = await fetch('/scenario');
-const scenario = await response.json();
-scenario.name = 'Agent candidate';
-const accepted = window.__SIM__.load(scenario);
-```
-
-Use `false` as rejection. Because `load()` does not reset runtime counters or persist, call the existing Reset control before a measured run and use HTTP POST when the candidate must become shared state.
-
-### Run and inspect
-
-Use Orca's browser to activate `#start`, wait for simulated time to advance, and read:
-
-```js
-const state = window.__SIM__.getState();
-const queues = Object.entries(state.nodes).filter(([, node]) => node.type === 'queues');
-```
-
-Pause before comparing snapshots. The loop uses `requestAnimationFrame` and wall-clock deltas, so equal wall-clock waits do not guarantee equal simulated time. Chaos expiries also use `performance.now()`.
-
-### Export
-
-```js
-const scenario = window.__SIM__.export();
-const json = JSON.stringify(scenario, null, 2);
-const hashPayload = window.SCENARIO.encode(scenario);
-```
-
-Export captures architecture only. Persist with `POST /scenario` when other tabs or future runs must receive it.
-
-## Interpret state and spend
-
-### Top-level state
-
-| Field | Meaning |
-|---|---|
-| `time` | Simulated seconds since the last reset or page load. |
-| `running` | Whether the simulation loop is advancing state. |
-| `rate` | Cloudflare usage rate in USD/s; excludes plan base fees and non-Cloudflare nodes. |
-| `spent` | Accumulated Cloudflare usage in USD; excludes plan base fees and model/external spend. |
-| `pathLat` | Longest active source-to-node latency chain in seconds. |
-| `plan` | Current `free`, `paid`, or `custom` plan selection. |
-| `usage` | Current modeled monthly Cloudflare totals by pricing dimension. |
-| `monthly` | Current plan result: base, overage, total, lines, exceeded limits, and unverified dimensions. |
-| `modelSpend` | Current external-model monthly projection as `{ set, total }`; not accumulated spend. |
-| `nodes` | Object keyed by known node id; opaque nodes are omitted. |
-
-### Per-node state
-
-| Field | Meaning |
-|---|---|
-| `lambda` | Input request rate in requests/s. |
-| `out` | Forwarded request rate in requests/s after cache/queue behavior. |
-| `util` | Utilization fraction; `1` is saturation, not 100%. |
-| `err` | Error fraction from 0 to 1; derived from overload or the external 402 chaos state. It is not an error code. |
-| `lat` | Service plus modeled queue wait in seconds. |
-| `cost` | Cloudflare usage in USD/s; zero for non-Cloudflare nodes. |
-| `capacity` | Queue service capacity in requests/s; zero for non-Queue nodes. |
-| `backlog` | Queued messages, advanced with simulated time. |
-| `drops` | Retention-expiry drops in messages/s, not a cumulative count. |
-| `billedRequests` | Durable Object billed requests/s after transport and WebSocket message rules. |
-| `doGbS` | Durable Object monthly GB-s under the current active-duration model. |
-| `objects` | Durable Object count used for explicit sharding. |
-| `perObjectRate` | Durable Object arrivals/s divided by object count. |
-| `objectLimit` | Documented per-object soft request-rate limit used by the model. |
-| `overloaded` | Whether the Durable Object reaches its modeled service or per-object limit. |
-
-Flow follows edges with full fan-out; edge `weight` does not affect physics. Ordinary nodes use M/M/c with Erlang-C, caches forward only the miss fraction, and only Queue nodes throttle into backlog. See [src/app.js](../src/app.js) and [src/engine.js](../src/engine.js) for the model.
-
-### Cloudflare, model, and external spend
-
-Cloudflare usage, accumulation, overage, and projections exclude nodes marked `cloudflare: false`. Native `workers_ai` inference contributes Neuron usage to Cloudflare spend. External-model token spend is a separate bucket and remains unset until all four token fields are populated; `getState().modelSpend` exposes its current monthly projection, while accumulated model spend remains internal. The UI shows the projection in `#k-model` and accumulated per-request model spend in `#k-modelreq`.
-
-The external API node is non-Cloudflare and has no separate external-spend bucket; its reported cost is zero. Prices, plan math, `asOf`, and source links live only in [src/pricing.js](../src/pricing.js).
-
-## Assumptions, provenance, and known limitations
-
-- This is a rate model, not a load test or Cloudflare emulator. It does not model retries, variable batch sizes, distributed coordination, storage/egress, or real provider capacity.
-- Catalog `verified` notes and source links identify sourced claims; other values are editable assumptions. Record which inputs were assumptions.
-- Cycles are skipped by the topological pass, so nodes in a cycle receive zero traffic.
-- Durable Object arrivals are assumed evenly sharded; active duration is capped per object and does not model individual connection schedules or pending I/O.
-- `load()` changes architecture without resetting runtime counters; Reset keeps the architecture and running state.
-- Base-fee/budget inputs, speed, chaos, accumulated model spend, request count, and CPU rate are absent from `getState()` and scenario export.
-- SSE synchronizes scenarios only. It does not synchronize run state, metrics, spend, or control changes.
+- This is a rate model, not a load test or Cloudflare emulator. It does not model retries, variable batches, distributed coordination, storage/egress, or real provider capacity.
+- Cycles are skipped by the topological pass, so cycle-dependent nodes receive zero traffic and produce a warning.
+- Durable Object arrivals are assumed evenly sharded; active duration does not model individual connection schedules or pending I/O.
+- V1 has no subscription, persistence, time-travel, explicit `advance(seconds)`, MCP, or CLI JSON interface.
 - Static HTML has no persistence; only `serve.mjs` provides the file-backed channel.
-- Unknown nodes are preserved but not fail-closed: they can be omitted from simulation while remaining in exported/stored data, and they are absent from `getState().nodes`.
-
-## Stabilization required after P0
-
-The current interface must not be described as stable. Before external agents depend on it, complete:
-
-1. A versioned machine-facing API with explicit compatibility rules.
-2. Structured error codes alongside human-readable messages.
-3. Deterministic set/run/state/export operations, including reset and time control.
-4. Assumptions and provenance embedded in output.
-5. Fail-closed behavior for unsupported nodes and params.
-6. Possibly an MCP or CLI JSON interface for external agents.
+- The API validates architecture and params, but cannot make modeled prices or capacity into measured production facts.
 
 ## References
 
 - [AGENTS.md](../AGENTS.md) — repository change workflow.
 - [agent-playbook.md](agent-playbook.md) — executable repository recipes.
+- [src/agent-api.js](../src/agent-api.js) — v1 validation, results, snapshot, and factory.
 - [src/scenario.js](../src/scenario.js) — schema, validation, merge, and hash encoding.
 - [src/catalog.js](../src/catalog.js) — node definitions, defaults, bounds, and provenance notes.
-- [src/app.js](../src/app.js) — browser API, controls, simulation loop, and metrics.
-- [src/engine.js](../src/engine.js) — queue capacity, backlog, and retention helpers.
+- [src/app.js](../src/app.js) — host wiring, controls, simulation loop, and metrics.
+- [src/engine.js](../src/engine.js) — queue capacity, backlog, retention, and Durable Object helpers.
 - [src/pricing.js](../src/pricing.js) — Cloudflare/model spend separation and pricing provenance.
-- [serve.mjs](../serve.mjs) — HTTP and SSE behavior.
+- [serve.mjs](../serve.mjs) — legacy HTTP and SSE behavior.
