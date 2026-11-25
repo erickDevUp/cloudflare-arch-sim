@@ -7,10 +7,14 @@
 <link rel="icon" href="data:,">
 <style>
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:#08080a;color:#e8e8ec;
   font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button{font:inherit;cursor:pointer}
-.app{width:100%;max-width:1180px;margin:0 auto;border:1px solid #1b1b22;border-radius:14px;
+button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,
+.canvas:focus-visible{outline:2px solid #a99bff;outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.app{position:relative;width:100%;max-width:1180px;margin:0 auto;border:1px solid #1b1b22;border-radius:14px;
   overflow:hidden;background:#0a0a0d}
 
 .top{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #17171d;
@@ -21,10 +25,17 @@ button{font:inherit;cursor:pointer}
 .logo svg{width:19px;height:19px}
 .brand b{display:block;font-size:13.5px;letter-spacing:-.01em}
 .brand span{display:block;font-size:10.5px;color:#7a7a88}
-.actions{margin-left:auto;display:flex;gap:7px}
+.actions{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
 .ghost{background:#14141a;color:#cfcfd8;border:1px solid #24242e;border-radius:8px;padding:5px 10px;font-size:11.5px}
 .ghost:hover{background:#1b1b23;border-color:#33333f}
 .ghost.on{background:#242433;border-color:#4a4a63;color:#fff}
+.save-status{font-size:10.5px;color:#7a7a88;white-space:nowrap}
+.save-status[data-phase="saving"]{color:#fbbf24}
+.save-status[data-phase="saved"]{color:#34d399}
+.save-status[data-phase="error"]{color:#ff8fa0}
+.channel-error{position:relative;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;
+  border-bottom:1px solid #7f1d2b;background:#2a0d14;color:#ffc4cd;font-size:11.5px}
+.channel-error .ghost{flex:none;background:#3a141d;border-color:#7f1d2b;color:#fff}
 
 .body{display:grid;grid-template-columns:var(--pal,196px) minmax(0,1fr) var(--insp,236px);height:var(--h,620px)}
 .app.no-pal{--pal:0px}
@@ -48,14 +59,16 @@ button{font:inherit;cursor:pointer}
 .pal-ico{width:19px;height:19px}
 .pal-empty{font-size:10.5px;color:#8a8a99;padding:8px 6px;line-height:1.4}
 .pal-ico svg{width:100%;height:100%}
+.sheet-head,.sheet-close{display:none}
 
 .stage{display:flex;flex-direction:column;min-width:0;min-height:0}
 .canvas-wrap{position:relative;flex:1;min-height:0;overflow:hidden;
   background:
     radial-gradient(circle at 1px 1px,rgba(255,255,255,.055) 1px,transparent 0) 0 0/22px 22px,
     linear-gradient(180deg,#08080b,#0a0a0e)}
-.canvas{position:absolute;inset:0;cursor:grab}
+.canvas{position:absolute;inset:0;cursor:grab;min-width:300px}
 .canvas:active{cursor:grabbing}
+.canvas:focus-visible{outline-offset:-3px}
 .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .edge-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .edge{fill:none;stroke:#262633;stroke-width:1.6;transition:stroke .25s}
@@ -75,6 +88,8 @@ button{font:inherit;cursor:pointer}
 .nbox.warm{border-color:#b45309;box-shadow:0 0 0 1px rgba(180,83,9,.3),0 0 22px -6px #b45309}
 .nbox.hot{border-color:#ef4444;box-shadow:0 0 0 1px rgba(239,68,68,.35),0 0 26px -4px #ef4444}
 .node.sel .nbox{outline:2px solid #6d5cff;outline-offset:2px}
+.node:focus-visible{outline:none;z-index:2}
+.node:focus-visible .nbox{outline:2px solid #a99bff;outline-offset:3px}
 .node.hit .nbox{animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 1px rgba(239,68,68,.4),0 0 26px -6px #ef4444}50%{box-shadow:0 0 0 3px rgba(239,68,68,.2),0 0 34px -4px #ef4444}}
 .node.sat .nbox{animation:shake .16s infinite}
@@ -125,10 +140,10 @@ button{font:inherit;cursor:pointer}
 
 .alerts{position:absolute;top:12px;left:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;pointer-events:none;z-index:3}
 .alert{font:700 10px/1 ui-monospace,monospace;letter-spacing:.06em;padding:6px 9px;border-radius:6px;background:#3b0d16;color:#ff8fa0;border:1px solid #7f1d2b;box-shadow:0 0 18px -8px #ef4444}
-.alert.warn{background:#3a2408;color:#ffc76b;border-color:#7a4d0b;box-shadow:0 0 18px -8px #f59e0b}
+.alert.warn{background:#3a2408;color:#ffc76b;border:1px solid #7a4d0b;box-shadow:0 0 18px -8px #f59e0b}
 .toast{position:absolute;top:14px;left:50%;transform:translate(-50%,-14px);opacity:0;
   background:#1a1220;border:1px solid #4a2340;color:#f0c7e4;border-radius:9px;padding:7px 12px;
-  font-size:11.5px;transition:.25s;pointer-events:none}
+  font-size:11.5px;transition:.25s;pointer-events:none;z-index:4}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
 .right{border-left:1px solid #17171d;background:#0b0b0f;display:flex;flex-direction:column;
@@ -143,6 +158,7 @@ button{font:inherit;cursor:pointer}
 .headline{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .headline>span{font-size:12px;color:#8a8a99}
 .headline b{font:700 21px/1.1 ui-monospace,monospace;color:#fff;letter-spacing:-.02em;margin-left:5px}
+.estimate-note{margin-top:4px;font-size:9.5px;color:#6f6f7d}
 .chip{display:inline-block;margin-top:7px;font-size:10.5px;padding:3px 8px;border-radius:999px;
   border:1px solid #1f4a3a;background:#0c2118;color:#34d399}
 .chip.over{border-color:#7f1d2b;background:#2a0d14;color:#ff8fa0}
@@ -182,6 +198,9 @@ button{font:inherit;cursor:pointer}
 .plan-line span{min-width:0;overflow-wrap:anywhere}
 .plan-line b{color:#b0b0be;font-weight:600;white-space:nowrap}
 .plan-line.over b{color:#ff8fa0}
+.provenance-note{display:flex;flex-direction:column;gap:2px;margin:8px 0;padding:7px 8px;
+  border:1px solid #1f4a3a;border-radius:8px;background:#0c2118;color:#8fbfa8;font-size:9.5px;line-height:1.4}
+.provenance-note b{color:#34d399;font-weight:600}
 .custom-fields{margin-top:6px}
 .custom-fields .field{margin-bottom:6px}
 .model{margin-top:6px;border-top:1px dashed #1f1f29;padding-top:8px}
@@ -194,8 +213,18 @@ button{font:inherit;cursor:pointer}
 .ins-sub{font-size:10px;margin-bottom:10px}
 .ins-sub .ok{color:#34d399}
 .ins-sub .asm{color:#f59e0b}
+.provenance{padding:8px 9px;border-radius:8px;margin:8px 0 10px;font-size:10px;line-height:1.45}
+.provenance b{display:block;margin-bottom:2px}
+.provenance.verified{border:1px solid #1f4a3a;background:#0c2118;color:#8fbfa8}
+.provenance.verified b{color:#34d399}
+.provenance.assumption{border:1px solid #60420c;background:#241a08;color:#e7bd72}
+.provenance.assumption b{color:#fbbf24}
+.field-group-title{margin:12px 0 6px;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#8a8a99}
 .field{display:block;margin-bottom:8px}
-.field span{display:block;font-size:10.5px;color:#8a8a99;margin-bottom:3px}
+.field-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:3px}
+.field-head>span:first-child{font-size:10.5px;color:#8a8a99}
+.prov-badge{font-size:8.5px;white-space:nowrap;color:#f59e0b}
+.prov-badge.verified{color:#34d399}
 .field input,.field select{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
   color:#e8e8ec;padding:5px 8px;font:11.5px ui-monospace,monospace}
 .field input:focus,.field select:focus{outline:none;border-color:#4b3fb0}
@@ -207,10 +236,14 @@ button{font:inherit;cursor:pointer}
 .ok-note{color:#8fbfa8}
 .src{display:inline-block;margin-top:6px;font-size:10px;color:#7b8cff;text-decoration:none}
 .src:hover{text-decoration:underline}
+.connect{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:6px;margin-top:12px}
+.connect .field{margin:0}
+.connect button{background:#242433;border:1px solid #4a4a63;color:#fff;border-radius:8px;padding:6px 9px;font-size:11px}
 .del{margin-top:12px;width:100%;background:#1a1114;border:1px solid #3f1d24;color:#f0a8b4;
   border-radius:8px;padding:6px;font-size:11px}
 .del:hover{background:#25141a}
 .empty{font-size:11px;color:#8a8a99;line-height:1.6}
+.sheet-scrim{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.62)}
 
 @media(max-width:1040px){
   .app{--pal:150px;--insp:200px;--h:560px}
@@ -225,11 +258,34 @@ button{font:inherit;cursor:pointer}
   .search{margin:0 8px 6px;font-size:10.5px}
 }
 @media(max-width:700px){
-  .app{--insp:172px;--h:520px}
-  .top{gap:8px;padding:8px 10px;flex-wrap:wrap}
+  .app{--h:min(640px,calc(100dvh - 132px));border-radius:0;border-left:0;border-right:0}
+  .top{gap:6px 10px;padding:8px 10px;flex-wrap:wrap}
+  .brand{flex:1 1 100%}
   .brand span{display:none}
-  .actions{gap:4px}
-  .ghost{padding:4px 7px;font-size:10.5px}
+  .save-status{order:2}
+  .actions{order:3;width:100%;margin-left:0;gap:5px;justify-content:flex-start}
+  .ghost{padding:5px 8px;font-size:10.5px}
+  .body{display:block;position:relative;height:var(--h)}
+  .stage{height:100%}
+  .app.mobile .palette,.app.mobile .right{position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;max-height:72%;
+    z-index:30;transform:translateY(105%);visibility:hidden;transition:transform .2s ease,visibility .2s ease;
+    overflow:auto;border-top:1px solid #33334a;border-left:0;border-right:0;border-radius:14px 14px 0 0;padding:0;
+    box-shadow:0 -18px 50px rgba(0,0,0,.5)}
+  .app.mobile.palette-open .palette,.app.mobile.right-open .right{transform:none;visibility:visible}
+  .app.mobile .pal-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px}
+  .app.mobile .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 4px;
+    font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#8a8a99}
+  .app.mobile .sheet-close{display:grid;place-items:center;width:30px;height:30px;background:#17171f;color:#e8e8ec;
+    border:1px solid #33333f;border-radius:8px;font-size:19px;line-height:1}
+  .app.mobile .cost-tabs{padding-right:52px}
+  .app.mobile .pal-grid{grid-template-columns:1fr 1fr}
+  .app.mobile .pal-item{flex-direction:column;text-align:center;padding:9px 4px 7px}
+  .app.mobile .pal-ico{width:19px;height:19px}
+  .stage-bar{padding:7px 8px;gap:6px}
+  .chaos{gap:4px}
+  .chaos-btn{padding:5px 7px;font-size:10px}
+  .alerts{left:8px;top:8px}
+  .channel-error{padding:8px 10px;align-items:flex-start}
 }
 
 </style>
@@ -246,18 +302,28 @@ button{font:inherit;cursor:pointer}
         <span id="scenario-name">model of real Cloudflare behaviour &mdash; not a load test</span>
       </div>
     </div>
+    <div id="save-status" class="save-status" role="status" aria-live="polite" aria-atomic="true">Local only</div>
     <div class="actions">
-      <button id="tog-pal" class="ghost on" title="Show or hide the component palette">Components</button>
-      <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
+      <button id="tog-pal" class="ghost on" title="Show or hide the component palette" aria-controls="palette" aria-expanded="true">Components</button>
+      <button id="tog-insp" class="ghost on" title="Show or hide costs and the inspector" aria-controls="right-panel" aria-expanded="true">Costs &amp; inspector</button>
       <button id="reset" class="ghost" title="Reset time, spent and chaos; keeps the architecture">Reset sim</button>
       <button id="fit" class="ghost">Fit view</button>
+      <button id="copy-link" class="ghost" title="Copy a shareable scenario link">Copy link</button>
       <button id="copy-json" class="ghost" title="Copy the scenario JSON for agents">Copy JSON</button>
     </div>
   </header>
 
+  <div id="channel-error" class="channel-error" role="alert" hidden>
+    <span id="channel-error-text"></span>
+    <button id="error-retry" class="ghost" hidden>Retry</button>
+  </div>
+
   <div class="body">
-    <aside class="palette">
-      <div class="pal-head">Components</div>
+    <aside class="palette" id="palette" aria-label="Component palette">
+      <div class="pal-head">
+        <span>Components</span>
+        <button id="close-palette" class="sheet-close" aria-label="Close components" title="Close components" hidden>&times;</button>
+      </div>
       <input id="search" class="search" placeholder="Search components" autocomplete="off">
       <div id="palette-list" class="pal-list"></div>
     </aside>
@@ -265,14 +331,15 @@ button{font:inherit;cursor:pointer}
     <main class="stage">
       <div class="canvas-wrap">
       <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
-      <div class="canvas" id="canvas">
+      <div class="canvas" id="canvas" tabindex="-1" role="group" aria-label="Architecture canvas" aria-describedby="canvas-help">
+        <p id="canvas-help" class="sr-only">Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use the inspector Connect to control to add an edge without dragging.</p>
         <div class="world" id="world">
           <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
           <div class="node-layer" id="node-layer"></div>
         </div>
       </div>
 
-        <div class="toast" id="toast"></div>
+        <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
       </div>
       <div class="stage-bar">
       <div class="toolbar">
@@ -284,7 +351,7 @@ button{font:inherit;cursor:pointer}
         </div>
       </div>
 
-      <div class="chaos">
+      <div class="chaos" role="group" aria-label="Chaos experiments">
         <span class="chaos-lbl">CHAOS:</span>
         <button class="chaos-btn" data-c="m429" title="Provider returns 429, concurrency drops">429</button>
         <button class="chaos-btn" data-c="doEvict" title="A Durable Object is evicted mid-stream">DO evict</button>
@@ -294,42 +361,47 @@ button{font:inherit;cursor:pointer}
         <button class="chaos-btn" data-c="webhook" title="Webhook burst on the sync path">Webhooks</button>
       </div>
 
-      <div class="zoombar">
-        <button id="zoomout">&minus;</button>
+      <div class="zoombar" role="group" aria-label="Canvas zoom">
+        <button id="zoomout" aria-label="Zoom out" title="Zoom out">&minus;</button>
         <span id="zoomlabel">100%</span>
-        <button id="zoomin">+</button>
+        <button id="zoomin" aria-label="Zoom in" title="Zoom in">+</button>
       </div>
       </div>
     </main>
 
-    <aside class="right">
-      <div class="cost-tabs" role="tablist" aria-label="Right panel views">
-        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost">Costos</button>
-        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect">Componentes</button>
+    <aside class="right" id="right-panel" aria-label="Costs and component inspector">
+      <div class="sheet-head">
+        <span>Costs &amp; inspector</span>
+        <button id="close-inspector" class="sheet-close" aria-label="Close costs and inspector" title="Close costs and inspector" hidden>&times;</button>
       </div>
-      <div class="cost" id="cost">
+      <div class="cost-tabs" role="tablist" aria-label="Costs and component inspector">
+        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost" tabindex="0">Costs</button>
+        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect" tabindex="-1">Components</button>
+      </div>
+      <div class="cost" id="cost" role="tabpanel" aria-labelledby="tab-cost">
         <div class="headline">
-          <span>Total <b id="k-total">$0.00/mo</b></span>
+          <span>Cloudflare total <b id="k-total">$0.00/mo</b></span>
           <select id="plan" class="plan-in" aria-label="Cloudflare plan">
             <option value="free">Free</option>
             <option value="paid">Paid $5</option>
             <option value="custom">Custom</option>
           </select>
         </div>
-        <div id="over-chip" class="chip">Dentro del plan</div>
+        <div class="estimate-note">Monthly estimate &middot; 730 hours</div>
+        <div id="over-chip" class="chip">Within plan</div>
 
         <div class="realtime">
-          Spent <b id="k-spent">$0.00</b> <span class="sep">&middot;</span> <b id="k-rate">$0.00/h</b>
-          <span class="sep">&middot;</span> <span class="muted">proyección 30d</span> <b id="k-proj">$0.00/mo</b>
+          Cloudflare spent <b id="k-spent">$0.00</b> <span class="sep">&middot;</span> <b id="k-rate">$0.00/h</b>
+          <span class="sep">&middot;</span> <span class="muted">monthly estimate</span> <b id="k-proj">$0.00/mo</b>
         </div>
 
         <div class="bars">
           <div class="bar-row">
-            <div class="bar-head"><span>Incluido</span><b id="incl-label">&mdash;</b></div>
+            <div class="bar-head"><span id="incl-label-text">Plan base / month</span><b id="incl-label">&mdash;</b></div>
             <div class="barmark"><i id="budget-bar"></i></div>
           </div>
           <div class="bar-row" id="extra-row" hidden>
-            <div class="bar-head"><span>Extra</span><b id="extra-label">&mdash;</b></div>
+            <div class="bar-head"><span>Overage</span><b id="extra-label">&mdash;</b></div>
             <div class="barmark"><i id="extra-bar" class="bad"></i></div>
           </div>
         </div>
@@ -337,9 +409,10 @@ button{font:inherit;cursor:pointer}
         <div id="capacity" class="capacity" hidden></div>
 
         <details id="breakdown" class="breakdown">
-          <summary>Desglose</summary>
+          <summary>Breakdown</summary>
           <div class="breakdown-body">
             <div id="plan-lines" class="plan-lines"></div>
+            <div id="cost-provenance" class="provenance-note"><b>Verified prices &amp; allowances</b><span>Workload rates and monthly totals are estimates.</span></div>
             <div class="krow"><span>Requests</span><b id="k-reqs">0</b></div>
             <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
             <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
@@ -347,19 +420,20 @@ button{font:inherit;cursor:pointer}
             <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
             <div class="krow small"><span>Cloudflare $/req &middot; usage only, no base fee</span><b id="k-perreq">&mdash;</b></div>
             <div class="krow small"><span>Model $/req &middot; not Cloudflare</span><b id="k-modelreq">&mdash;</b></div>
-            <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
+            <div class="krow small model"><span>External model spend &middot; separate</span><b id="k-model">unset</b></div>
             <div class="krow small asof"><span id="k-asof"></span><span id="k-src"></span></div>
           </div>
         </details>
+        <div id="custom-fields" class="custom-fields" hidden>
+          <div class="cost-head">Custom plan settings</div>
+          <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
+          <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
+        </div>
       </div>
-      <div id="custom-fields" class="custom-fields cost" hidden>
-        <div class="cost-head">Custom plan settings</div>
-        <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
-        <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
-      </div>
-      <div class="inspect" id="inspect" hidden></div>
+      <div id="inspect" class="inspect" role="tabpanel" aria-labelledby="tab-components" hidden></div>
     </aside>
   </div>
+  <div id="sheet-scrim" class="sheet-scrim" aria-hidden="true" hidden></div>
 </div>
 <script>
 // Cloudflare plan pricing, verified against the live docs.
@@ -2639,17 +2713,87 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 
 </script>
 <script>
+(function (root) {
+  const VERIFIED_DEFAULTS = new Set([
+    'price', 'priceGBs', 'priceRowRead', 'priceRowWritten', 'priceStoredGb',
+    'priceClassA', 'priceStorage', 'pricePerThousand', 'priceStored',
+    'priceDelivered', 'storagePrice', 'deliveryPricePerThousand', 'retention',
+    'neuronsIn', 'neuronsOut'
+  ]);
+
+  function saveStatus(event) {
+    switch (event.type) {
+      case 'local': return { phase: 'local', message: 'Local only', retryable: false };
+      case 'checking': return { phase: 'saving', message: 'Checking live channel…', retryable: false };
+      case 'saving': return { phase: 'saving', message: 'Saving scenario…', retryable: false };
+      case 'saved': return { phase: 'saved', message: 'All changes saved', retryable: false };
+      case 'rejected': return { phase: 'error', message: 'Scenario not saved: ' + event.message, retryable: false };
+      case 'http': return {
+        phase: 'error',
+        message: 'Save failed (HTTP ' + event.status + '). Your changes remain in this tab.',
+        retryable: event.status !== 400
+      };
+      case 'network': return {
+        phase: 'error',
+        message: 'Network error. Your changes remain in this tab.',
+        retryable: true
+      };
+      case 'disconnected': return {
+        phase: 'error',
+        message: 'Live updates disconnected. Your changes remain in this tab.',
+        retryable: true
+      };
+      case 'unavailable': return {
+        phase: 'error',
+        message: 'Scenario channel unavailable (HTTP ' + event.status + ').',
+        retryable: true
+      };
+      default: return { phase: 'local', message: 'Local only', retryable: false };
+    }
+  }
+
+  function nextTab(current, key, tabs) {
+    const index = tabs.indexOf(current);
+    if (index < 0) return tabs[0];
+    if (key === 'Home') return tabs[0];
+    if (key === 'End') return tabs[tabs.length - 1];
+    if (key === 'ArrowRight') return tabs[(index + 1) % tabs.length];
+    if (key === 'ArrowLeft') return tabs[(index - 1 + tabs.length) % tabs.length];
+    return current;
+  }
+
+  function fieldProvenance(def, field) {
+    if (def && def.verified && VERIFIED_DEFAULTS.has(field)) {
+      return { kind: 'verified', label: 'Verified default · editable' };
+    }
+    return { kind: 'assumption', label: 'Editable assumption' };
+  }
+
+  function connectTargets(nodes, fromId) {
+    return nodes.filter(n => n.id !== fromId).map(n => ({
+      id: n.id,
+      label: n.alias || (root.CATALOG && root.CATALOG.types[n.type] && root.CATALOG.types[n.type].name) || n.type
+    }));
+  }
+
+  const api = { saveStatus, nextTab, fieldProvenance, connectTargets };
+  root.UX = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
 (function () {
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
   const QE = window.QUEUE_ENGINE;
   const CORE = window.SIM_STATE_CORE;
+  const UX = window.UX;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = v => String(v).replace(/[&<>"']/g, c => ESC[c]);
-  const cloneJson = value => JSON.parse(JSON.stringify(value));
   const NODE_KEYS = ['id', 'type', 'x', 'y', 'alias', 'p'];
   const EDGE_KEYS = ['from', 'to', 'weight'];
   // ponytail: the engine models rates, not people. One visible assumption turns
@@ -2658,15 +2802,11 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   const ROOT_KEYS = ['version', 'name', 'nodes', 'edges'];
   const hasType = n => Object.hasOwn(TYPES, n.type);
 
-  let runSeq = 0;
-  function nextRunId() { return 'run-' + String(++runSeq).padStart(6, '0'); }
-
   const state = {
     nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
     running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
-    time: 0, spent: 0, requests: 0, modelSpent: 0, chaos: {}, errors: 0,
-    res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {},
-    runId: nextRunId(), scenarioRevision: null, scenarioHash: null, dirty: false, saving: false, saveError: null
+    t: 0, spent: 0, reqs: 0, modelSpent: 0, chaos: {}, errors: 0,
+    res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {}
   };
   let seq = 1;
   const uid = () => 'n' + seq++;
@@ -2691,51 +2831,41 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 
   function nodeById(id) { return state.nodes.find(n => n.id === id); }
 
-  function eff(n, clock) {
-    const current = clock || state;
+  function eff(n) {
     let p = Object.assign({}, n.p);
-    const now = current.time;
+    const now = performance.now() / 1000;
     let slashed = false;
-    const modelHit = QE.model429(n.type, p, current.chaos.model429 > now);
+    const modelHit = QE.model429(n.type, p, state.chaos.model429 > now);
     if (modelHit.slashed) { p = modelHit.p; slashed = true; }
-    if (n.type === 'durable_objects' && current.chaos.doEvict > now) {
+    if (n.type === 'durable_objects' && state.chaos.doEvict > now) {
       p.latency *= 8; slashed = true;
     }
-    if (n.type === 'd1' && current.chaos.d1Write > now) {
+    if (n.type === 'd1' && state.chaos.d1Write > now) {
       p.latency *= 20; slashed = true;
     }
-    if (n.type === 'cache' && current.chaos.cacheStorm > now) {
+    if (n.type === 'cache' && state.chaos.cacheStorm > now) {
       p.hit = 0; slashed = true;
     }
-    if (n.type === 'external' && current.chaos.store402 > now) {
+    if (n.type === 'external' && state.chaos.store402 > now) {
       p.latency *= 100; slashed = true;
     }
-    if (n.type === 'queues' && current.chaos.webhook > now) {
+    if (n.type === 'queues' && state.chaos.webhook > now) {
       p.latency *= 2; slashed = true;
     }
     return { p, slashed };
   }
 
-  function modelFor(nodes, edges, backlog, drops, clock) {
-    const current = clock || state;
+  function compute() {
     const params = {};
-    nodes.forEach(n => { params[n.id] = eff(n, current).p; });
-    const model = QE.compute(nodes, edges, TYPES, params, backlog, drops, PRICING.hoursPerMonth);
-    nodes.forEach(n => {
-      if (n.type === 'external' && current.chaos.store402 > current.time) model.res[n.id].err = 1;
-    });
-    return model;
-  }
-
-  function applyModel(model) {
+    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
+    const model = QE.compute(state.nodes, state.edges, TYPES, params, state.backlog, state.drops, PRICING.hoursPerMonth);
     state.res = model.res;
     state.cpuRate = model.cpuRate;
     state.rate = model.rate;
     state.pathLat = model.pathLat;
-  }
-
-  function compute() {
-    applyModel(modelFor(state.nodes, state.edges, state.backlog, state.drops));
+    state.nodes.forEach(n => {
+      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) state.res[n.id].err = 1;
+    });
   }
 
   function addFromPalette(type) {
@@ -2903,6 +3033,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 
   function renderNodes() {
     const layer = $('#node-layer');
+    const focused = document.activeElement && document.activeElement.closest('.node');
+    const focusId = focused ? focused.dataset.id : null;
     layer.innerHTML = '';
     state.nodes.forEach(n => {
       const def = typeOf(n);
@@ -2917,6 +3049,9 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       const el = document.createElement('div');
       el.className = 'node' + (state.sel === n.id ? ' sel' : '') + (slashed ? ' hit' : '') + (bad ? ' sat' : '');
       el.dataset.id = n.id;
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', nname(n) + '. ' + badge(n, r) + '. Press Enter to select, Delete to remove.');
       el.style.left = n.x + 'px';
       el.style.top = n.y + 'px';
       const color = groupColor(n.type);
@@ -2931,8 +3066,19 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         '<span class="port" data-port="1"></span>';
       layer.appendChild(el);
     });
-    $$('.node').forEach(el => { el.addEventListener('pointerdown', onNodeDown); });
+    $$('.node').forEach(el => {
+      el.addEventListener('pointerdown', onNodeDown);
+      el.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        select(el.dataset.id, true);
+      });
+    });
     $$('.port').forEach(p => { p.addEventListener('pointerdown', onPortDown); });
+    if (focusId) {
+      const next = Array.from(layer.children).find(el => el.dataset.id === focusId);
+      if (next) next.focus({ preventScroll: true });
+    }
   }
 
   function badge(n, r) {
@@ -3003,7 +3149,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   function renderInspector() {
     const box = $('#inspect');
     if (!state.sel) {
-      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Add from the palette. Drag the dot on a node to connect. Drag the canvas to pan.</div>';
+      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Keyboard: Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use Connect to in the inspector to add an edge without dragging.</div>';
       return;
     }
     const n = nodeById(state.sel);
@@ -3032,6 +3178,13 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       storedGb: 'SQLite stored GB (total)',
       classAUnits: 'Class A units / request',
       storageGb: 'Stored GB',
+      priceClassA: '$ per million Class A units',
+      priceStorage: '$ per GB-month',
+      pricePerThousand: '$ per 1,000 transforms',
+      priceStored: '$ per 100,000 stored images',
+      priceDelivered: '$ per 100,000 delivered images',
+      storagePrice: '$ per 1,000 stored minutes',
+      deliveryPricePerThousand: '$ per 1,000 delivered minutes',
       uniqueTransforms: 'Unique transforms / month',
       imagesStored: 'Images stored / month',
       imagesDelivered: 'Images delivered / month',
@@ -3047,22 +3200,34 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     const RANGES = window.CATALOG.ranges || {};
     const ENUMS = window.CATALOG.enums || {};
     let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + esc(n.alias || def.name) + '</b></div>';
-    html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
+    if (def.verified) {
+      html += '<div class="provenance verified"><b>Verified prices &amp; limits</b>' + def.verified + '</div>';
+    } else {
+      html += '<div class="provenance assumption"><b>Editable assumptions</b>No verified price or limit is provided for this component. Workload and price fields below are editable assumptions.</div>';
+    }
+    html += '<div class="field-group-title">Editable assumptions</div>';
     fields.forEach(f => {
       const L = labels[f] || f;
+      const provenance = UX.fieldProvenance(def, f);
+      const head = '<div class="field-head"><span>' + L + '</span><span class="prov-badge ' + provenance.kind + '">' + provenance.label + '</span></div>';
       if (ENUMS[f]) {
-        html += '<label class="field"><span>' + L + '</span><select data-f="' + f + '">' +
+        html += '<label class="field">' + head + '<select data-f="' + f + '">' +
           ENUMS[f].map(v => '<option value="' + v + '"' + (n.p[f] === v ? ' selected' : '') + '>' + v + '</option>').join('') +
           '</select></label>';
         return;
       }
       const R = RANGES[f] || [0, 1e6, 1];
-      html += '<label class="field"><span>' + L + '</span><input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
+      html += '<label class="field">' + head + '<input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
-    if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
-    if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
+    if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">Source</a>';
+    const targets = UX.connectTargets(state.nodes, n.id);
+    if (targets.length) {
+      html += '<div class="connect"><label class="field"><span>Connect to</span><select id="connect-target">' +
+        targets.map(t => '<option value="' + esc(t.id) + '">' + esc(t.label) + '</option>').join('') +
+        '</select></label><button id="connect-node">Connect</button></div>';
+    }
     html += '<button class="del" id="delnode">Delete node</button>';
     box.innerHTML = html;
     $$('select[data-f]', box).forEach(sel => {
@@ -3077,11 +3242,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         const f = inp.dataset.f;
         const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
         if (inp.value.trim() === '') {
-          if (nullable) {
-            n.p[f] = null;
-            compute(); renderNodes(); renderCost(); renderInspectorStats();
-            pushScenario();
-          }
+          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); pushScenario(); }
           return;
         }
         const raw = parseFloat(inp.value);
@@ -3093,13 +3254,18 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       });
       inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
     });
-    $('#delnode').addEventListener('click', () => {
-      state.nodes = state.nodes.filter(x => x.id !== n.id);
-      state.edges = state.edges.filter(e => e.from !== n.id && e.to !== n.id);
-      state.sel = null;
-      compute(); render();
-      pushScenario();
-    });
+    $('#delnode').addEventListener('click', () => deleteSelected());
+    if ($('#connect-node')) {
+      $('#connect-node').addEventListener('click', () => {
+        const to = $('#connect-target').value;
+        if (addEdge(n.id, to)) {
+          compute(); renderNodes(); renderCost(); renderInspectorStats(); pushScenario();
+          toast('Connected to ' + nname(nodeById(to)));
+        } else {
+          toast('Those components are already connected');
+        }
+      });
+    }
   }
 
   function fmt(v) { return v < 1000 ? Math.round(v) + 'ms' : (v / 1000).toFixed(1) + 's'; }
@@ -3149,14 +3315,16 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     if (plan === 'free') {
       if (!res.exceeded.length) return '<div class="plan-line">within free limits</div>';
       return res.exceeded.map(l => {
-        const lim = l.period === 'per request' ? l.limit + ' ms/req' : human(l.limit) + '/mo';
-        const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/mo';
+        const lim = l.period === 'per request' ? l.limit + ' ms/req'
+          : l.period === 'per day' ? human(l.daily) + '/day' : human(l.limit) + '/month';
+        const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/month';
         return '<div class="plan-line over"><span>Free limit: ' + l.label + ' (' + lim + ')</span><b>' + used + '</b></div>';
       }).join('');
     }
     return res.lines.map(l =>
       '<div class="plan-line' + (l.cost > 0 ? ' over' : '') + '"><span>' + l.label + ' ' +
-      human(l.used) + ' / ' + human(l.included) + '</span><b>' + (l.cost > 0 ? '+' + money(l.cost) : '$0') + '</b></div>'
+      human(l.used) + ' / ' + (l.included > 0 ? human(l.included) + ' per month' : 'no monthly allowance') +
+      '</span><b>' + (l.cost > 0 ? '+' + money(l.cost) : '$0') + '</b></div>'
     ).join('');
   }
 
@@ -3177,19 +3345,19 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     const n = Math.floor(first.limit / perReq / REQ_PER_USER_PER_MONTH);
     if (!(n > 0)) return '';
     const plan = state.plan === 'paid' ? 'Paid $5' : 'Free';
-    const tip = 'Estimación basada en ' + REQ_PER_USER_PER_MONTH +
-      ' requests por usuario al mes. Primer límite: ' + first.label +
-      ' (' + human(first.limit) + '/mo).';
-    return '~' + n.toLocaleString() + ' usuarios en ' + plan +
-      ' antes del primer límite <span class="info" title="' + esc(tip) + '">&#9432;</span>';
+    const tip = 'Estimate based on ' + REQ_PER_USER_PER_MONTH +
+      ' requests per user per month. First limit: ' + first.label +
+      ' (' + human(first.limit) + '/month).';
+    return '~' + n.toLocaleString() + ' users on ' + plan +
+      ' before the first limit <span class="info" title="' + esc(tip) + '">&#9432;</span>';
   }
 
   function renderCost() {
     const rate = state.rate;
-    const hours = state.time / 3600;
+    const hours = state.t / 3600;
     $('#k-rate').textContent = money(rate * 3600) + '/h';
     $('#k-spent').textContent = '$' + state.spent.toFixed(2);
-    $('#k-time').textContent = hours < 1 ? Math.round(state.time) + 's' : hours.toFixed(2) + 'h';
+    $('#k-time').textContent = hours < 1 ? Math.round(state.t) + 's' : hours.toFixed(2) + 'h';
     $('#k-lat').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
     $('#k-cpu').textContent = Math.round(state.cpuRate || 0) + ' ms/s';
     const anyErr = state.nodes.some(n => (state.res[n.id] || {}).err > 0);
@@ -3212,10 +3380,10 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     const overBudget = state.plan === 'custom' && res.total > state.budget;
     const over = overMoney || overFree || overBudget;
     const chip = $('#over-chip');
-    chip.textContent = overMoney ? '+ ' + money(res.overage) + ' extra'
-      : overFree ? 'Fuera de los límites Free'
-      : overBudget ? '+ ' + money(res.total - state.budget) + ' sobre presupuesto'
-      : 'Dentro del plan';
+    chip.textContent = overMoney ? '+ ' + money(res.overage) + ' overage'
+      : overFree ? 'Outside Free limits'
+      : overBudget ? '+ ' + money(res.total - state.budget) + ' over budget'
+      : 'Within plan';
     chip.className = 'chip' + (over ? ' over' : '');
 
     // Included bar shows what the plan covers; the red Extra bar exists only
@@ -3236,10 +3404,15 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       used = peak.used;
       limit = peak.limit;
       pct = peak.ratio * 100;
-      if (overFree) extra = { label: '+' + pctText((peak.ratio - 1) * 100) + '% sobre el límite', pct: 100 };
+      if (overFree) extra = { label: '+' + pctText((peak.ratio - 1) * 100) + '% over limit', pct: 100 };
     }
+    $('#incl-label-text').textContent = state.plan === 'paid' ? 'Plan base / month'
+      : state.plan === 'custom' ? 'Budget / month'
+      : peak && peak.period === 'per day' ? 'Highest daily limit'
+      : peak && peak.period === 'per request' ? 'Per-request limit'
+      : 'Highest monthly limit';
     $('#incl-label').textContent = used == null ? '\u2014'
-      : state.plan === 'free' && peak.period === 'per day' ? human(used) + ' / ' + human(limit) + '/mo'
+      : state.plan === 'free' && peak.period === 'per day' ? human(used) + ' / month vs ' + human(limit) + ' / day'
       : state.plan === 'free' && peak.period === 'per request' ? (Math.round(used * 10) / 10) + ' / ' + limit + ' ms/req'
       : money(used) + ' / ' + money(limit);
     const bar = $('#budget-bar');
@@ -3255,33 +3428,18 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     $('#capacity').innerHTML = capacity;
     $('#capacity').hidden = !capacity;
     $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
+    $('#cost-provenance').innerHTML = res.unverified.length
+      ? '<b>Some prices are unverified</b><span>Unverified dimensions are excluded from the total. Workload rates and monthly totals are estimates.</span>'
+      : '<b>Verified prices &amp; allowances</b><span>Workload rates and monthly totals are estimates.</span>';
     $('#custom-fields').hidden = state.plan !== 'custom';
 
     const ms = modelBucket();
     const mdl = $('#k-model');
     mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
     mdl.className = ms.set ? 'v good' : '';
-    $('#k-reqs').textContent = Math.round(state.requests).toLocaleString();
-    $('#k-perreq').textContent = state.requests > 0 ? perReq(state.spent / state.requests) : '\u2014';
-    $('#k-modelreq').textContent = !ms.set ? 'unset' : state.requests > 0 ? perReq(state.modelSpent / state.requests) : '\u2014';
-  }
-
-  function syncBillingControls() {
-    $('#plan').value = state.plan;
-    $('#budget').value = state.budget;
-    $('#basefee').value = state.baseFee;
-  }
-
-  function setPlan(plan) {
-    state.plan = plan;
-    syncBillingControls();
-    renderCost();
-  }
-
-  function setBillingInputs(patch) {
-    Object.assign(state, patch);
-    syncBillingControls();
-    renderCost();
+    $('#k-reqs').textContent = Math.round(state.reqs).toLocaleString();
+    $('#k-perreq').textContent = state.reqs > 0 ? perReq(state.spent / state.reqs) : '\u2014';
+    $('#k-modelreq').textContent = !ms.set ? 'unset' : state.reqs > 0 ? perReq(state.modelSpent / state.reqs) : '\u2014';
   }
 
   let drag = null, link = null, pan = null;
@@ -3291,6 +3449,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     ev.stopPropagation();
     const el = ev.target.closest('.node');
     const n = nodeById(el.dataset.id);
+    el.focus({ preventScroll: true });
     select(n.id);
     drag = { id: n.id, sx: ev.clientX, sy: ev.clientY, ox: n.x, oy: n.y };
   }
@@ -3352,11 +3511,31 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     if (changed) pushScenario();
   }
 
-  function select(id) {
+  function select(id, revealInspector) {
     state.sel = id;
     renderNodes();
     renderInspector();
     setTab('components');
+    if (revealInspector && mobile.matches) openMobileSheet('right', true);
+  }
+
+  function deleteSelected() {
+    if (!state.sel) return;
+    const index = state.nodes.findIndex(n => n.id === state.sel);
+    const next = state.nodes[index + 1] || state.nodes[index - 1];
+    state.nodes = state.nodes.filter(n => n.id !== state.sel);
+    state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
+    state.sel = null;
+    compute(); render();
+    pushScenario();
+    requestAnimationFrame(() => {
+      if (mobile.matches && openSheet === 'right') {
+        $('#close-inspector').focus({ preventScroll: true });
+        return;
+      }
+      const el = next && Array.from($('#node-layer').children).find(node => node.dataset.id === next.id);
+      (el || $('#canvas')).focus({ preventScroll: true });
+    });
   }
 
   function fit() {
@@ -3376,7 +3555,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   function loadTemplate() {
     state.nodes = []; state.edges = []; seq = 1;
     state.name = 'Beauty store on Cloudflare';
-    state.time = 0; state.spent = 0; state.requests = 0; state.modelSpent = 0; state.chaos = {};
+    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
     state.backlog = {}; state.drops = {};
     const t = addNode('traffic', 20, 220); t.p.rate = 12; t.alias = 'Storefront traffic';
     const waf = addNode('waf', 160, 220);
@@ -3413,7 +3592,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       cacheStorm: ['cacheStorm', 12], store402: ['store402', 12], webhook: ['webhook', 10]
     };
     const [k, dur] = map[key];
-    state.chaos[k] = state.time + dur;
+    state.chaos[k] = performance.now() / 1000 + dur;
     toast(label(key) + ' for ' + dur + ' seconds');
     compute(); render();
   }
@@ -3444,26 +3623,20 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     });
   }
 
-  function advanceSimulation(seconds) {
-    if (!(seconds > 0)) return;
-    QE.advanceClock(state, seconds, dt => {
-      stepQueues(dt);
-      const ms = modelBucket();
-      return {
-        rate: state.rate,
-        requests: sourceRate(),
-        modelRate: ms.set ? ms.total / (3600 * PRICING.hoursPerMonth) : 0
-      };
-    }, compute);
-  }
-
   let lastReal = 0, acc = 0;
   function loop(ts) {
     if (!lastReal) lastReal = ts;
     const dtReal = Math.min(0.5, (ts - lastReal) / 1000);
     lastReal = ts;
     if (state.running) {
-      advanceSimulation(dtReal * state.speed);
+      const dtSim = dtReal * state.speed;
+      stepQueues(dtSim);
+      state.t += dtSim;
+      state.spent += state.rate * dtSim;
+      state.reqs += sourceRate() * dtSim;
+      const ms = modelBucket();
+      if (ms.set) state.modelSpent += ms.total / (3600 * PRICING.hoursPerMonth) * dtSim;
+      compute();
       acc += dtReal;
       if (acc >= 0.22) {
         acc = 0;
@@ -3478,64 +3651,36 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   document.addEventListener('pointerup', onUp);
 
   $('#search').addEventListener('input', renderPalette);
-  function syncRunControl() {
+  $('#start').addEventListener('click', () => {
+    state.running = !state.running;
     $('#start').textContent = state.running ? 'Pause simulation' : 'Start simulation';
     $('#start').classList.toggle('on', state.running);
-  }
-
-  function setRunning(running) {
-    state.running = !!running;
-    syncRunControl();
     compute(); render();
-  }
-
-  function clearRuntime() {
-    state.time = 0; state.spent = 0; state.requests = 0; state.modelSpent = 0; state.chaos = {};
-    state.backlog = {}; state.drops = {}; lastReal = 0; acc = 0;
-  }
-
-  function resetSim() {
-    clearRuntime();
+  });
+  $('#reset').addEventListener('click', () => {
+    state.t = 0; state.spent = 0; state.reqs = 0; state.modelSpent = 0; state.chaos = {};
+    state.backlog = {}; state.drops = {};
     compute(); render(); toast('Simulation reset');
-  }
-
-  function resetApiRuntime() {
-    state.running = false;
-    clearRuntime();
-    state.runId = nextRunId();
-    syncRunControl();
-    compute(); render();
-  }
-
-  function runSimulation(seconds) {
-    setRunning(false);
-    advanceSimulation(seconds);
-    renderCost(); renderNodes(); renderAlerts(); renderInspectorStats();
-  }
-
-  $('#start').addEventListener('click', () => setRunning(!state.running));
-  $('#reset').addEventListener('click', resetSim);
+  });
   function speedEq(v) {
     if (v < 60) return '1s = ' + v + 's';
     if (v < 3600) return '1s = ' + (Math.round(v / 6) / 10) + 'm';
     return '1s = ' + (Math.round(v / 360) / 10) + 'h';
   }
-  function setSpeed(value) {
-    const v = parseInt(value, 10);
+  $('#speed').addEventListener('input', e => {
+    const v = parseInt(e.target.value, 10);
     if (!isNaN(v)) state.speed = Math.max(1, Math.min(7200, v));
-    $('#speed').value = state.speed;
     $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
-  }
-  $('#speed').addEventListener('input', e => setSpeed(e.target.value));
+  });
   $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
   $$('.chaos-btn').forEach(b => b.addEventListener('click', () => chaos(b.dataset.c)));
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
-  $('#budget').addEventListener('change', e => setBillingInputs({ budget: Math.max(1, parseFloat(e.target.value) || 1) }));
-  $('#plan').addEventListener('change', e => setPlan(e.target.value));
-  $('#basefee').addEventListener('change', e => setBillingInputs({ baseFee: Math.max(0, parseFloat(e.target.value) || 0) }));
-  $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
+  $('#budget').addEventListener('change', e => { state.budget = Math.max(1, parseFloat(e.target.value) || 1); renderCost(); });
+  $('#plan').addEventListener('change', e => { state.plan = e.target.value; renderCost(); });
+  $('#basefee').addEventListener('change', e => { state.baseFee = Math.max(0, parseFloat(e.target.value) || 0); renderCost(); });
+  $('#k-asof').textContent = 'Prices verified as of ' + PRICING.asOf;
   $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
     '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
     k.charAt(0).toUpperCase() + k.slice(1) + '</a>'
@@ -3543,6 +3688,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 
   $('#canvas').addEventListener('pointerdown', ev => {
     if (ev.target.closest('.node')) return;
+    $('#canvas').focus({ preventScroll: true });
     pan = { sx: ev.clientX, sy: ev.clientY, px: state.px, py: state.py };
     state.sel = null; renderNodes(); renderInspector();
   });
@@ -3553,15 +3699,27 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   }, { passive: false });
 
   document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && openSheet) {
+      ev.preventDefault();
+      closeMobileSheet();
+      return;
+    }
+    if (ev.key === 'Tab' && openSheet) {
+      const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
+      const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
+        .filter(el => !el.disabled && el.offsetParent !== null);
+      if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
+      if (focusable.length) {
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+        else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+      }
+    }
     if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
-    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
     if (!state.sel) return;
     ev.preventDefault();
-    state.nodes = state.nodes.filter(x => x.id !== state.sel);
-    state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
-    state.sel = null;
-    compute(); render();
-    pushScenario();
+    deleteSelected();
   });
 
   let rz = null;
@@ -3570,17 +3728,77 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   if (window.ResizeObserver) new ResizeObserver(refit).observe($('#canvas'));
 
   const app = document.querySelector('.app');
-  const toggle = (btn, cls) => {
+  const mobile = window.matchMedia('(max-width: 700px)');
+  let openSheet = null;
+
+  function setPanelClosed(panel, closed) {
+    panel.inert = closed;
+    panel.setAttribute('aria-hidden', String(closed));
+  }
+
+  function syncPanels() {
+    const isMobile = mobile.matches;
+    app.classList.toggle('mobile', isMobile);
+    if (!isMobile) {
+      app.classList.remove('palette-open', 'right-open');
+      openSheet = null;
+    }
+    const paletteClosed = isMobile ? !app.classList.contains('palette-open') : app.classList.contains('no-pal');
+    const inspectorClosed = isMobile ? !app.classList.contains('right-open') : app.classList.contains('no-insp');
+    const active = document.activeElement;
+    const activePanel = active && (active.closest('.palette') ? 'palette' : active.closest('.right') ? 'right' : null);
+    if ((activePanel === 'palette' && paletteClosed) || (activePanel === 'right' && inspectorClosed)) active.blur();
+    setPanelClosed($('#palette'), paletteClosed);
+    setPanelClosed($('#right-panel'), inspectorClosed);
+    $('#tog-pal').setAttribute('aria-expanded', String(!paletteClosed));
+    $('#tog-insp').setAttribute('aria-expanded', String(!inspectorClosed));
+    $('#tog-pal').classList.toggle('on', !paletteClosed);
+    $('#tog-insp').classList.toggle('on', !inspectorClosed);
+    $('#sheet-scrim').hidden = !(isMobile && openSheet);
+    $('#close-palette').hidden = !isMobile;
+    $('#close-inspector').hidden = !isMobile;
+  }
+
+  function openMobileSheet(name, focusPanel) {
+    if (!mobile.matches) return;
+    app.classList.toggle('palette-open', name === 'palette');
+    app.classList.toggle('right-open', name === 'right');
+    openSheet = name;
+    syncPanels();
+    if (focusPanel) (name === 'palette' ? $('#search') : $('#close-inspector')).focus();
+  }
+
+  function closeMobileSheet() {
+    const previous = openSheet;
+    app.classList.remove('palette-open', 'right-open');
+    openSheet = null;
+    syncPanels();
+    if (previous) (previous === 'palette' ? $('#tog-pal') : $('#tog-insp')).focus();
+  }
+
+  const togglePanel = cls => {
+    if (mobile.matches) {
+      const name = cls === 'no-pal' ? 'palette' : 'right';
+      if (openSheet === name) closeMobileSheet();
+      else openMobileSheet(name, true);
+      return;
+    }
     app.classList.toggle(cls);
-    btn.classList.toggle('on', app.classList.contains(cls));
+    syncPanels();
     refit();
   };
-  $('#tog-pal').addEventListener('click', () => toggle($('#tog-pal'), 'no-pal'));
-  $('#tog-insp').addEventListener('click', () => toggle($('#tog-insp'), 'no-insp'));
-  if (window.innerWidth < 780) { app.classList.add('no-insp'); $('#tog-insp').classList.remove('on'); }
+  $('#tog-pal').addEventListener('click', () => togglePanel('no-pal'));
+  $('#tog-insp').addEventListener('click', () => togglePanel('no-insp'));
+  $('#close-palette').addEventListener('click', closeMobileSheet);
+  $('#close-inspector').addEventListener('click', closeMobileSheet);
+  $('#sheet-scrim').addEventListener('click', closeMobileSheet);
+  if (mobile.addEventListener) mobile.addEventListener('change', syncPanels);
+  else mobile.addListener(syncPanels);
+  syncPanels();
 
   const tabCost = $('#tab-cost'), tabComponents = $('#tab-components');
-  function setTab(name) {
+  const tabNames = ['cost', 'components'];
+  function setTab(name, moveFocus) {
     const cost = name === 'cost';
     $('#cost').hidden = !cost;
     $('#inspect').hidden = cost;
@@ -3588,9 +3806,20 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     tabComponents.classList.toggle('on', !cost);
     tabCost.setAttribute('aria-selected', String(cost));
     tabComponents.setAttribute('aria-selected', String(!cost));
+    tabCost.tabIndex = cost ? 0 : -1;
+    tabComponents.tabIndex = cost ? -1 : 0;
+    if (moveFocus) (cost ? tabCost : tabComponents).focus();
   }
   tabCost.addEventListener('click', () => setTab('cost'));
   tabComponents.addEventListener('click', () => setTab('components'));
+  $('.cost-tabs').addEventListener('keydown', ev => {
+    const current = tabCost.getAttribute('aria-selected') === 'true' ? 'cost' : 'components';
+    const next = UX.nextTab(current, ev.key, tabNames);
+    if (next !== current) {
+      ev.preventDefault();
+      setTab(next, true);
+    }
+  });
   setTab('cost');
 
   // Scenario channel: scenario.json is the source of truth for humans and agents.
@@ -3623,67 +3852,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     }), state.nodes, state);
   }
 
-  function installScenario(s, doFit, warning, options) {
-    const settings = Object.assign({ resetRuntime: true, persisted: false, newRunId: true }, options || {});
-    const known = s.nodes.filter(hasType);
-    const backlog = {};
-    const drops = {};
-    if (!settings.resetRuntime) {
-      known.filter(n => n.type === 'queues').forEach(n => {
-        backlog[n.id] = state.backlog[n.id] || 0;
-        drops[n.id] = state.drops[n.id] || 0;
-      });
-    }
-    const clock = settings.resetRuntime ? { time: 0, chaos: {} } : state;
-    const model = modelFor(known, s.edges, backlog, drops, clock);
-    const rootExtra = {};
-    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) rootExtra[k] = s[k]; });
-    const previousState = Object.assign({}, state);
-    const previousDrag = drag, previousLink = link, previousSeq = seq;
-    try {
-      const keep = state.sel;
-      state.name = s.name;
-      state.nodes = known;
-      state.opaque = s.nodes.filter(n => !hasType(n));
-      state.rootExtra = rootExtra;
-      state.edges = s.edges;
-      state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
-      drag = null;
-      link = null;
-      seq = window.SCENARIO.nextNodeSeq(s.nodes);
-      if (settings.resetRuntime) {
-        clearRuntime();
-        state.running = false;
-      }
-      state.backlog = backlog;
-      state.drops = drops;
-      if (settings.newRunId !== false) state.runId = nextRunId();
-      if (settings.persisted) {
-        state.scenarioRevision = storedRevision;
-        state.scenarioHash = storedHash;
-        state.dirty = false;
-        state.saveError = null;
-      } else {
-        markDirty();
-      }
-      applyModel(model);
-      syncRunControl();
-      render();
-      if (doFit) fit();
-      if (warning) toast(warning);
-      return true;
-    } catch (err) {
-      Object.assign(state, previousState);
-      drag = previousDrag;
-      link = previousLink;
-      seq = previousSeq;
-      syncRunControl();
-      render();
-      throw err;
-    }
-  }
-
-  function applyScenario(raw, doFit, storage) {
+  function applyScenario(raw, doFit) {
     const res = window.SCENARIO.validate(raw, window.CATALOG);
     if (!res.scenario || res.dropped > 0) {
       toast(res.error || 'Invalid scenario');
@@ -3695,52 +3864,35 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       toast(res.error || 'Scenario has no renderable nodes');
       return false;
     }
-    if (storage) setStoredIdentity(storage);
-    return installScenario(s, doFit, res.error, {
-      resetRuntime: !storage,
-      persisted: !!storage,
-      newRunId: !!storage
-    });
-  }
-
-  function setNodeParams(nodeId, patch) {
-    const node = nodeById(nodeId);
-    if (!node) throw new Error('Unknown node');
-    const previousParams = node.p;
-    const nextParams = Object.assign({}, previousParams, patch);
-    const nodes = state.nodes.map(n => n.id === nodeId ? Object.assign({}, n, { p: nextParams }) : n);
-    const model = modelFor(nodes, state.edges, state.backlog, state.drops);
-    const previousModel = { res: state.res, cpuRate: state.cpuRate, rate: state.rate, pathLat: state.pathLat };
-    const previousIdentity = {
-      scenarioRevision: state.scenarioRevision, scenarioHash: state.scenarioHash,
-      dirty: state.dirty, saveError: state.saveError
-    };
-    try {
-      node.p = nextParams;
-      markDirty();
-      applyModel(model);
-      render();
-    } catch (err) {
-      node.p = previousParams;
-      Object.assign(state, previousIdentity);
-      Object.assign(state, previousModel);
-      render();
-      throw err;
-    }
-    return { nodeId, params: Object.assign({}, nextParams) };
+    state.name = s.name;
+    state.nodes = known;
+    state.backlog = {}; state.drops = {};
+    state.opaque = s.nodes.filter(n => !hasType(n));
+    state.rootExtra = {};
+    Object.keys(s).forEach(k => { if (ROOT_KEYS.indexOf(k) < 0) state.rootExtra[k] = s[k]; });
+    state.edges = s.edges;
+    const keep = state.sel;
+    state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
+    drag = null;
+    link = null;
+    // Opaque ids count too: a palette node must never reuse a preserved id.
+    seq = window.SCENARIO.nextNodeSeq(s.nodes);
+    compute();
+    render();
+    if (doFit) fit();
+    if (res.error) toast(res.error);
+    return true;
   }
 
   const http = /^https?:$/.test(location.protocol);
   const clientId = Math.random().toString(36).slice(2);
   let saveTimer = null;
   let channel = null;
-  let storedRevision = null;
-  let storedHash = null;
-  let storedEtag = null;
-  let saveQueue = Promise.resolve();
-  let resolveChannelReady;
-  const channelReady = new Promise(resolve => { resolveChannelReady = resolve; });
-  if (!http) resolveChannelReady(false);
+  let live = false;
+  let pendingSave = false;
+  let saveRevision = 0;
+  let retryAction = null;
+  let saveState = UX.saveStatus({ type: 'local' });
 
   function setStoredIdentity(storage) {
     const parsed = CORE.parseStoredIdentity(storage);
@@ -3757,79 +3909,74 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     return CORE.saveFailure(state, error);
   }
 
-  async function postScenario(scenario, body) {
-    state.saving = true;
-    try {
-      const available = http ? await channelReady : false;
-      if (!available || !channel) {
-        return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: 'Scenario channel is unavailable' });
-      }
-      const headers = { 'content-type': 'application/json', 'x-client-id': clientId };
-      if (storedEtag) headers['if-match'] = storedEtag;
-      let response;
-      try {
-        response = await fetch('/scenario', { method: 'POST', headers, body });
-      } catch (err) {
-        return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: String((err && err.message) || err).split('\n')[0] });
-      }
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) {
-        const code = response.status === 409 || payload.code === 'STORAGE_CONFLICT'
-          ? 'STORAGE_CONFLICT'
-          : 'SAVE_FAILED';
-        return saveFailure({
-          code,
-          message: payload.error || 'Scenario save failed',
-          details: { status: response.status }
-        });
-      }
-      if (!Number.isInteger(payload.revision) || typeof payload.hash !== 'string' || !payload.scenario) {
-        return saveFailure({ code: 'SAVE_FAILED', message: 'Scenario channel returned an invalid save result' });
-      }
-      setStoredIdentity({ revision: payload.revision, hash: payload.hash, etag: response.headers.get('etag') });
-      if (JSON.stringify(currentScenario()) === body) {
-        installScenario(payload.scenario, false, null, { resetRuntime: false, persisted: true, newRunId: false });
-        state.scenarioRevision = storedRevision;
-        state.scenarioHash = storedHash;
-        state.dirty = false;
-        state.saveError = null;
-      }
-      return {
-        data: {
-          revision: payload.revision,
-          eventId: payload.eventId,
-          hash: payload.hash,
-          scenario: payload.scenario
-        }
-      };
-    } catch (err) {
-      return saveFailure({ code: 'SAVE_FAILED', message: String((err && err.message) || err).split('\n')[0] });
-    } finally {
-      state.saving = false;
-    }
+  function showError(message, retry) {
+    $('#channel-error-text').textContent = message;
+    retryAction = retry || null;
+    $('#error-retry').hidden = !retryAction;
+    $('#channel-error').hidden = false;
   }
 
-  function saveScenario(scenario) {
-    const payload = cloneJson(scenario || currentScenario());
-    const body = JSON.stringify(payload);
-    const task = saveQueue.then(() => postScenario(payload, body));
-    saveQueue = task.catch(() => {});
-    return task;
+  function clearError() {
+    $('#channel-error').hidden = true;
+    $('#channel-error-text').textContent = '';
+    $('#error-retry').hidden = true;
+    retryAction = null;
+  }
+
+  function renderSaveState() {
+    const el = $('#save-status');
+    el.textContent = saveState.message;
+    el.dataset.phase = saveState.phase;
+    if (saveState.phase === 'error') showError(saveState.message, saveState.retryable ? retryAction : null);
+    else clearError();
+  }
+
+  function setSave(event, retry) {
+    saveState = UX.saveStatus(event);
+    retryAction = retry || null;
+    renderSaveState();
   }
 
   function pushScenario() {
-    markDirty();
-    if (!http || !channel) return;
+    if (!http) return;
+    pendingSave = true;
+    const revision = ++saveRevision;
+    setSave({ type: 'saving' });
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveScenario().then(result => {
-        if (result.error) toast(result.error.message);
-      });
-    }, 400);
+    saveTimer = setTimeout(() => saveNow(revision), 400);
   }
 
-  function copyJson() {
-    const text = JSON.stringify(currentScenario(), null, 2);
+  function saveNow(revision) {
+    revision = revision || saveRevision;
+    if (!live) {
+      setSave({ type: 'checking' });
+      return;
+    }
+    setSave({ type: 'saving' });
+    fetch('/scenario', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-client-id': clientId },
+      body: JSON.stringify(currentScenario())
+    }).then(r => {
+      if (revision !== saveRevision) return;
+      if (r.ok) {
+        pendingSave = false;
+        setSave({ type: 'saved' });
+        return;
+      }
+      const fail = body => {
+        if (revision !== saveRevision) return;
+        const message = body && body.error ? body.error : 'request rejected';
+        if (r.status === 400) setSave({ type: 'rejected', message });
+        else setSave({ type: 'http', status: r.status }, () => saveNow(revision));
+      };
+      return r.json().then(fail, () => fail({}));
+    }).catch(() => {
+      if (revision === saveRevision) setSave({ type: 'network' }, () => saveNow(revision));
+    });
+  }
+
+  function copyText(text, successMessage) {
     const fallback = () => {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -3839,16 +3986,37 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       ta.remove();
-      toast(ok ? 'Scenario JSON copied' : 'Copy failed');
+      if (ok) toast(successMessage);
+      else showError('Copy failed. Select and copy the text manually.');
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => toast('Scenario JSON copied'), fallback);
+      navigator.clipboard.writeText(text).then(() => toast(successMessage), fallback);
     } else {
       fallback();
     }
   }
 
+  function copyJson() {
+    copyText(JSON.stringify(currentScenario(), null, 2), 'Scenario JSON copied');
+  }
+
+  function copyLink() {
+    const encoded = window.SCENARIO.encode(currentScenario());
+    if (!encoded) {
+      showError('Link is too large (8,000-character limit). Use Copy JSON instead.');
+      toast('Link is too large. Use Copy JSON instead.');
+      return;
+    }
+    copyText(location.href.split('#')[0] + '#s=' + encoded, 'Scenario link copied');
+  }
+
   $('#copy-json').addEventListener('click', copyJson);
+  $('#copy-link').addEventListener('click', copyLink);
+  $('#error-retry').addEventListener('click', () => {
+    const action = retryAction;
+    if (action) action();
+  });
+  renderSaveState();
 
   window.__SIM__ = {
     load: raw => applyScenario(raw, true),
@@ -3887,10 +4055,11 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       hash: storedHash
     })
   });
-
   renderPalette();
   loadTemplate();
-  syncBillingControls();
+  $('#budget').value = state.budget;
+  $('#plan').value = state.plan;
+  $('#basefee').value = state.baseFee;
 
   let booted = false;
   const hashMatch = /^#s=(.+)$/.exec(location.hash);
@@ -3906,9 +4075,13 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   if (http) {
     const subscribe = () => {
       if (channel) return;
-      channel = new EventSource('/events');
-      resolveChannelReady(true);
-      channel.onmessage = ev => {
+      const source = new EventSource('/events');
+      channel = source;
+      source.onopen = () => {
+        if (channel !== source) return;
+        if (!pendingSave) setSave({ type: 'saved' });
+      };
+      source.onmessage = ev => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
@@ -3922,43 +4095,42 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
           return;
         }
         const before = state.nodes.map(n => n.id).join('|');
-        if (applyScenario(msg.scenario, false, storage)) {
+        if (applyScenario(msg.scenario, false)) {
           booted = true;
           if (state.nodes.map(n => n.id).join('|') !== before) fit();
+          if (!pendingSave) setSave({ type: 'saved' });
           toast('Scenario updated from the server');
         }
       };
+      source.onerror = () => {
+        source.close();
+        if (channel === source) channel = null;
+        setSave({ type: 'disconnected' }, () => subscribe());
+      };
     };
-    // One probe: /scenario is both the bootstrap source and the signal that
-    // serve.mjs exists. A plain static server answers 404/HTML, so the page
-    // never subscribes or publishes to it.
-    fetch('/scenario')
-      .then(r => {
+    const bootstrap = () => {
+      setSave({ type: 'checking' });
+      return fetch('/scenario').then(r => {
         const type = r.headers.get('content-type') || '';
-        const json = type.indexOf('json') >= 0;
-        if (json) subscribe();
-        if (r.ok) {
-          const storage = {
-            revision: r.headers.get('x-scenario-revision'),
-            hash: r.headers.get('x-scenario-hash'),
-            etag: r.headers.get('etag')
-          };
-          return r.json().then(s => {
-            if (!s) return;
-            if (!booted) booted = applyScenario(s, true, storage);
-            else setStoredIdentity(storage);
-          });
+        if (type.indexOf('json') < 0) {
+          setSave({ type: 'local' });
+          return null;
         }
-        if (json) {
-          return r.json().then(
-            j => { toast(j.error || 'Scenario unavailable (HTTP ' + r.status + ')'); throw 0; },
-            () => { throw 0; }
-          );
+        if (!r.ok) {
+          setSave({ type: 'unavailable', status: r.status }, bootstrap);
+          return null;
         }
-        throw 0;
-      })
-      .catch(() => {})
-      .finally(() => resolveChannelReady(!!channel));
+        live = true;
+        subscribe();
+        return r.json();
+      }).then(s => {
+        if (s && !booted) applyScenario(s, true);
+        if (live && pendingSave) pushScenario();
+      }).catch(() => {
+        setSave({ type: 'network' }, bootstrap);
+      });
+    };
+    bootstrap();
   }
 
   window.addEventListener('hashchange', () => {

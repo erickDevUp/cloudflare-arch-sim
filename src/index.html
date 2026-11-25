@@ -19,18 +19,28 @@
         <span id="scenario-name">model of real Cloudflare behaviour &mdash; not a load test</span>
       </div>
     </div>
+    <div id="save-status" class="save-status" role="status" aria-live="polite" aria-atomic="true">Local only</div>
     <div class="actions">
-      <button id="tog-pal" class="ghost on" title="Show or hide the component palette">Components</button>
-      <button id="tog-insp" class="ghost on" title="Show or hide the inspector">Inspector</button>
+      <button id="tog-pal" class="ghost on" title="Show or hide the component palette" aria-controls="palette" aria-expanded="true">Components</button>
+      <button id="tog-insp" class="ghost on" title="Show or hide costs and the inspector" aria-controls="right-panel" aria-expanded="true">Costs &amp; inspector</button>
       <button id="reset" class="ghost" title="Reset time, spent and chaos; keeps the architecture">Reset sim</button>
       <button id="fit" class="ghost">Fit view</button>
+      <button id="copy-link" class="ghost" title="Copy a shareable scenario link">Copy link</button>
       <button id="copy-json" class="ghost" title="Copy the scenario JSON for agents">Copy JSON</button>
     </div>
   </header>
 
+  <div id="channel-error" class="channel-error" role="alert" hidden>
+    <span id="channel-error-text"></span>
+    <button id="error-retry" class="ghost" hidden>Retry</button>
+  </div>
+
   <div class="body">
-    <aside class="palette">
-      <div class="pal-head">Components</div>
+    <aside class="palette" id="palette" aria-label="Component palette">
+      <div class="pal-head">
+        <span>Components</span>
+        <button id="close-palette" class="sheet-close" aria-label="Close components" title="Close components" hidden>&times;</button>
+      </div>
       <input id="search" class="search" placeholder="Search components" autocomplete="off">
       <div id="palette-list" class="pal-list"></div>
     </aside>
@@ -38,14 +48,15 @@
     <main class="stage">
       <div class="canvas-wrap">
       <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
-      <div class="canvas" id="canvas">
+      <div class="canvas" id="canvas" tabindex="-1" role="group" aria-label="Architecture canvas" aria-describedby="canvas-help">
+        <p id="canvas-help" class="sr-only">Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use the inspector Connect to control to add an edge without dragging.</p>
         <div class="world" id="world">
           <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
           <div class="node-layer" id="node-layer"></div>
         </div>
       </div>
 
-        <div class="toast" id="toast"></div>
+        <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
       </div>
       <div class="stage-bar">
       <div class="toolbar">
@@ -57,7 +68,7 @@
         </div>
       </div>
 
-      <div class="chaos">
+      <div class="chaos" role="group" aria-label="Chaos experiments">
         <span class="chaos-lbl">CHAOS:</span>
         <button class="chaos-btn" data-c="m429" title="Provider returns 429, concurrency drops">429</button>
         <button class="chaos-btn" data-c="doEvict" title="A Durable Object is evicted mid-stream">DO evict</button>
@@ -67,42 +78,47 @@
         <button class="chaos-btn" data-c="webhook" title="Webhook burst on the sync path">Webhooks</button>
       </div>
 
-      <div class="zoombar">
-        <button id="zoomout">&minus;</button>
+      <div class="zoombar" role="group" aria-label="Canvas zoom">
+        <button id="zoomout" aria-label="Zoom out" title="Zoom out">&minus;</button>
         <span id="zoomlabel">100%</span>
-        <button id="zoomin">+</button>
+        <button id="zoomin" aria-label="Zoom in" title="Zoom in">+</button>
       </div>
       </div>
     </main>
 
-    <aside class="right">
-      <div class="cost-tabs" role="tablist" aria-label="Right panel views">
-        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost">Costos</button>
-        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect">Componentes</button>
+    <aside class="right" id="right-panel" aria-label="Costs and component inspector">
+      <div class="sheet-head">
+        <span>Costs &amp; inspector</span>
+        <button id="close-inspector" class="sheet-close" aria-label="Close costs and inspector" title="Close costs and inspector" hidden>&times;</button>
       </div>
-      <div class="cost" id="cost">
+      <div class="cost-tabs" role="tablist" aria-label="Costs and component inspector">
+        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost" tabindex="0">Costs</button>
+        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect" tabindex="-1">Components</button>
+      </div>
+      <div class="cost" id="cost" role="tabpanel" aria-labelledby="tab-cost">
         <div class="headline">
-          <span>Total <b id="k-total">$0.00/mo</b></span>
+          <span>Cloudflare total <b id="k-total">$0.00/mo</b></span>
           <select id="plan" class="plan-in" aria-label="Cloudflare plan">
             <option value="free">Free</option>
             <option value="paid">Paid $5</option>
             <option value="custom">Custom</option>
           </select>
         </div>
-        <div id="over-chip" class="chip">Dentro del plan</div>
+        <div class="estimate-note">Monthly estimate &middot; 730 hours</div>
+        <div id="over-chip" class="chip">Within plan</div>
 
         <div class="realtime">
-          Spent <b id="k-spent">$0.00</b> <span class="sep">&middot;</span> <b id="k-rate">$0.00/h</b>
-          <span class="sep">&middot;</span> <span class="muted">proyección 30d</span> <b id="k-proj">$0.00/mo</b>
+          Cloudflare spent <b id="k-spent">$0.00</b> <span class="sep">&middot;</span> <b id="k-rate">$0.00/h</b>
+          <span class="sep">&middot;</span> <span class="muted">monthly estimate</span> <b id="k-proj">$0.00/mo</b>
         </div>
 
         <div class="bars">
           <div class="bar-row">
-            <div class="bar-head"><span>Incluido</span><b id="incl-label">&mdash;</b></div>
+            <div class="bar-head"><span id="incl-label-text">Plan base / month</span><b id="incl-label">&mdash;</b></div>
             <div class="barmark"><i id="budget-bar"></i></div>
           </div>
           <div class="bar-row" id="extra-row" hidden>
-            <div class="bar-head"><span>Extra</span><b id="extra-label">&mdash;</b></div>
+            <div class="bar-head"><span>Overage</span><b id="extra-label">&mdash;</b></div>
             <div class="barmark"><i id="extra-bar" class="bad"></i></div>
           </div>
         </div>
@@ -110,9 +126,10 @@
         <div id="capacity" class="capacity" hidden></div>
 
         <details id="breakdown" class="breakdown">
-          <summary>Desglose</summary>
+          <summary>Breakdown</summary>
           <div class="breakdown-body">
             <div id="plan-lines" class="plan-lines"></div>
+            <div id="cost-provenance" class="provenance-note"><b>Verified prices &amp; allowances</b><span>Workload rates and monthly totals are estimates.</span></div>
             <div class="krow"><span>Requests</span><b id="k-reqs">0</b></div>
             <div class="krow"><span>Sim time</span><b id="k-time">0s</b></div>
             <div class="krow"><span>Critical path</span><b id="k-lat">&mdash;</b></div>
@@ -120,19 +137,20 @@
             <div class="krow"><span>Status</span><b id="k-path" class="v">ok</b></div>
             <div class="krow small"><span>Cloudflare $/req &middot; usage only, no base fee</span><b id="k-perreq">&mdash;</b></div>
             <div class="krow small"><span>Model $/req &middot; not Cloudflare</span><b id="k-modelreq">&mdash;</b></div>
-            <div class="krow small model"><span>Model spend &middot; not Cloudflare</span><b id="k-model">unset</b></div>
+            <div class="krow small model"><span>External model spend &middot; separate</span><b id="k-model">unset</b></div>
             <div class="krow small asof"><span id="k-asof"></span><span id="k-src"></span></div>
           </div>
         </details>
+        <div id="custom-fields" class="custom-fields" hidden>
+          <div class="cost-head">Custom plan settings</div>
+          <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
+          <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
+        </div>
       </div>
-      <div id="custom-fields" class="custom-fields cost" hidden>
-        <div class="cost-head">Custom plan settings</div>
-        <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
-        <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
-      </div>
-      <div class="inspect" id="inspect" hidden></div>
+      <div id="inspect" class="inspect" role="tabpanel" aria-labelledby="tab-components" hidden></div>
     </aside>
   </div>
+  <div id="sheet-scrim" class="sheet-scrim" aria-hidden="true" hidden></div>
 </div>
 <script src="pricing.js"></script>
 <script src="catalog.js"></script>
@@ -140,6 +158,7 @@
 <script src="engine.js"></script>
 <script src="state-core.mjs"></script>
 <script src="agent-api.js"></script>
+<script src="ux.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
