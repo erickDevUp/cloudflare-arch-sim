@@ -69,116 +69,17 @@
     return { p, slashed };
   }
 
-  function erlangC(a, c) {
-    if (c <= 1) return Math.min(1, a);
-    if (a <= 0) return 0;
-    const rho = a / c;
-    if (rho >= 1) return 1;
-    let sum = 1, term = 1;
-    const cap = Math.min(c, 400);
-    for (let k = 1; k < cap; k++) { term *= a / k; sum += term; }
-    const acfact = term * a / cap;
-    const tail = acfact / (1 - rho);
-    return tail / (sum + tail);
-  }
-
   function compute() {
-    state.res = {};
-    const inc = {}, out = {};
-    state.nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
-    state.edges.forEach(e => {
-      // Edges touching a preserved unknown node are exported, not simulated.
-      if (!out[e.from] || !inc[e.to]) return;
-      out[e.from].push(e.to);
-      inc[e.to].push(e.from);
-    });
-
-    const indeg = {};
-    state.nodes.forEach(n => { indeg[n.id] = inc[n.id].length; });
-    const q = state.nodes.filter(n => indeg[n.id] === 0).map(n => n.id);
-    const order = [];
-    while (q.length) {
-      const id = q.shift();
-      order.push(id);
-      out[id].forEach(to => { indeg[to]--; if (indeg[to] === 0) q.push(to); });
-    }
-
-    const lambda = {}, outLambda = {}, lat = {}, arrive = {};
-    state.nodes.forEach(n => { lambda[n.id] = 0; outLambda[n.id] = 0; lat[n.id] = 0; arrive[n.id] = 0; });
-
-    order.forEach(id => {
-      const n = nodeById(id);
-      if (!n) return;
-      const { p } = eff(n);
-      const t = typeOf(n);
-      if (t.source) {
-        lambda[id] = p.rate;
-        lat[id] = 0;
-        outLambda[id] = p.rate;
-        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0, out: p.rate };
-      } else {
-        let util = 0, waitS = 0;
-        if (p.concurrency > 0 && p.latency > 0) {
-          const mu = 1000 / p.latency;
-          util = lambda[id] / (mu * p.concurrency);
-          if (util >= 1) {
-            waitS = 30;
-          } else if (p.concurrency > 400) {
-            waitS = 0;
-          } else if (util > 0.005) {
-            const C = erlangC(lambda[id] / mu, Math.max(1, Math.round(p.concurrency)));
-            waitS = C / Math.max(0.0001, p.concurrency * mu - lambda[id]);
-          }
-        }
-        const latS = p.latency / 1000 + waitS;
-        lat[id] = latS;
-        const hit = n.type === 'cache' ? Math.max(0, Math.min(100, p.hit)) / 100 : 0;
-        outLambda[id] = lambda[id] * (1 - hit);
-        // A Queue cannot forward more than it can serve. The excess waits in
-        // the backlog; every other node keeps the full fan-out semantics.
-        if (n.type === 'queues') outLambda[id] = QE.forward(outLambda[id], p, true);
-        const failing = n.type === 'external' && state.chaos.store402 > performance.now() / 1000;
-        const err = failing ? 1 : util > 1 ? Math.min(0.85, (util - 1) * 0.55) : 0;
-        state.res[id] = {
-          lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0, out: outLambda[id],
-          capacity: n.type === 'queues' ? QE.capacity(p) : undefined,
-          backlog: state.backlog[id] || 0, drops: state.drops[id] || 0
-        };
-      }
-      out[id].forEach(to => {
-        lambda[to] += outLambda[id];
-        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
-      });
-    });
-
-    state.cpuRate = 0;
+    const params = {};
+    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
+    const model = QE.compute(state.nodes, state.edges, TYPES, params, state.backlog, state.drops, PRICING.hoursPerMonth);
+    state.res = model.res;
+    state.cpuRate = model.cpuRate;
+    state.rate = model.rate;
+    state.pathLat = model.pathLat;
     state.nodes.forEach(n => {
-      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0, out: 0 });
-      const { p } = eff(n);
-      const def = typeOf(n);
-      // rate/spent are Cloudflare-only money. Non-Cloudflare nodes (the model
-      // provider, external APIs) never add to them; the model lives in its own
-      // token-price bucket.
-      let cost = 0;
-      if (def.cloudflare !== false) {
-        cost = r.lambda * p.units * p.price / 1e6;
-        if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
-        if (n.type === 'durable_objects' && p.priceGBs != null) {
-          cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
-        }
-      }
-      r.cost = cost;
-      r.cpu = (p.cpuMs || 0) * r.lambda;
-      state.cpuRate += r.cpu;
+      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) state.res[n.id].err = 1;
     });
-
-    let rate = 0;
-    Object.keys(state.res).forEach(k => { rate += state.res[k].cost || 0; });
-    state.rate = rate;
-    state.pathLat = state.nodes.reduce((m, n) => {
-      const r = state.res[n.id] || {};
-      return r.lambda > 0 ? Math.max(m, (arrive[n.id] || 0) + (lat[n.id] || 0)) : m;
-    }, 0);
   }
 
   function addFromPalette(type) {
@@ -382,6 +283,9 @@
     if (typeOf(n).source) return Math.round(r.lambda || 0) + '/s in';
     if (!r || !r.lambda) return 'idle';
     const pct = Math.round((r.util || 0) * 100);
+    if (n.type === 'queues' && (r.drops || 0) > 0) return 'EXPIRY ' + (r.drops || 0).toFixed(1) + '/s';
+    if (n.type === 'queues' && (r.backlog || 0) > 0) return 'BACKLOG ' + Math.round(r.backlog).toLocaleString();
+    if (n.type === 'durable_objects' && r.overloaded) return 'OVERLOADED ' + pct + '%';
     if ((r.err || 0) > 0) return 'ERR ' + Math.round(r.err * 100) + '%';
     if (r.util >= 1) return 'SATURATED ' + pct + '%';
     if (r.util > 0.9) return 'LOAD ' + pct + '%';
@@ -413,16 +317,22 @@
     if (box.innerHTML !== html) box.innerHTML = html;
   }
 
-  function statsHtml(r, isQueue) {
+  function statsHtml(r, n) {
     let html = '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
       '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
       '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
       '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
       '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>';
-    if (isQueue) {
+    if (n && n.type === 'queues') {
       const b = r.backlog || 0;
-      html += '<div><span>backlog</span><b>' + (b ? Math.round(b).toLocaleString() : '0') + '</b></div>' +
+      html += '<div><span>capacity</span><b>' + (r.capacity ? r.capacity.toFixed(1) + '/s' : '0/s') + '</b></div>' +
+        '<div><span>backlog</span><b>' + (b ? Math.round(b).toLocaleString() : '0') + '</b></div>' +
         '<div><span>drops</span><b>' + ((r.drops || 0) ? r.drops.toFixed(1) + '/s' : '0/s') + '</b></div>';
+    }
+    if (n && n.type === 'durable_objects') {
+      html += '<div><span>objects</span><b>' + (r.objects || 0) + '</b></div>' +
+        '<div><span>req/object</span><b>' + (r.perObjectRate || 0).toFixed(1) + '/s</b></div>' +
+        '<div><span>billed req</span><b>' + (r.billedRequests || 0).toFixed(1) + '/s</b></div>';
     }
     return html;
   }
@@ -431,7 +341,7 @@
     const el = $('#ins-stats');
     if (!el || !state.sel) return;
     const n = nodeById(state.sel);
-    el.innerHTML = statsHtml(state.res[state.sel] || {}, !!n && n.type === 'queues');
+    el.innerHTML = statsHtml(state.res[state.sel] || {}, n);
   }
 
   function renderInspector() {
@@ -455,25 +365,57 @@
       hit: 'Cache hit %',
       priceGBs: '$ per M GB-s',
       cpuMs: 'CPU ms / request',
+      objects: 'Object count',
+      transport: 'Transport',
+      connections: 'WebSocket connections / s',
+      activePct: 'Connected / active window %',
+      activeMs: 'Active ms / incoming message',
+      activeSeconds: 'Active wall-clock seconds / month',
+      rowsRead: 'SQLite rows read / request',
+      rowsWritten: 'SQLite rows written / request',
+      storedGb: 'SQLite stored GB (total)',
+      classAUnits: 'Class A units / request',
+      storageGb: 'Stored GB',
+      uniqueTransforms: 'Unique transforms / month',
+      imagesStored: 'Images stored / month',
+      imagesDelivered: 'Images delivered / month',
+      minutesStored: 'Video minutes stored',
+      minutesDelivered: 'Video minutes delivered',
+      neuronsIn: 'Neurons / 1M input tokens',
+      neuronsOut: 'Neurons / 1M output tokens',
       inPrice: 'Input $ / 1M tokens',
       outPrice: 'Output $ / 1M tokens',
       inTokens: 'Input tokens / request',
       outTokens: 'Output tokens / request'
     };
     const RANGES = window.CATALOG.ranges || {};
+    const ENUMS = window.CATALOG.enums || {};
     let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + esc(n.alias || def.name) + '</b></div>';
     html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
     fields.forEach(f => {
       const L = labels[f] || f;
+      if (ENUMS[f]) {
+        html += '<label class="field"><span>' + L + '</span><select data-f="' + f + '">' +
+          ENUMS[f].map(v => '<option value="' + v + '"' + (n.p[f] === v ? ' selected' : '') + '>' + v + '</option>').join('') +
+          '</select></label>';
+        return;
+      }
       const R = RANGES[f] || [0, 1e6, 1];
       html += '<label class="field"><span>' + L + '</span><input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
-    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n.type === 'queues') + '</div>';
+    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
     if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
     if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
     html += '<button class="del" id="delnode">Delete node</button>';
     box.innerHTML = html;
+    $$('select[data-f]', box).forEach(sel => {
+      sel.addEventListener('change', () => {
+        n.p[sel.dataset.f] = sel.value;
+        compute(); renderNodes(); renderCost(); renderInspectorStats();
+        pushScenario();
+      });
+    });
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
         const f = inp.dataset.f;
@@ -530,29 +472,14 @@
 
   // Monthly Cloudflare usage by plan dimension, from each node's live rate.
   function dimUsage() {
-    const mult = 3600 * PRICING.hoursPerMonth;
-    const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0, doRequests: 0, doGbS: 0, kvReads: 0, queueOps: 0, cpuMsPerRequest: 0 };
-    let wReq = 0, wCpu = 0;
-    state.nodes.forEach(n => {
-      const r = state.res[n.id] || {};
-      const req = (r.lambda || 0) * mult;
-      const { p } = eff(n);
-      if (n.type === 'workers') { wReq += req; wCpu += req * (p.cpuMs || 0); }
-      else if (n.type === 'd1') u.d1Rows += req * (p.units || 0);
-      else if (n.type === 'durable_objects') { u.doRequests += req; u.doGbS += req * (r.lat || 0) * 0.128; }
-      else if (n.type === 'kv') u.kvReads += req * (p.units || 0);
-      else if (n.type === 'queues') u.queueOps += req * (p.units || 0);
-    });
-    u.workersRequests = wReq;
-    u.workersCpuMs = wCpu;
-    u.cpuMsPerRequest = wReq > 0 ? wCpu / wReq : 0;
-    return u;
+    const params = {};
+    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
+    return QE.usage(state.nodes, state.res, params, PRICING.hoursPerMonth);
   }
 
-  // External model tokens are user-entered and never part of the Cloudflare bill.
   function modelBucket() {
     return PRICING.modelSpend(state.nodes
-      .filter(n => n.type === 'workers_ai')
+      .filter(n => n.type === 'external_model')
       .map(n => ({ p: n.p, lambda: (state.res[n.id] || {}).lambda || 0 })));
   }
 
@@ -984,12 +911,20 @@
         type: n.type, lambda: r.lambda || 0, util: r.util || 0,
         err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
         out: r.out || 0, capacity: r.capacity || 0,
-        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0
+        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0,
+        billedRequests: r.billedRequests || 0, doGbS: r.doGbS || 0,
+        objects: r.objects || 0, perObjectRate: r.perObjectRate || 0,
+        objectLimit: r.objectLimit || 0, overloaded: !!r.overloaded
       };
     });
+    const usage = dimUsage();
+    const monthly = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
+      baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
+    }));
     return {
       time: state.t, spent: state.spent, rate: state.rate,
-      pathLat: state.pathLat, running: state.running, nodes: nodes
+      pathLat: state.pathLat, running: state.running, plan: state.plan,
+      usage, monthly, modelSpend: modelBucket(), nodes
     };
   }
 

@@ -342,6 +342,59 @@ test('nextNodeSeq reserves every existing numeric id, opaque ones included', () 
   assert.equal(scenario.nextNodeSeq([{ id: 'n1' }, { id: 'n9' }, { id: 'x' }]), 10);
 });
 
+test('legacy external workers_ai scenarios migrate without losing token fields', () => {
+  const raw = minimal();
+  raw.nodes.push({ id: 'm', type: 'workers_ai', p: {
+    concurrency: 24, latency: 900, inPrice: 3, outPrice: 15, inTokens: 1000, outTokens: 500
+  } });
+  raw.edges.push({ from: 'b', to: 'm' });
+  const { scenario: s, error, dropped } = scenario.validate(raw, catalog);
+  assert.equal(error, null);
+  assert.equal(dropped, 0);
+  assert.equal(s.nodes[2].type, 'external_model');
+  assert.equal(s.nodes[2].p.inPrice, 3);
+  assert.deepEqual(scenario.decode(scenario.encode(s)), s);
+});
+
+test('native Workers AI keeps token counts and fills Neuron rates', () => {
+  const raw = minimal();
+  raw.nodes.push({ id: 'm', type: 'workers_ai', p: { inTokens: 1000, outTokens: 500 } });
+  const { scenario: s, error } = scenario.validate(raw, catalog);
+  assert.equal(error, null);
+  assert.equal(s.nodes[2].type, 'workers_ai');
+  assert.equal(s.nodes[2].p.neuronsIn, 4625);
+  assert.equal(s.nodes[2].p.neuronsOut, 30475);
+});
+
+test('Durable Object transport choices validate and round-trip', () => {
+  const raw = minimal();
+  raw.nodes.push({ id: 'd', type: 'durable_objects', p: { objects: 100, transport: 'hibernatable', activeSeconds: 1000 } });
+  const { scenario: s, error } = scenario.validate(raw, catalog);
+  assert.equal(error, null);
+  assert.equal(s.nodes[2].p.transport, 'hibernatable');
+  assert.deepEqual(scenario.decode(scenario.encode(s)), s);
+  raw.nodes[2].p.transport = 'carrier-pigeon';
+  const bad = scenario.validate(raw, catalog);
+  assert.equal(bad.dropped, 1);
+  assert.match(bad.error, /invalid value for "transport"/);
+});
+
+test('Images and Stream audit fields validate without opaque-node fallback', () => {
+  const raw = {
+    version: 1,
+    nodes: [
+      { id: 'i', type: 'images', p: { uniqueTransforms: 5000, pricePerThousand: 0.5 } },
+      { id: 's', type: 'stream', p: { minutesStored: 1000, minutesDelivered: 100000, storagePrice: 5, deliveryPricePerThousand: 1 } }
+    ],
+    edges: []
+  };
+  const { scenario: s, error, dropped } = scenario.validate(raw, catalog);
+  assert.equal(error, null);
+  assert.equal(dropped, 0);
+  assert.deepEqual(s.nodes.map(n => n.type), ['images', 'stream']);
+  assert.deepEqual(scenario.decode(scenario.encode(s)), s);
+});
+
 test('the shipped scenario.json validates cleanly', () => {
   const raw = JSON.parse(fs.readFileSync(new URL('../scenario.json', import.meta.url), 'utf8'));
   const { scenario: s, error, dropped } = scenario.validate(raw, catalog);

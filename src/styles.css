@@ -188,9 +188,9 @@ button{font:inherit;cursor:pointer}
 .ins-sub .asm{color:#f59e0b}
 .field{display:block;margin-bottom:8px}
 .field span{display:block;font-size:10.5px;color:#8a8a99;margin-bottom:3px}
-.field input{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
+.field input,.field select{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
   color:#e8e8ec;padding:5px 8px;font:11.5px ui-monospace,monospace}
-.field input:focus{outline:none;border-color:#4b3fb0}
+.field input:focus,.field select:focus{outline:none;border-color:#4b3fb0}
 .ins-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
 .ins-stats div{background:#101016;border:1px solid #1c1c25;border-radius:8px;padding:6px 8px}
 .ins-stats span{display:block;font-size:9.5px;color:#8a8a99;text-transform:uppercase;letter-spacing:.04em}

@@ -72,29 +72,61 @@ test('model spend stays in its own bucket, computed from token prices', () => {
   // The Cloudflare table has no model dimension, and no catalog node may feed
   // a legacy model price into the Cloudflare rate.
   assert.deepEqual(dims.filter(d => /model|token/i.test(d.id)), []);
-  const model = CATALOG.types.workers_ai;
+  const model = CATALOG.types.external_model;
   assert.equal(model.cloudflare, false);
   assert.equal(model.p.price, undefined);
   assert.equal(model.p.units, undefined);
+  assert.equal(CATALOG.types.workers_ai.cloudflare, undefined);
+  assert.equal(CATALOG.types.workers_ai.priceNeurons, dims.find(d => d.id === 'workersAiNeurons').price);
 });
 
 test('catalog unit prices match the plan pricing table', () => {
   const byId = id => dims.find(d => d.id === id);
-  // priceCpu lives on the type, the rest on p.
-  const price = (type, key) => key === 'priceCpu' ? CATALOG.types[type].priceCpu : CATALOG.types[type].p[key];
+  const price = (type, key) => key === 'priceCpu' || key === 'priceNeurons'
+    ? CATALOG.types[type][key] : CATALOG.types[type].p[key];
   const pairs = [
     ['workers', 'price', 'workersRequests'],
     ['workers', 'priceCpu', 'workersCpuMs'],
     ['durable_objects', 'price', 'doRequests'],
     ['durable_objects', 'priceGBs', 'doGbS'],
+    ['durable_objects', 'priceRowRead', 'doSqlRowsRead'],
+    ['durable_objects', 'priceRowWritten', 'doSqlRowsWritten'],
+    ['durable_objects', 'priceStoredGb', 'doSqlStoredGb'],
     ['d1', 'price', 'd1Rows'],
     ['kv', 'price', 'kvReads'],
-    ['queues', 'price', 'queueOps']
+    ['queues', 'price', 'queueOps'],
+    ['r2', 'price', 'r2ClassB'],
+    ['r2', 'priceClassA', 'r2ClassA'],
+    ['r2', 'priceStorage', 'r2StorageGb'],
+    ['images', 'pricePerThousand', 'imagesTransformed'],
+    ['images', 'priceStored', 'imagesStored'],
+    ['images', 'priceDelivered', 'imagesDelivered'],
+    ['stream', 'storagePrice', 'streamStoredMinutes'],
+    ['stream', 'deliveryPricePerThousand', 'streamDeliveredMinutes'],
+    ['workers_ai', 'priceNeurons', 'workersAiNeurons']
   ];
   pairs.forEach(([type, key, id]) => {
     assert.equal(price(type, key), byId(id).price,
       type + '.' + key + ' drifted from PRICING.dims.' + id + '.price');
   });
+});
+
+test('billable dimensions round up to the documented unit', () => {
+  const requests = monthlyCost('paid', usage({ doRequests: 1.5e6 }));
+  assert.equal(requests.lines.find(l => l.id === 'doRequests').billable, 1e6);
+  assert.equal(requests.lines.find(l => l.id === 'doRequests').cost, 0.15);
+  const duration = monthlyCost('paid', usage({ doGbS: 900000 }));
+  assert.equal(duration.lines.find(l => l.id === 'doGbS').billable, 1e6);
+  assert.equal(duration.lines.find(l => l.id === 'doGbS').cost, 12.5);
+  const stream = monthlyCost('paid', usage({ streamStoredMinutes: 1 }));
+  assert.equal(stream.lines.find(l => l.id === 'streamStoredMinutes').billable, 1000);
+});
+
+test('Workers AI uses the daily Neuron allocation and stays in Cloudflare spend', () => {
+  const monthlyAllowance = 10000 * pricing.hoursPerMonth / 24;
+  const r = monthlyCost('paid', usage({ workersAiNeurons: monthlyAllowance + 1000 }));
+  assert.equal(r.lines.find(l => l.id === 'workersAiNeurons').cost, 0.011);
+  assert.equal(r.total.toFixed(3), '5.011');
 });
 
 test('every verified dimension points at a declared source', () => {

@@ -196,9 +196,9 @@ button{font:inherit;cursor:pointer}
 .ins-sub .asm{color:#f59e0b}
 .field{display:block;margin-bottom:8px}
 .field span{display:block;font-size:10.5px;color:#8a8a99;margin-bottom:3px}
-.field input{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
+.field input,.field select{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
   color:#e8e8ec;padding:5px 8px;font:11.5px ui-monospace,monospace}
-.field input:focus{outline:none;border-color:#4b3fb0}
+.field input:focus,.field select:focus{outline:none;border-color:#4b3fb0}
 .ins-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
 .ins-stats div{background:#101016;border:1px solid #1c1c25;border-radius:8px;padding:6px 8px}
 .ins-stats span{display:block;font-size:9.5px;color:#8a8a99;text-transform:uppercase;letter-spacing:.04em}
@@ -370,7 +370,13 @@ button{font:inherit;cursor:pointer}
 
   const SOURCES = {
     workers: 'https://developers.cloudflare.com/workers/platform/pricing/',
-    d1: 'https://developers.cloudflare.com/d1/platform/pricing/'
+    d1: 'https://developers.cloudflare.com/d1/platform/pricing/',
+    durableObjects: 'https://developers.cloudflare.com/durable-objects/platform/pricing/',
+    queues: 'https://developers.cloudflare.com/queues/platform/pricing/',
+    r2: 'https://developers.cloudflare.com/r2/pricing/',
+    images: 'https://developers.cloudflare.com/images/pricing/',
+    stream: 'https://developers.cloudflare.com/stream/pricing/',
+    workersAi: 'https://developers.cloudflare.com/workers-ai/platform/pricing/'
   };
 
   const PLANS = {
@@ -397,13 +403,28 @@ button{font:inherit;cursor:pointer}
     },
     {
       id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
-      price: 0.15, paidIncluded: 1e6, freeDaily: 100000,
-      verified: true, source: SOURCES.workers
+      price: 0.15, paidIncluded: 1e6, freeDaily: 100000, roundUp: true,
+      verified: true, source: SOURCES.durableObjects
     },
     {
       id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
-      price: 12.5, paidIncluded: 4e5, freeDaily: 13000,
-      verified: true, source: SOURCES.workers
+      price: 12.5, paidIncluded: 4e5, freeDaily: 13000, roundUp: true,
+      verified: true, source: SOURCES.durableObjects
+    },
+    {
+      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6,
+      price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
+      verified: true, source: SOURCES.durableObjects
+    },
+    {
+      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6,
+      price: 1, paidIncluded: 50e6, freeDaily: 100000,
+      verified: true, source: SOURCES.durableObjects
+    },
+    {
+      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1,
+      price: 0.20, paidIncluded: 5, freeMonthly: 5,
+      verified: true, source: SOURCES.durableObjects
     },
     {
       id: 'kvReads', label: 'KV reads', unit: 1e6,
@@ -413,7 +434,52 @@ button{font:inherit;cursor:pointer}
     {
       id: 'queueOps', label: 'Queues operations', unit: 1e6,
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
-      verified: true, source: SOURCES.workers
+      verified: true, source: SOURCES.queues
+    },
+    {
+      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6,
+      price: 4.50, paidIncluded: 1e6, freeMonthly: 1e6,
+      verified: true, source: SOURCES.r2
+    },
+    {
+      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6,
+      price: 0.36, paidIncluded: 1e7, freeMonthly: 1e7,
+      verified: true, source: SOURCES.r2
+    },
+    {
+      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1,
+      price: 0.015, paidIncluded: 10, freeMonthly: 10,
+      verified: true, source: SOURCES.r2
+    },
+    {
+      id: 'imagesTransformed', label: 'Images transformations', unit: 1000,
+      price: 0.50, paidIncluded: 5000, freeMonthly: 5000,
+      verified: true, source: SOURCES.images
+    },
+    {
+      id: 'imagesStored', label: 'Images stored', unit: 100000,
+      price: 5, paidIncluded: 0, freeMonthly: 0,
+      verified: true, source: SOURCES.images
+    },
+    {
+      id: 'imagesDelivered', label: 'Images delivered', unit: 100000,
+      price: 1, paidIncluded: 0, freeMonthly: 0,
+      verified: true, source: SOURCES.images
+    },
+    {
+      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000,
+      price: 5, paidIncluded: 0, freeMonthly: 0, roundUp: true,
+      verified: true, source: SOURCES.stream
+    },
+    {
+      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000,
+      price: 1, paidIncluded: 0, freeMonthly: 0,
+      verified: true, source: SOURCES.stream
+    },
+    {
+      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000,
+      price: 0.011, paidIncluded: 10000 * HOURS_PER_MONTH / 24, freeDaily: 10000,
+      verified: true, source: SOURCES.workersAi
     }
   ];
 
@@ -439,10 +505,10 @@ button{font:inherit;cursor:pointer}
             period: 'per request', ratio: per / d.freePerRequest, over: per > d.freePerRequest, cost: 0
           };
         } else {
-          const limit = d.freeDaily * HOURS_PER_MONTH / 24;
+          const limit = d.freeDaily != null ? d.freeDaily * HOURS_PER_MONTH / 24 : d.freeMonthly;
           line = {
             id: d.id, label: d.label, used, limit, daily: d.freeDaily,
-            period: 'per day', ratio: used / limit, over: used > limit, cost: 0
+            period: d.freeDaily != null ? 'per day' : 'per month', ratio: limit > 0 ? used / limit : Infinity, over: used > limit, cost: 0
           };
         }
         lines.push(line);
@@ -457,11 +523,12 @@ button{font:inherit;cursor:pointer}
         const used = +u[d.id] || 0;
         if (!used) return;
         const over = Math.max(0, used - d.paidIncluded);
-        const cost = over / d.unit * d.price;
+        const billable = d.roundUp && over > 0 ? Math.ceil(over / d.unit) * d.unit : over;
+        const cost = billable / d.unit * d.price;
         overage += cost;
         lines.push({
           id: d.id, label: d.label, used, included: d.paidIncluded,
-          over, cost, ratio: used / d.paidIncluded
+          over, billable, cost, ratio: d.paidIncluded > 0 ? used / d.paidIncluded : Infinity
         });
       });
       const base = PLANS.paid.base;
@@ -500,7 +567,7 @@ button{font:inherit;cursor:pointer}
   }
 
   const api = {
-    asOf: '2026-11-21', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
+    asOf: '2026-11-24', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
     plans: PLANS, dims: DIMS, monthlyCost, monthlyUsage, modelSpend
   };
   root.PRICING = api;
@@ -509,7 +576,7 @@ button{font:inherit;cursor:pointer}
 
 </script>
 <script>
-window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" />","globe":"<svg class=\"lucide lucide-globe\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /> <path d=\"M2 12h20\" />","shield":"<svg class=\"lucide lucide-shield\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" />","shield-check":"<svg class=\"lucide lucide-shield-check\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" />","layers":"<svg class=\"lucide lucide-layers\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","zap":"<svg class=\"lucide lucide-zap\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","box":"<svg class=\"lucide lucide-box\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\" /> <path d=\"m3.3 7 8.7 5 8.7-5\" /> <path d=\"M12 22V12\" />","list-ordered":"<svg class=\"lucide lucide-list-ordered\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11 5h10\" /> <path d=\"M11 12h10\" /> <path d=\"M11 19h10\" /> <path d=\"M4 4h1v5\" /> <path d=\"M4 9h2\" /> <path d=\"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02\" />","database":"<svg class=\"lucide lucide-database\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />","key-round":"<svg class=\"lucide lucide-key-round\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","archive":"<svg class=\"lucide lucide-archive\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /> <path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /> <path d=\"M10 12h4\" />","scan-search":"<svg class=\"lucide lucide-scan-search\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" /> <path d=\"m16 16-1.9-1.9\" />","route":"<svg class=\"lucide lucide-route\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <circle cx=\"6\" cy=\"5\" r=\"3\" />","sparkles":"<svg class=\"lucide lucide-sparkles\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />","plug":"<svg class=\"lucide lucide-plug\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 22v-5\" /> <path d=\"M15 8V2\" /> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\" /> <path d=\"M9 8V2\" />"};
+window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" />","globe":"<svg class=\"lucide lucide-globe\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /> <path d=\"M2 12h20\" />","shield":"<svg class=\"lucide lucide-shield\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" />","shield-check":"<svg class=\"lucide lucide-shield-check\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" />","layers":"<svg class=\"lucide lucide-layers\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","zap":"<svg class=\"lucide lucide-zap\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","box":"<svg class=\"lucide lucide-box\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\" /> <path d=\"m3.3 7 8.7 5 8.7-5\" /> <path d=\"M12 22V12\" />","list-ordered":"<svg class=\"lucide lucide-list-ordered\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11 5h10\" /> <path d=\"M11 12h10\" /> <path d=\"M11 19h10\" /> <path d=\"M4 4h1v5\" /> <path d=\"M4 9h2\" /> <path d=\"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02\" />","database":"<svg class=\"lucide lucide-database\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />","key-round":"<svg class=\"lucide lucide-key-round\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","archive":"<svg class=\"lucide lucide-archive\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /> <path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /> <path d=\"M10 12h4\" />","scan-search":"<svg class=\"lucide lucide-scan-search\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" /> <path d=\"m16 16-1.9-1.9\" />","route":"<svg class=\"lucide lucide-route\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <circle cx=\"6\" cy=\"5\" r=\"3\" />","sparkles":"<svg class=\"lucide lucide-sparkles\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />","plug":"<svg class=\"lucide lucide-plug\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 22v-5\" /> <path d=\"M15 8V2\" /> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\" /> <path d=\"M9 8V2\" />","image":"<svg class=\"lucide lucide-image\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /> <circle cx=\"9\" cy=\"9\" r=\"2\" /> <path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","video":"<svg class=\"lucide lucide-video\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5\" /> <rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\" />"};
 </script>
 <script>
 window.CATALOG = {
@@ -535,7 +602,36 @@ window.CATALOG = {
     inPrice: [0, 1000, 0.01],
     outPrice: [0, 1000, 0.01],
     inTokens: [0, 1000000, 1],
-    outTokens: [0, 1000000, 1]
+    outTokens: [0, 1000000, 1],
+    objects: [1, 1000000, 1],
+    connections: [0, 1000000, 1],
+    activePct: [0, 100, 1],
+    activeMs: [0, 60000, 0.5],
+    activeSeconds: [0, 1000000000, 1],
+    rowsRead: [0, 1000000, 1],
+    rowsWritten: [0, 1000000, 1],
+    storedGb: [0, 1000000, 0.1],
+    classAUnits: [0, 100000, 1],
+    priceClassA: [0, 100, 0.001],
+    priceStorage: [0, 100, 0.001],
+    priceRowRead: [0, 100, 0.001],
+    priceRowWritten: [0, 100, 0.001],
+    priceStoredGb: [0, 100, 0.001],
+    uniqueTransforms: [0, 1000000000, 1],
+    imagesStored: [0, 1000000000, 1],
+    imagesDelivered: [0, 1000000000, 1],
+    pricePerThousand: [0, 1000, 0.01],
+    priceStored: [0, 1000, 0.01],
+    priceDelivered: [0, 1000, 0.01],
+    minutesStored: [0, 1000000000, 1],
+    minutesDelivered: [0, 1000000000, 1],
+    storagePrice: [0, 1000, 0.01],
+    deliveryPricePerThousand: [0, 1000, 0.01],
+    neuronsIn: [0, 1000000000, 1],
+    neuronsOut: [0, 1000000000, 1]
+  },
+  enums: {
+    transport: ['http', 'rpc', 'websocket', 'hibernatable']
   },
   types: {
     traffic: {
@@ -575,16 +671,22 @@ window.CATALOG = {
     },
     durable_objects: {
       name: 'Durable Objects', group: 'compute', icon: 'box',
-      p: { concurrency: 1000, latency: 20, price: 0.15, units: 1, priceGBs: 12.5 },
-      fields: ['concurrency'],
-      verified: '$0.15/M requests, $12.50/M GB-s. Soft limit ~1,000 req/s per object; scale with more objects, not more load on one.',
+      p: { concurrency: 1000, latency: 20, price: 0.15, units: 1, priceGBs: 12.5,
+        objects: 1, transport: 'http', connections: 0, activePct: 100, activeMs: 20, activeSeconds: 0,
+        rowsRead: 0, rowsWritten: 0, storedGb: 0,
+        priceRowRead: 0.001, priceRowWritten: 1, priceStoredGb: 0.2 },
+      fields: ['concurrency', 'latency', 'objects', 'transport', 'connections', 'activePct', 'activeMs', 'activeSeconds', 'rowsRead', 'rowsWritten', 'storedGb'],
+      note: 'Object count spreads arrivals evenly. HTTP/RPC duration derives from service time unless active wall-clock seconds are set; non-hibernatable WebSockets use the connected window. Hibernatable WebSockets use actual incoming messages × active milliseconds, capped by each object\'s available wall time. SQLite rows are per incoming message and stored GB is total.',
+      verified: '$0.15/M requests, $12.50/M GB-s. SQLite rows and stored data are billed separately. Soft limit ~1,000 req/s per object. WebSocket incoming messages bill 20:1; non-hibernatable connections bill for their connected window, while hibernatable messages bill only active time.',
       doc: 'https://developers.cloudflare.com/durable-objects/platform/pricing/'
     },
     queues: {
       name: 'Queues', group: 'compute', icon: 'list-ordered',
       p: { concurrency: 50, latency: 10, retention: 345600, price: 0.4, units: 1 },
       fields: ['concurrency', 'latency', 'retention'],
-      note: 'Throttles downstream to concurrency / service time; the rest builds a backlog. Messages older than retention expire. Assumption: FIFO, so the oldest messages drop first.'
+      verified: 'Normally 3 operations per message: write, read and delete. Paid retention defaults to 4 days and can reach 14 days. Throughput is capped at 5,000 messages/s and push consumers at 250 concurrent invocations.',
+      note: 'Throttles downstream to forward capacity; the rest builds a backlog. Zero capacity retains everything and uses the retention horizon as its wait. Messages older than retention expire. Assumption: FIFO, one deterministic service rate and no retries.',
+      doc: 'https://developers.cloudflare.com/queues/platform/pricing/'
     },
     d1: {
       name: 'D1', group: 'data', icon: 'database',
@@ -600,8 +702,30 @@ window.CATALOG = {
     },
     r2: {
       name: 'R2', group: 'data', icon: 'archive',
-      p: { concurrency: 1000000, latency: 30, price: 0.36, units: 1 },
-      note: 'Objects by key, no egress fee. Price per operation is an assumption here.'
+      p: { concurrency: 1000000, latency: 30, price: 0.36, units: 1,
+        classAUnits: 0, storageGb: 0, priceClassA: 4.5, priceStorage: 0.015 },
+      fields: ['units', 'classAUnits', 'storageGb'],
+      verified: 'Standard storage $0.015/GB-month, Class A $4.50/M and Class B $0.36/M. Monthly free tier: 10 GB, 1M Class A and 10M Class B operations. Delete operations and egress are free.',
+      note: 'Units per request default to Class B reads. Class A units cover writes and lists; stored GB is a monthly provisioned amount.',
+      doc: 'https://developers.cloudflare.com/r2/pricing/'
+    },
+    images: {
+      name: 'Images', group: 'data', icon: 'image',
+      p: { concurrency: 1000000, latency: 40, uniqueTransforms: 0, imagesStored: 0, imagesDelivered: 0,
+        pricePerThousand: 0.5, priceStored: 5, priceDelivered: 1 },
+      fields: ['uniqueTransforms', 'imagesStored', 'imagesDelivered'],
+      verified: 'Paid: first 5,000 unique transformations included, then $0.50/1,000. Images stored cost $5/100,000 and delivered images $1/100,000.',
+      note: 'Monthly dimensions, not per-request charges. Repeated requests for the same source and transformation count once. Stored and delivered metrics apply only to images stored in Images.',
+      doc: 'https://developers.cloudflare.com/images/pricing/'
+    },
+    stream: {
+      name: 'Stream', group: 'data', icon: 'video',
+      p: { concurrency: 1000000, latency: 50, minutesStored: 0, minutesDelivered: 0,
+        storagePrice: 5, deliveryPricePerThousand: 1 },
+      fields: ['minutesStored', 'minutesDelivered'],
+      verified: 'Storage is prepaid in $5 increments per 1,000 minutes. Delivery is $1/1,000 minutes; ingress and encoding are free.',
+      note: 'Monthly video-minute dimensions. Storage capacity rounds up to the next 1,000 minutes; delivery uses total minutes watched.',
+      doc: 'https://developers.cloudflare.com/stream/pricing/'
     },
     vectorize: {
       name: 'Vectorize', group: 'data', icon: 'scan-search',
@@ -614,11 +738,19 @@ window.CATALOG = {
       note: 'No charge for the gateway itself. It buys you caching, rate limits and logs, not capacity.'
     },
     workers_ai: {
-      name: 'Model', group: 'ai', icon: 'sparkles', cloudflare: false,
-      p: { concurrency: 24, latency: 900,
-        inPrice: null, outPrice: null, inTokens: null, outTokens: null },
+      name: 'Workers AI', group: 'ai', icon: 'sparkles',
+      p: { concurrency: 24, latency: 900, inTokens: 1000, outTokens: 500, neuronsIn: 4625, neuronsOut: 30475 },
+      fields: ['concurrency', 'latency', 'inTokens', 'outTokens', 'neuronsIn', 'neuronsOut'],
+      priceNeurons: 0.011,
+      verified: 'Cloudflare Neuron spend: $0.011/1,000 Neurons above 10,000/day. Defaults use @cf/meta/llama-3.2-3b-instruct: 4,625 input and 30,475 output Neurons per million tokens.',
+      note: 'Native Cloudflare inference. Neuron usage enters Cloudflare spend, never the external model bucket.',
+      doc: 'https://developers.cloudflare.com/workers-ai/platform/pricing/'
+    },
+    external_model: {
+      name: 'External model', group: 'external', icon: 'plug', cloudflare: false,
+      p: { concurrency: 24, latency: 900, inPrice: null, outPrice: null, inTokens: null, outTokens: null },
       fields: ['concurrency', 'latency', 'inPrice', 'outPrice', 'inTokens', 'outTokens'],
-      note: 'Concurrency is the scarce resource: this is the provider tier, not the edge. Tokens per request drive both latency and cost. Token prices below are the external model price, shown only as Model spend and never in the Cloudflare bill.'
+      note: 'Third-party inference. Token prices stay in Model spend and never enter the Cloudflare bill.'
     },
     external: {
       name: 'Tiendanube API', group: 'external', icon: 'plug', cloudflare: false,
@@ -679,6 +811,7 @@ window.CATALOG = {
     let dropped = 0; // genuinely unusable nodes/edges; writers reject these
     const types = (catalog && catalog.types) || {};
     const ranges = (catalog && catalog.ranges) || {};
+    const enums = (catalog && catalog.enums) || {};
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return { scenario: null, error: 'Scenario: expected a JSON object', dropped: 1 };
     }
@@ -720,7 +853,10 @@ window.CATALOG = {
         dropped++;
         return;
       }
-      const type = rn.type;
+      let type = rn.type;
+      const legacyModel = type === 'workers_ai' && rn.p &&
+        (rn.p.inPrice != null || rn.p.outPrice != null);
+      if (legacyModel) type = 'external_model';
       if (typeof type !== 'string' || !isOwn(types, type)) {
         if (typeof type === 'string' && !isProtoName(type)) {
           // Genuine unknown type: keep the raw node verbatim, render nothing.
@@ -772,6 +908,15 @@ window.CATALOG = {
           // (the external model token prices); every other param stays numeric.
           const nullable = v === null && def.p[k] === null;
           if (nullable) { p[k] = null; return; }
+          if (enums[k]) {
+            if (!enums[k].includes(v)) {
+              issues.push('invalid value for "' + k + '" on node "' + id + '"');
+              dropped++;
+              return;
+            }
+            p[k] = v;
+            return;
+          }
           if (!fin(v)) {
             issues.push('invalid value for "' + k + '" on node "' + id + '"');
             dropped++;
@@ -1036,8 +1181,6 @@ window.CATALOG = {
 
 </script>
 <script>
-/* Queue physics shared by the browser engine and the node tests.
-   Pure functions: simulated seconds in, rates/messages out. No DOM, no wall clock. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -1045,40 +1188,270 @@ window.CATALOG = {
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
 
-  const DEFAULT_RETENTION = 345600; // 4 days, in simulated seconds
+  const DEFAULT_RETENTION = 345600;
+  const MODEL = Object.freeze({
+    erlangServerCap: 400,
+    saturatedWaitS: 30,
+    queueOpsPerMessage: 3,
+    queueMaxThroughput: 5000,
+    doRequestsPerSecondPerObject: 1000,
+    doWebSocketMessageRatio: 20,
+    doMemoryGb: 0.128
+  });
 
-  // Service capacity in requests/s. latency is in ms; the engine's mu is 1000/latency.
   function capacity(p) {
     if (!(p.concurrency > 0) || !(p.latency > 0)) return 0;
-    return p.concurrency / (p.latency / 1000);
+    return Math.min(MODEL.queueMaxThroughput, p.concurrency / (p.latency / 1000));
   }
 
-  // A Queue forwards at most its service capacity; other nodes forward full rate.
   function forward(lambda, p, isQueue) {
     if (!isQueue) return lambda;
     const cap = capacity(p);
-    return cap > 0 ? Math.min(lambda, cap) : lambda;
+    return cap > 0 ? Math.min(lambda, cap) : 0;
   }
 
-  // Evolve a Queue's backlog over dt simulated seconds.
-  // Invariant: backlog = cap * wait, where wait is the FIFO wait a just-arrived
-  // message would face (Little's law). Messages whose wait exceeds retention
-  // expire; the excess is reported as drops/s. Simulated seconds only.
+  function queueWait(backlog, cap, p, lambda) {
+    if (cap > 0) return Math.max(0, backlog) / cap;
+    if (!(lambda > 0)) return 0;
+    const retention = p.retention == null ? DEFAULT_RETENTION : p.retention;
+    return retention > 0 ? retention : MODEL.saturatedWaitS;
+  }
+
   function step(backlog, lambda, cap, dt, retention) {
     const t = retention == null ? DEFAULT_RETENTION : retention;
-    if (!(dt > 0) || !(cap > 0)) return { backlog: Math.max(0, backlog), drops: 0 };
-    const wait = backlog / cap;
+    const current = Math.max(0, backlog);
+    if (!(dt > 0)) return { backlog: current, drops: 0 };
+    if (!(cap > 0)) {
+      if (!(lambda > 0)) return { backlog: 0, drops: current / dt };
+      if (t > 0) return { backlog: lambda * t, drops: lambda };
+      return { backlog: current + lambda * dt, drops: 0 };
+    }
+    const wait = current / cap;
     const nextWait = Math.max(0, wait + (lambda / cap - 1) * dt);
-    // FIFO: messages older than retention leave the queue as drops.
     const keptWait = t > 0 ? Math.min(nextWait, t) : nextWait;
     const expiredMsgs = (nextWait - keptWait) * cap;
+    return { backlog: keptWait * cap, drops: expiredMsgs / dt };
+  }
+
+  function erlangC(a, c) {
+    const servers = Math.max(1, Math.round(c));
+    if (servers <= 1) return Math.min(1, a);
+    if (a <= 0) return 0;
+    const rho = a / servers;
+    if (rho >= 1) return 1;
+    let sum = 1, term = 1;
+    const cap = Math.min(servers, MODEL.erlangServerCap);
+    for (let k = 1; k < cap; k++) { term *= a / k; sum += term; }
+    const acfact = term * a / cap;
+    const tail = acfact / (1 - rho);
+    return tail / (sum + tail);
+  }
+
+  function durableObject(lambda, p, latencyS, hoursPerMonth) {
+    const objects = Math.max(1, Math.round(p.objects || 1));
+    const socket = p.transport === 'websocket' || p.transport === 'hibernatable';
+    const billedRequests = socket
+      ? (p.connections || 0) + lambda / MODEL.doWebSocketMessageRatio
+      : lambda;
+    const monthSeconds = hoursPerMonth * 3600;
+    const activeWindow = objects * monthSeconds * Math.max(0, Math.min(100, p.activePct == null ? 100 : p.activePct)) / 100;
+    let activeSeconds;
+    if (p.activeSeconds > 0) activeSeconds = Math.min(activeWindow, p.activeSeconds);
+    else if (p.transport === 'websocket') activeSeconds = activeWindow;
+    else if (p.transport === 'hibernatable') {
+      activeSeconds = Math.min(activeWindow, lambda * (p.activeMs || 0) / 1000 * monthSeconds);
+    } else activeSeconds = Math.min(activeWindow, lambda * latencyS * monthSeconds);
     return {
-      backlog: keptWait * cap,
-      drops: expiredMsgs / dt
+      objects, socket, billedRequests,
+      perObjectRate: lambda / objects,
+      objectLimit: MODEL.doRequestsPerSecondPerObject,
+      activeSeconds, gbS: activeSeconds * MODEL.doMemoryGb
     };
   }
 
-  return { DEFAULT_RETENTION: DEFAULT_RETENTION, capacity: capacity, forward: forward, step: step };
+  function emptyResult() {
+    return { lambda: 0, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0, out: 0,
+      backlog: 0, drops: 0, billedRequests: 0, doGbS: 0, objects: 0,
+      perObjectRate: 0, objectLimit: MODEL.doRequestsPerSecondPerObject, overloaded: false };
+  }
+
+  function nodeCost(n, r, p, def, hoursPerMonth) {
+    if (def.cloudflare === false) return 0;
+    const monthSeconds = hoursPerMonth * 3600;
+    if (n.type === 'workers_ai') {
+      const neurons = r.lambda * ((p.inTokens || 0) * (p.neuronsIn || 0) +
+        (p.outTokens || 0) * (p.neuronsOut || 0)) / 1e6;
+      return neurons * (def.priceNeurons || 0) / 1000;
+    }
+    if (n.type === 'images') {
+      return ((p.uniqueTransforms || 0) / 1000 * (p.pricePerThousand || 0) +
+        (p.imagesStored || 0) / 100000 * (p.priceStored || 0) +
+        (p.imagesDelivered || 0) / 100000 * (p.priceDelivered || 0)) / monthSeconds;
+    }
+    if (n.type === 'stream') {
+      return (Math.ceil((p.minutesStored || 0) / 1000) * 1000 / 1000 * (p.storagePrice || 0) +
+        (p.minutesDelivered || 0) / 1000 * (p.deliveryPricePerThousand || 0)) / monthSeconds;
+    }
+    let cost = r.lambda * (p.units || 0) * (p.price || 0) / 1e6;
+    if (n.type === 'workers') cost += r.lambda * (p.cpuMs || 0) * (def.priceCpu || 0) / 1e6;
+    if (n.type === 'queues') cost = Math.max(0, cost * MODEL.queueOpsPerMessage - (r.drops || 0) * (p.price || 0) / 1e6);
+    if (n.type === 'r2') {
+      cost += r.lambda * (p.classAUnits || 0) * (p.priceClassA || 0) / 1e6;
+      cost += (p.storageGb || 0) * (p.priceStorage || 0) / monthSeconds;
+    }
+    if (n.type === 'durable_objects') {
+      cost += r.doGbS / monthSeconds * (p.priceGBs || 0);
+      cost += r.lambda * (p.rowsRead || 0) * (p.priceRowRead || 0) / 1e6;
+      cost += r.lambda * (p.rowsWritten || 0) * (p.priceRowWritten || 0) / 1e6;
+      cost += (p.storedGb || 0) * (p.priceStoredGb || 0) / monthSeconds;
+    }
+    return cost;
+  }
+
+  function compute(nodes, edges, types, params, backlog, drops, hoursPerMonth) {
+    const res = {};
+    const inc = {}, out = {};
+    nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
+    edges.forEach(e => {
+      if (!out[e.from] || !inc[e.to]) return;
+      out[e.from].push(e.to);
+      inc[e.to].push(e.from);
+    });
+    const indeg = {};
+    nodes.forEach(n => { indeg[n.id] = inc[n.id].length; });
+    const q = nodes.filter(n => indeg[n.id] === 0).map(n => n.id);
+    const order = [];
+    while (q.length) {
+      const id = q.shift();
+      order.push(id);
+      out[id].forEach(to => { indeg[to]--; if (indeg[to] === 0) q.push(to); });
+    }
+    const byId = new Map(nodes.map(n => [n.id, n]));
+    const lambda = {}, outLambda = {}, lat = {}, arrive = {};
+    nodes.forEach(n => { lambda[n.id] = 0; outLambda[n.id] = 0; lat[n.id] = 0; arrive[n.id] = 0; });
+    order.forEach(id => {
+      const n = byId.get(id);
+      if (!n) return;
+      const p = params[id] || n.p || {};
+      const def = types[n.type] || {};
+      if (def.source) {
+        res[id] = Object.assign(emptyResult(), { lambda: p.rate, out: p.rate });
+        outLambda[id] = p.rate;
+      } else {
+        const r = emptyResult();
+        let waitS = 0;
+        if (n.type === 'queues') {
+          const cap = capacity(p);
+          r.capacity = cap;
+          r.util = lambda[id] > 0 ? (cap > 0 ? lambda[id] / cap : 1) : 0;
+          waitS = queueWait(backlog[id] || 0, cap, p, lambda[id]);
+          outLambda[id] = forward(lambda[id], p, true);
+        } else {
+          let queueUtil = 0;
+          if (p.concurrency > 0 && p.latency > 0) {
+            const mu = 1000 / p.latency;
+            queueUtil = lambda[id] / (mu * p.concurrency);
+          }
+          if (n.type === 'durable_objects') {
+            const dobj = durableObject(lambda[id], p, p.latency / 1000, hoursPerMonth);
+            r.util = Math.max(queueUtil, dobj.perObjectRate / dobj.objectLimit);
+            r.billedRequests = dobj.billedRequests;
+            r.doGbS = dobj.gbS;
+            r.objects = dobj.objects;
+            r.perObjectRate = dobj.perObjectRate;
+            r.objectLimit = dobj.objectLimit;
+            r.overloaded = r.util >= 1;
+          } else r.util = queueUtil;
+          if (r.util >= 1) waitS = MODEL.saturatedWaitS;
+          else if (r.util > 0.005) {
+            const mu = 1000 / p.latency;
+            const C = erlangC(lambda[id] / mu, Math.max(1, Math.round(p.concurrency)));
+            waitS = C / Math.max(0.0001, p.concurrency * mu - lambda[id]);
+          }
+          outLambda[id] = lambda[id];
+        }
+        const latS = p.latency / 1000 + waitS;
+        lat[id] = latS;
+        const hit = n.type === 'cache' ? Math.max(0, Math.min(100, p.hit)) / 100 : 0;
+        outLambda[id] *= 1 - hit;
+        r.lambda = lambda[id];
+        r.lat = latS;
+        r.hit = hit;
+        r.out = outLambda[id];
+        r.err = n.type !== 'queues' && r.util > 1 ? Math.min(0.85, (r.util - 1) * 0.55) : 0;
+        r.backlog = backlog[id] || 0;
+        r.drops = drops[id] || 0;
+        res[id] = r;
+      }
+      out[id].forEach(to => {
+        lambda[to] += outLambda[id];
+        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
+      });
+    });
+    let cpuRate = 0, rate = 0;
+    nodes.forEach(n => {
+      const r = res[n.id] || (res[n.id] = emptyResult());
+      const p = params[n.id] || n.p || {};
+      const def = types[n.type] || {};
+      r.cost = nodeCost(n, r, p, def, hoursPerMonth);
+      r.cpu = (p.cpuMs || 0) * r.lambda;
+      cpuRate += r.cpu;
+      rate += r.cost;
+    });
+    const pathLat = nodes.reduce((m, n) => {
+      const r = res[n.id] || {};
+      return r.lambda > 0 ? Math.max(m, (arrive[n.id] || 0) + (lat[n.id] || 0)) : m;
+    }, 0);
+    return { res, cpuRate, rate, pathLat };
+  }
+
+  function usage(nodes, res, params, hoursPerMonth) {
+    const mult = hoursPerMonth * 3600;
+    const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0,
+      doRequests: 0, doGbS: 0, doSqlRowsRead: 0, doSqlRowsWritten: 0, doSqlStoredGb: 0,
+      kvReads: 0, queueOps: 0, r2ClassA: 0, r2ClassB: 0, r2StorageGb: 0,
+      imagesTransformed: 0, imagesStored: 0, imagesDelivered: 0,
+      streamStoredMinutes: 0, streamDeliveredMinutes: 0, workersAiNeurons: 0, cpuMsPerRequest: 0 };
+    nodes.forEach(n => {
+      const r = res[n.id] || {};
+      const p = params[n.id] || n.p || {};
+      const req = (r.lambda || 0) * mult;
+      if (n.type === 'workers') {
+        u.workersRequests += req;
+        u.workersCpuMs += req * (p.cpuMs || 0);
+      } else if (n.type === 'd1') u.d1Rows += req * (p.units || 0);
+      else if (n.type === 'durable_objects') {
+        const dobj = durableObject(r.lambda || 0, p, p.latency / 1000, hoursPerMonth);
+        u.doRequests += dobj.billedRequests * mult;
+        u.doGbS += dobj.gbS;
+        u.doSqlRowsRead += req * (p.rowsRead || 0);
+        u.doSqlRowsWritten += req * (p.rowsWritten || 0);
+        u.doSqlStoredGb += p.storedGb || 0;
+      } else if (n.type === 'kv') u.kvReads += req * (p.units || 0);
+      else if (n.type === 'queues') {
+        u.queueOps += Math.max(0, req * (p.units || 0) * MODEL.queueOpsPerMessage - (r.drops || 0) * mult);
+      } else if (n.type === 'r2') {
+        u.r2ClassA += req * (p.classAUnits || 0);
+        u.r2ClassB += req * (p.units || 0);
+        u.r2StorageGb += p.storageGb || 0;
+      } else if (n.type === 'images') {
+        u.imagesTransformed += p.uniqueTransforms || 0;
+        u.imagesStored += p.imagesStored || 0;
+        u.imagesDelivered += p.imagesDelivered || 0;
+      } else if (n.type === 'stream') {
+        u.streamStoredMinutes += p.minutesStored || 0;
+        u.streamDeliveredMinutes += p.minutesDelivered || 0;
+      } else if (n.type === 'workers_ai') {
+        u.workersAiNeurons += req * ((p.inTokens || 0) * (p.neuronsIn || 0) +
+          (p.outTokens || 0) * (p.neuronsOut || 0)) / 1e6;
+      }
+    });
+    u.cpuMsPerRequest = u.workersRequests > 0 ? u.workersCpuMs / u.workersRequests : 0;
+    return u;
+  }
+
+  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, erlangC,
+    durableObject, compute, usage };
 });
 
 </script>
@@ -1154,116 +1527,17 @@ window.CATALOG = {
     return { p, slashed };
   }
 
-  function erlangC(a, c) {
-    if (c <= 1) return Math.min(1, a);
-    if (a <= 0) return 0;
-    const rho = a / c;
-    if (rho >= 1) return 1;
-    let sum = 1, term = 1;
-    const cap = Math.min(c, 400);
-    for (let k = 1; k < cap; k++) { term *= a / k; sum += term; }
-    const acfact = term * a / cap;
-    const tail = acfact / (1 - rho);
-    return tail / (sum + tail);
-  }
-
   function compute() {
-    state.res = {};
-    const inc = {}, out = {};
-    state.nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
-    state.edges.forEach(e => {
-      // Edges touching a preserved unknown node are exported, not simulated.
-      if (!out[e.from] || !inc[e.to]) return;
-      out[e.from].push(e.to);
-      inc[e.to].push(e.from);
-    });
-
-    const indeg = {};
-    state.nodes.forEach(n => { indeg[n.id] = inc[n.id].length; });
-    const q = state.nodes.filter(n => indeg[n.id] === 0).map(n => n.id);
-    const order = [];
-    while (q.length) {
-      const id = q.shift();
-      order.push(id);
-      out[id].forEach(to => { indeg[to]--; if (indeg[to] === 0) q.push(to); });
-    }
-
-    const lambda = {}, outLambda = {}, lat = {}, arrive = {};
-    state.nodes.forEach(n => { lambda[n.id] = 0; outLambda[n.id] = 0; lat[n.id] = 0; arrive[n.id] = 0; });
-
-    order.forEach(id => {
-      const n = nodeById(id);
-      if (!n) return;
-      const { p } = eff(n);
-      const t = typeOf(n);
-      if (t.source) {
-        lambda[id] = p.rate;
-        lat[id] = 0;
-        outLambda[id] = p.rate;
-        state.res[id] = { lambda: p.rate, util: 0, err: 0, lat: 0, hit: 0, cpu: 0, cost: 0, out: p.rate };
-      } else {
-        let util = 0, waitS = 0;
-        if (p.concurrency > 0 && p.latency > 0) {
-          const mu = 1000 / p.latency;
-          util = lambda[id] / (mu * p.concurrency);
-          if (util >= 1) {
-            waitS = 30;
-          } else if (p.concurrency > 400) {
-            waitS = 0;
-          } else if (util > 0.005) {
-            const C = erlangC(lambda[id] / mu, Math.max(1, Math.round(p.concurrency)));
-            waitS = C / Math.max(0.0001, p.concurrency * mu - lambda[id]);
-          }
-        }
-        const latS = p.latency / 1000 + waitS;
-        lat[id] = latS;
-        const hit = n.type === 'cache' ? Math.max(0, Math.min(100, p.hit)) / 100 : 0;
-        outLambda[id] = lambda[id] * (1 - hit);
-        // A Queue cannot forward more than it can serve. The excess waits in
-        // the backlog; every other node keeps the full fan-out semantics.
-        if (n.type === 'queues') outLambda[id] = QE.forward(outLambda[id], p, true);
-        const failing = n.type === 'external' && state.chaos.store402 > performance.now() / 1000;
-        const err = failing ? 1 : util > 1 ? Math.min(0.85, (util - 1) * 0.55) : 0;
-        state.res[id] = {
-          lambda: lambda[id], util, err, lat: latS, hit, cpu: 0, cost: 0, out: outLambda[id],
-          capacity: n.type === 'queues' ? QE.capacity(p) : undefined,
-          backlog: state.backlog[id] || 0, drops: state.drops[id] || 0
-        };
-      }
-      out[id].forEach(to => {
-        lambda[to] += outLambda[id];
-        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
-      });
-    });
-
-    state.cpuRate = 0;
+    const params = {};
+    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
+    const model = QE.compute(state.nodes, state.edges, TYPES, params, state.backlog, state.drops, PRICING.hoursPerMonth);
+    state.res = model.res;
+    state.cpuRate = model.cpuRate;
+    state.rate = model.rate;
+    state.pathLat = model.pathLat;
     state.nodes.forEach(n => {
-      const r = state.res[n.id] || (state.res[n.id] = { lambda: 0, util: 0, err: 0, lat: 0, cpu: 0, cost: 0, out: 0 });
-      const { p } = eff(n);
-      const def = typeOf(n);
-      // rate/spent are Cloudflare-only money. Non-Cloudflare nodes (the model
-      // provider, external APIs) never add to them; the model lives in its own
-      // token-price bucket.
-      let cost = 0;
-      if (def.cloudflare !== false) {
-        cost = r.lambda * p.units * p.price / 1e6;
-        if (def.priceCpu && p.cpuMs) cost += r.lambda * p.cpuMs * def.priceCpu / 1e6;
-        if (n.type === 'durable_objects' && p.priceGBs != null) {
-          cost += r.lambda * r.lat * 0.128 * p.priceGBs / 1e6;
-        }
-      }
-      r.cost = cost;
-      r.cpu = (p.cpuMs || 0) * r.lambda;
-      state.cpuRate += r.cpu;
+      if (n.type === 'external' && state.chaos.store402 > performance.now() / 1000) state.res[n.id].err = 1;
     });
-
-    let rate = 0;
-    Object.keys(state.res).forEach(k => { rate += state.res[k].cost || 0; });
-    state.rate = rate;
-    state.pathLat = state.nodes.reduce((m, n) => {
-      const r = state.res[n.id] || {};
-      return r.lambda > 0 ? Math.max(m, (arrive[n.id] || 0) + (lat[n.id] || 0)) : m;
-    }, 0);
   }
 
   function addFromPalette(type) {
@@ -1467,6 +1741,9 @@ window.CATALOG = {
     if (typeOf(n).source) return Math.round(r.lambda || 0) + '/s in';
     if (!r || !r.lambda) return 'idle';
     const pct = Math.round((r.util || 0) * 100);
+    if (n.type === 'queues' && (r.drops || 0) > 0) return 'EXPIRY ' + (r.drops || 0).toFixed(1) + '/s';
+    if (n.type === 'queues' && (r.backlog || 0) > 0) return 'BACKLOG ' + Math.round(r.backlog).toLocaleString();
+    if (n.type === 'durable_objects' && r.overloaded) return 'OVERLOADED ' + pct + '%';
     if ((r.err || 0) > 0) return 'ERR ' + Math.round(r.err * 100) + '%';
     if (r.util >= 1) return 'SATURATED ' + pct + '%';
     if (r.util > 0.9) return 'LOAD ' + pct + '%';
@@ -1498,16 +1775,22 @@ window.CATALOG = {
     if (box.innerHTML !== html) box.innerHTML = html;
   }
 
-  function statsHtml(r, isQueue) {
+  function statsHtml(r, n) {
     let html = '<div><span>in</span><b>' + (r.lambda ? r.lambda.toFixed(1) + '/s' : '\u2014') + '</b></div>' +
       '<div><span>util</span><b>' + (r.util ? Math.round(r.util * 100) + '%' : '\u2014') + '</b></div>' +
       '<div><span>errors</span><b>' + (r.err ? Math.round(r.err * 100) + '%' : '0%') + '</b></div>' +
       '<div><span>latency</span><b>' + (r.lat ? fmt(r.lat * 1000) : '\u2014') + '</b></div>' +
       '<div><span>cost/h</span><b>' + (r.cost ? '$' + (r.cost * 3600).toFixed(2) : '$0') + '</b></div>';
-    if (isQueue) {
+    if (n && n.type === 'queues') {
       const b = r.backlog || 0;
-      html += '<div><span>backlog</span><b>' + (b ? Math.round(b).toLocaleString() : '0') + '</b></div>' +
+      html += '<div><span>capacity</span><b>' + (r.capacity ? r.capacity.toFixed(1) + '/s' : '0/s') + '</b></div>' +
+        '<div><span>backlog</span><b>' + (b ? Math.round(b).toLocaleString() : '0') + '</b></div>' +
         '<div><span>drops</span><b>' + ((r.drops || 0) ? r.drops.toFixed(1) + '/s' : '0/s') + '</b></div>';
+    }
+    if (n && n.type === 'durable_objects') {
+      html += '<div><span>objects</span><b>' + (r.objects || 0) + '</b></div>' +
+        '<div><span>req/object</span><b>' + (r.perObjectRate || 0).toFixed(1) + '/s</b></div>' +
+        '<div><span>billed req</span><b>' + (r.billedRequests || 0).toFixed(1) + '/s</b></div>';
     }
     return html;
   }
@@ -1516,7 +1799,7 @@ window.CATALOG = {
     const el = $('#ins-stats');
     if (!el || !state.sel) return;
     const n = nodeById(state.sel);
-    el.innerHTML = statsHtml(state.res[state.sel] || {}, !!n && n.type === 'queues');
+    el.innerHTML = statsHtml(state.res[state.sel] || {}, n);
   }
 
   function renderInspector() {
@@ -1540,25 +1823,57 @@ window.CATALOG = {
       hit: 'Cache hit %',
       priceGBs: '$ per M GB-s',
       cpuMs: 'CPU ms / request',
+      objects: 'Object count',
+      transport: 'Transport',
+      connections: 'WebSocket connections / s',
+      activePct: 'Connected / active window %',
+      activeMs: 'Active ms / incoming message',
+      activeSeconds: 'Active wall-clock seconds / month',
+      rowsRead: 'SQLite rows read / request',
+      rowsWritten: 'SQLite rows written / request',
+      storedGb: 'SQLite stored GB (total)',
+      classAUnits: 'Class A units / request',
+      storageGb: 'Stored GB',
+      uniqueTransforms: 'Unique transforms / month',
+      imagesStored: 'Images stored / month',
+      imagesDelivered: 'Images delivered / month',
+      minutesStored: 'Video minutes stored',
+      minutesDelivered: 'Video minutes delivered',
+      neuronsIn: 'Neurons / 1M input tokens',
+      neuronsOut: 'Neurons / 1M output tokens',
       inPrice: 'Input $ / 1M tokens',
       outPrice: 'Output $ / 1M tokens',
       inTokens: 'Input tokens / request',
       outTokens: 'Output tokens / request'
     };
     const RANGES = window.CATALOG.ranges || {};
+    const ENUMS = window.CATALOG.enums || {};
     let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + esc(n.alias || def.name) + '</b></div>';
     html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
     fields.forEach(f => {
       const L = labels[f] || f;
+      if (ENUMS[f]) {
+        html += '<label class="field"><span>' + L + '</span><select data-f="' + f + '">' +
+          ENUMS[f].map(v => '<option value="' + v + '"' + (n.p[f] === v ? ' selected' : '') + '>' + v + '</option>').join('') +
+          '</select></label>';
+        return;
+      }
       const R = RANGES[f] || [0, 1e6, 1];
       html += '<label class="field"><span>' + L + '</span><input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
-    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n.type === 'queues') + '</div>';
+    html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
     if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
     if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
     html += '<button class="del" id="delnode">Delete node</button>';
     box.innerHTML = html;
+    $$('select[data-f]', box).forEach(sel => {
+      sel.addEventListener('change', () => {
+        n.p[sel.dataset.f] = sel.value;
+        compute(); renderNodes(); renderCost(); renderInspectorStats();
+        pushScenario();
+      });
+    });
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
         const f = inp.dataset.f;
@@ -1615,29 +1930,14 @@ window.CATALOG = {
 
   // Monthly Cloudflare usage by plan dimension, from each node's live rate.
   function dimUsage() {
-    const mult = 3600 * PRICING.hoursPerMonth;
-    const u = { workersRequests: 0, workersCpuMs: 0, d1Rows: 0, doRequests: 0, doGbS: 0, kvReads: 0, queueOps: 0, cpuMsPerRequest: 0 };
-    let wReq = 0, wCpu = 0;
-    state.nodes.forEach(n => {
-      const r = state.res[n.id] || {};
-      const req = (r.lambda || 0) * mult;
-      const { p } = eff(n);
-      if (n.type === 'workers') { wReq += req; wCpu += req * (p.cpuMs || 0); }
-      else if (n.type === 'd1') u.d1Rows += req * (p.units || 0);
-      else if (n.type === 'durable_objects') { u.doRequests += req; u.doGbS += req * (r.lat || 0) * 0.128; }
-      else if (n.type === 'kv') u.kvReads += req * (p.units || 0);
-      else if (n.type === 'queues') u.queueOps += req * (p.units || 0);
-    });
-    u.workersRequests = wReq;
-    u.workersCpuMs = wCpu;
-    u.cpuMsPerRequest = wReq > 0 ? wCpu / wReq : 0;
-    return u;
+    const params = {};
+    state.nodes.forEach(n => { params[n.id] = eff(n).p; });
+    return QE.usage(state.nodes, state.res, params, PRICING.hoursPerMonth);
   }
 
-  // External model tokens are user-entered and never part of the Cloudflare bill.
   function modelBucket() {
     return PRICING.modelSpend(state.nodes
-      .filter(n => n.type === 'workers_ai')
+      .filter(n => n.type === 'external_model')
       .map(n => ({ p: n.p, lambda: (state.res[n.id] || {}).lambda || 0 })));
   }
 
@@ -2069,12 +2369,20 @@ window.CATALOG = {
         type: n.type, lambda: r.lambda || 0, util: r.util || 0,
         err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
         out: r.out || 0, capacity: r.capacity || 0,
-        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0
+        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0,
+        billedRequests: r.billedRequests || 0, doGbS: r.doGbS || 0,
+        objects: r.objects || 0, perObjectRate: r.perObjectRate || 0,
+        objectLimit: r.objectLimit || 0, overloaded: !!r.overloaded
       };
     });
+    const usage = dimUsage();
+    const monthly = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
+      baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
+    }));
     return {
       time: state.t, spent: state.spent, rate: state.rate,
-      pathLat: state.pathLat, running: state.running, nodes: nodes
+      pathLat: state.pathLat, running: state.running, plan: state.plan,
+      usage, monthly, modelSpend: modelBucket(), nodes
     };
   }
 
