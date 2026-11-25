@@ -17,7 +17,12 @@
     "node": ">=18"
   },
   "scripts": {
+    "dev": "node cli.mjs",
+    "build": "node build.mjs",
     "test": "node --test",
+    "test:coverage": "node --experimental-test-coverage --test",
+    "check:dist": "node check-dist.mjs",
+    "pack:check": "npm pack --dry-run --json",
     "prepublishOnly": "node --test && node build.mjs"
   },
   "keywords": [],

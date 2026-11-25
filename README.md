@@ -21,6 +21,13 @@ Open `dist/cloudflare-arch-sim.html` in Orca, or copy it into `$ORCA_CHAT_SCRATC
 is the whole app: CSS, JavaScript and icons are inlined by `build.mjs`. The live, file-backed
 channel described below is an optional addition served by `serve.mjs`.
 
+## Agent workflow
+
+Start with [AGENTS.md](AGENTS.md), load [the project skill](skills/cloudflare-arch-sim/SKILL.md), and
+follow [the agent playbook](docs/agent-playbook.md). Verify changes with `npm test`,
+`npm run check:dist`, and `npm run pack:check`; use Orca's browser for UI checks. Keep work on a
+task branch and leave merging and npm publication to the maintainer.
+
 ## Engine model
 
 - **Flow follows the edges.** A source emits `rate` requests/second. Every other node passes its
@@ -137,7 +144,7 @@ node build.mjs           # -> dist/cloudflare-arch-sim.html (single offline file
 
 node serve.mjs --port 8788            # page + shared scenario channel on 127.0.0.1:8788
 node build.mjs --scenario scenario.json   # offline build with scenario.json embedded
-node --test                            # 72 tests: pricing, model, scenario and HTTP channel
+node --test                            # 79 tests: engine, pricing, model, scenario, server, and CLI
 ```
 
 `node serve.mjs --port 8788` serves the page at `http://127.0.0.1:8788/`, the live `scenario.json`
@@ -249,16 +256,18 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 | `cli.mjs` | npm `bin`: flag parsing and delegation to `serve.mjs`, or `--path` to print the bundled HTML |
 | `build.mjs` | Inlines CSS/JS/icons into `dist/cloudflare-arch-sim.html`; optional `--scenario` snapshot |
 | `scenario.json` | Live source of truth when served by `serve.mjs` |
-| `tests/` | `pricing`, `model`, `engine`, `scenario` and `serve` test files (`node --test`) |
+| `tests/` | `pricing`, `model`, `engine`, `scenario`, `serve` and `cli` test files (`node --test`) |
 | `docs/images/` | Screenshots used in this README; `dist/` is generated, not hand-edited |
 
 ## Verification and known gaps
 
-`node --test` passes all 72 tests on this branch (pricing math, catalog/price parity, P0 audit
-fixtures, queue and Durable Object physics, schema validation, merge rules and the HTTP channel).
-`npm pack --dry-run` lists only the files the installed CLI needs; `prepublishOnly` runs the tests
-and rebuilds the bundle before publication. Prices are the values in `PRICING.dims` with
-`asOf: 2026-11-24`; adding a component or a price means updating `src/catalog.js` and
+`npm test` passes all 79 tests on this branch (pricing math, catalog/price parity, P0 audit
+fixtures, queue and Durable Object physics, model billing, schema validation, merge rules, the HTTP
+channel and CLI validation). `npm run check:dist` verifies the tracked bundle against a fresh
+temporary build, and `npm run pack:check` lists only the files the installed CLI needs;
+`prepublishOnly` runs the tests and rebuilds the bundle before publication. Prices are the values
+in `PRICING.dims` with `asOf: 2026-11-24`; adding a component or a price means updating
+`src/catalog.js` and
 `src/pricing.js` together.
 
 - The static HTML has no persistence of its own: reloading restarts from the embedded scenario
