@@ -2,7 +2,7 @@
 
 ## Start here
 
-Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows and load the project skill at [skills/cloudflare-arch-sim/SKILL.md](skills/cloudflare-arch-sim/SKILL.md) before changing this repository.
+Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows and load the project skill at [skills/cloudflare-arch-sim/SKILL.md](skills/cloudflare-arch-sim/SKILL.md) before changing this repository. When using the simulator as a design tool, read [docs/agent-operator.md](docs/agent-operator.md) instead.
 
 ## Project map
 
@@ -21,6 +21,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `build.mjs` | Inlines CSS, JavaScript, and icons into one offline HTML file |
 | `dist/cloudflare-arch-sim.html` | Generated package payload; never hand-edit |
 | `tests/` | Node built-in tests for engine, pricing, scenario, server, and CLI |
+| `docs/agent-operator.md` | Experimental agent-as-operator contract for scenario design and evaluation |
 | `docs/images/` | README screenshots |
 
 ## Entry points
@@ -114,7 +115,7 @@ orca tab close --page <browserPageId> --json
 
 ### Docs and agent tooling
 
-1. Update `README.md`, this file, the playbook, or the project skill next to the behavior they explain.
+1. Update `README.md`, this file, the playbook, the operator guide, or the project skill next to the behavior they explain.
 2. Link to source files instead of copying prices, formulas, or scenario defaults into prose.
 3. Keep README screenshots and human instructions intact.
 4. Run `git diff --check`; run the full verification loop when commands or automation change.

@@ -1,6 +1,6 @@
 ---
 name: cloudflare-arch-sim
-description: "Trigger: cloudflare-arch-sim, simulator change, pricing, scenario, queue physics. Operate and verify this repo safely."
+description: "Trigger: cloudflare-arch-sim, simulator change, architecture design, pricing, scenario, queue physics. Edit the repo or operate the simulator safely."
 license: ISC
 metadata:
   author: "erickDevUp"
@@ -9,7 +9,7 @@ metadata:
 
 ## Activation Contract
 
-Load this skill for any change to the simulator, its packaging, agent tooling, or documentation. Read `AGENTS.md` and `docs/agent-playbook.md` before editing.
+Load this skill for repository changes or for using the simulator to design/evaluate an architecture. For operator work, read `docs/agent-operator.md`; for repository work, read `AGENTS.md` and `docs/agent-playbook.md` before editing.
 
 ## Hard Rules
 
@@ -19,36 +19,33 @@ Load this skill for any change to the simulator, its packaging, agent tooling, o
 - Preserve unknown scenario data and lossless merge behavior.
 - Keep UI work in English and defer localization/copy changes to Phase 2 after P0.
 - Use Orca's browser for UI checks.
+- Treat `window.__SIM__`, HTTP/SSE, and DOM controls as experimental; never claim they are stable.
 - Work on a task branch; do not merge, publish, deploy, or change accounts.
 
 ## Decision Gates
 
-| Change | Primary files | Required checks |
+| Goal | Authority | Required checks |
 |---|---|---|
-| Node/catalog | `src/catalog.js`, pricing if applicable | Scenario/pricing tests, build, dist check |
-| Pricing | `src/pricing.js`, `src/catalog.js` | Pricing tests, build, dist check |
-| Scenario | `scenario.json` | Scenario/server tests |
-| Physics | `src/engine.js`, `src/app.js` | Engine tests, full tests, build |
-| UI | `src/index.html`, `src/styles.css`, `src/app.js` | Build, smoke test, Orca browser |
-| Docs/tooling | `AGENTS.md`, playbook, skill, scripts, CI | Relevant tests, full verification |
+| Change the simulator codebase | `AGENTS.md` and `docs/agent-playbook.md`; owning source/tests | Focused/full tests; build, dist, pack, coverage, and smoke checks as applicable |
+| Design/evaluate an architecture | `docs/agent-operator.md`; experimental `window.__SIM__`/HTTP contract | Validate, load, run, inspect, and export; record assumptions/provenance |
 
 ## Execution Steps
 
-1. Inspect the branch, working tree, source of truth, and existing tests.
-2. Make the smallest change in the owning module; add a focused regression test for behavior changes.
-3. Run focused tests, then `npm test`.
-4. Run `npm run build` and `npm run check:dist` for app-source changes.
-5. Run `npm run pack:check`, `npm run test:coverage`, and the local server smoke test.
-6. Use Orca browser snapshots and console output for UI changes.
-7. Review the diff, commit on the task branch, and report exact evidence without merging or publishing.
+1. Choose repository mode or operator mode from the decision table.
+2. In repository mode, inspect the branch, source of truth, and tests; make the smallest owning-module change with a focused regression test.
+3. In operator mode, build/start the live channel, validate/load the scenario, use the existing controls, inspect state, and export without editing simulator source.
+4. Run focused tests, `npm test`, and generated/package checks for repository changes; use Orca browser for UI changes.
+5. Review the diff or operator evidence, including assumptions and unsupported behavior.
+6. Commit repository work on the task branch or return design findings; report exact evidence without merging or publishing.
 
 ## Output Contract
 
-Return changed files, commands and results, generated-dist status, skill metadata, CI/PR status when applicable, and any limitation or skipped check.
+Return changed files or design findings, commands/results, generated-dist status, assumptions/provenance, CI/PR status when applicable, and limitations or skipped checks.
 
 ## References
 
 - `../../AGENTS.md`
+- `../../docs/agent-operator.md`
 - `../../docs/agent-playbook.md`
 - `../../src/pricing.js`
 - `../../src/engine.js`
