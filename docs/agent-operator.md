@@ -144,7 +144,7 @@ The authoritative schema remains [src/scenario.js](../src/scenario.js). Defaults
 
 ### Units and allowances
 
-Top-level units identify simulated seconds, USD, USD/s, requests, and USD/month. Each Cloudflare dimension includes a semantic usage unit, billing unit, period, price, currency, source, and verified flag. `cloudflare.allowances` includes every pricing dimension, with used amount, included allowance, overage, exceeded flag, billable amount, cost, and verification state.
+Top-level units identify simulated seconds, USD, USD/s, requests, and USD/month. Each Cloudflare dimension includes a semantic usage unit, billing unit, period, price, currency, source, and verified flag. `cloudflare.allowances` includes every pricing dimension, with used amount, included allowance, overage, exceeded flag, billable amount, cost, and verification state. Paid allowances use monthly units and periods; Free keeps per-request and daily semantics. Custom plans have no included allowances, so per-dimension `billable` and `cost` are `null` with an explicit reason because `monthly.total` uses the aggregate live rate.
 
 ### Per-node metrics
 

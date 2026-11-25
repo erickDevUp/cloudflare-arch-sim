@@ -577,6 +577,104 @@ test('getState includes complete identity, runtime, billing, model, node, and di
   });
 });
 
+test('paid allowance metadata uses monthly units and derives exceeded from overage', () => {
+  const host = makeHost();
+  const usage = {
+    workersRequests: 15000000,
+    workersCpuMs: 26280000000,
+    doRequests: 1500000
+  };
+  Object.assign(host.runtime, {
+    plan: 'paid',
+    usage,
+    monthly: PRICING.monthlyCost('paid', usage)
+  });
+  const state = API.createAgentApi(host).getState().data;
+  const byId = id => state.cloudflare.allowances.find(item => item.id === id);
+  const cpu = byId('workersCpuMs');
+  assert.equal(cpu.unit, 'CPU-ms/month');
+  assert.equal(cpu.period, 'per month');
+  assert.equal(cpu.used, 26280000000);
+  assert.equal(cpu.included, 30000000);
+  assert.equal(cpu.over, 26250000000);
+  assert.equal(cpu.exceeded, true);
+  assert.equal(cpu.billable, 26250000000);
+  assert.equal(cpu.cost, 525);
+  const requests = byId('workersRequests');
+  assert.equal(requests.unit, 'requests/month');
+  assert.equal(requests.period, 'per month');
+  assert.equal(requests.exceeded, true);
+  assert.equal(requests.billable, 5000000);
+  assert.equal(requests.cost, 1.5);
+  const objects = byId('doRequests');
+  assert.equal(objects.billable, 1000000);
+  assert.equal(objects.cost, 0.15);
+  assert.deepEqual(state.cloudflare.exceeded.map(item => item.id), ['workersRequests', 'workersCpuMs', 'doRequests']);
+});
+
+test('free allowance metadata preserves per-request and daily semantics', () => {
+  const host = makeHost();
+  const daysPerMonth = PRICING.hoursPerMonth / 24;
+  const usage = {
+    workersRequests: 100000 * daysPerMonth,
+    workersCpuMs: 12 * 100000 * daysPerMonth,
+    cpuMsPerRequest: 12
+  };
+  Object.assign(host.runtime, {
+    plan: 'free',
+    usage,
+    monthly: PRICING.monthlyCost('free', usage)
+  });
+  const state = API.createAgentApi(host).getState().data;
+  const byId = id => state.cloudflare.allowances.find(item => item.id === id);
+  const requests = byId('workersRequests');
+  assert.equal(requests.unit, 'requests/day');
+  assert.equal(requests.period, 'per day');
+  assert.equal(requests.used, 100000);
+  assert.equal(requests.included, 100000);
+  assert.equal(requests.exceeded, false);
+  const cpu = byId('workersCpuMs');
+  assert.equal(cpu.unit, 'CPU-ms/request');
+  assert.equal(cpu.period, 'per request');
+  assert.equal(cpu.used, 12);
+  assert.equal(cpu.included, 10);
+  assert.equal(cpu.exceeded, true);
+});
+
+test('custom allowance metadata marks unallocated billable and cost as not applicable', () => {
+  const host = makeHost();
+  const usage = {
+    workersRequests: 15000000,
+    workersCpuMs: 105000000,
+    doRequests: 1500000
+  };
+  const rateMonthly = PRICING.dims.reduce((total, dim) => {
+    return total + (usage[dim.id] || 0) / dim.unit * dim.price;
+  }, 0);
+  Object.assign(host.runtime, {
+    plan: 'custom',
+    baseFee: 10,
+    usage,
+    monthly: PRICING.monthlyCost('custom', Object.assign({ rateMonthly, baseFee: 10 }, usage))
+  });
+  const state = API.createAgentApi(host).getState().data;
+  const byId = id => state.cloudflare.allowances.find(item => item.id === id);
+  const requests = byId('workersRequests');
+  assert.equal(requests.unit, 'requests/month');
+  assert.equal(requests.period, 'per month');
+  assert.equal(requests.included, null);
+  assert.equal(requests.over, null);
+  assert.equal(requests.exceeded, null);
+  assert.equal(requests.billable, null);
+  assert.equal(requests.cost, null);
+  assert.equal(requests.allowanceStatus, 'not_applicable');
+  assert.match(requests.reason, /aggregate live rate/);
+  assert.equal(byId('workersCpuMs').billable, null);
+  assert.equal(byId('workersCpuMs').cost, null);
+  assert.equal(state.cloudflare.monthly.total, 10 + rateMonthly);
+  assert.deepEqual(state.cloudflare.exceeded, []);
+});
+
 test('getState warns about cycles and unsupported boot data', () => {
   const host = makeHost({
     version: 1,

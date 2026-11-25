@@ -2014,10 +2014,18 @@ window.CATALOG = {
         classification: 'editable_model_assumption'
       })))
     ];
+    const plan = simulation.plan;
+    const daysPerMonth = pricing.hoursPerMonth / 24;
     const units = Object.fromEntries(pricing.dims.map(dim => [dim.id, {
-      unit: dim.freePerRequest != null ? dim.usageUnit.replace('/month', '/request') : dim.usageUnit,
+      unit: plan === 'free' && dim.freePerRequest != null
+        ? dim.usageUnit.replace('/month', '/request')
+        : plan === 'free' && dim.freeDaily != null
+          ? dim.usageUnit.replace('/month', '/day')
+          : dim.usageUnit,
       billingUnit: dim.unit,
-      period: dim.freePerRequest != null ? 'per request' : dim.freeDaily != null ? 'per day' : 'per month',
+      period: plan === 'free'
+        ? dim.freePerRequest != null ? 'per request' : dim.freeDaily != null ? 'per day' : 'per month'
+        : 'per month',
       price: dim.price,
       currency: 'USD',
       verified: dim.verified,
@@ -2042,29 +2050,54 @@ window.CATALOG = {
       units: { monthly: 'USD/month', accumulated: 'USD', perRequest: 'USD/request' }
     };
     const monthly = simulation.monthly || {};
-    const exceededIds = new Set((monthly.exceeded || []).map(line => line.id));
+    const usage = simulation.usage || {};
     const allowances = pricing.dims.map(dim => {
       const line = (monthly.lines || []).find(item => item.id === dim.id);
-      const included = simulation.plan === 'paid'
-        ? dim.paidIncluded
-        : simulation.plan === 'free'
-          ? dim.freePerRequest != null ? dim.freePerRequest
-            : dim.freeDaily != null ? dim.freeDaily * pricing.hoursPerMonth / 24 : dim.freeMonthly
-          : null;
-      return {
+      const monthlyUsed = line ? line.used : usage[dim.id] || 0;
+      let used = monthlyUsed;
+      let included = null;
+      let over = null;
+      let billable = null;
+      let cost = null;
+      let allowanceStatus = 'included';
+      let reason;
+      if (plan === 'free') {
+        included = dim.freePerRequest != null
+          ? dim.freePerRequest
+          : dim.freeDaily != null ? dim.freeDaily : dim.freeMonthly;
+        used = dim.freePerRequest != null
+          ? line ? line.used : usage.cpuMsPerRequest || 0
+          : dim.freeDaily != null ? monthlyUsed / daysPerMonth : monthlyUsed;
+        over = dim.freeDaily != null ? used > included : line ? line.over : used > included;
+        billable = 0;
+        cost = 0;
+      } else if (plan === 'paid') {
+        included = dim.paidIncluded;
+        over = line ? line.over : monthlyUsed > included;
+        billable = line ? line.billable || 0 : 0;
+        cost = line ? line.cost || 0 : 0;
+      } else {
+        allowanceStatus = 'not_applicable';
+        reason = 'Custom plan has no included allowances; per-dimension billable and cost are not allocated because monthly.total uses the aggregate live rate.';
+      }
+      const allowance = {
         id: dim.id,
         label: dim.label,
         unit: units[dim.id].unit,
         period: units[dim.id].period,
-        used: line ? line.used : (simulation.usage || {})[dim.id] || 0,
-        included: included == null ? null : included,
-        over: line ? line.over : false,
-        exceeded: exceededIds.has(dim.id),
-        billable: line ? line.billable || 0 : 0,
-        cost: line ? line.cost || 0 : 0,
+        used,
+        included,
+        over,
+        exceeded: over == null ? null : over > 0,
+        billable,
+        cost,
+        allowanceStatus,
         verified: dim.verified
       };
+      if (reason) allowance.reason = reason;
+      return allowance;
     });
+    const exceeded = allowances.filter(item => item.exceeded === true);
     const cloudflare = {
       rate: simulation.rate || 0,
       spent: simulation.spent || 0,
@@ -2072,7 +2105,7 @@ window.CATALOG = {
       monthly,
       allowances,
       overage: monthly.overage || 0,
-      exceeded: monthly.exceeded || [],
+      exceeded,
       unverified: monthly.unverified || [],
       units
     };
