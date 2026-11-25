@@ -30,7 +30,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - `npm run dev` starts `cli.mjs`, which serves the bundled page and state channel on loopback.
 - `node cli.mjs --path` prints the bundled HTML path; `node cli.mjs --help` prints CLI usage.
 - `node serve.mjs` runs the same server directly; tests use its exported `startServer`.
-- `window.SIM_API` exposes the version 1 load/set/run/state/export contract with structured results.
+- `window.SIM_API` exposes the version 1 capabilities/validate/load/set/run/state/export/save contract with structured results and exact simulated-time advancement.
 - `window.__SIM__` preserves the legacy `load`, `export`, and `getState` shapes for browser automation.
 - `npm run build` regenerates `dist/cloudflare-arch-sim.html`.
 
@@ -43,7 +43,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - Cloudflare usage, spend, overage, and projections exclude non-Cloudflare nodes. Model-token spend stays in a separate bucket.
 - `src/pricing.js` is the only pricing source of truth. Keep catalog price fields aligned with its dimensions.
 - `scenario.json` is the default scenario source of truth. Preserve unknown fields, params, and node types during edits.
-- `window.SIM_API` v1 fails closed on unsupported nodes/params, returns structured results, and never duplicates billing or engine math.
+- `window.SIM_API` v1 fails closed on unsupported schema versions/nodes/params, returns structured results, uses exact simulated time for assessments, and never duplicates billing or engine math.
+- Scenario persistence is revisioned and atomic: v1 `save()` returns revision/hash only after 2xx, uses `If-Match`, and clears dirty only when the saved snapshot is still current.
 - `dist/` is generated. Commit it with source changes; CI validates freshness against a clean temporary build.
 - UI language is English. UI localization/copy work belongs to Phase 2 after P0.
 
@@ -105,8 +106,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 1. Keep pure validation, result envelopes, request IDs, and provenance in [src/agent-api.js](src/agent-api.js); inject host functions for Node tests.
 2. Wire `src/app.js` to existing compute, queue, Durable Object, pricing, and control functions. Do not duplicate engine or billing logic.
 3. Preserve `window.__SIM__` return shapes and keep HTTP `/scenario`/SSE unversioned unless a separate task adds HTTP v1.
-4. Extend `tests/agent-api.test.mjs` for contract, error, atomicity, provenance, and compatibility behavior.
-5. Run `npm test`, `npm run build`, and `npm run check:dist`; exercise static site, Queue, and AI retrieval workflows in Orca's browser using only `window.SIM_API`.
+4. Extend `tests/agent-api.test.mjs` for contract, error, atomicity, provenance, save conflicts, deterministic advancement, and compatibility behavior.
+5. Run `npm test`, `npm run build`, and `npm run check:dist`; exercise static site, Queue, AI retrieval, validation, reset, and save workflows in Orca's browser using only `window.SIM_API`.
 
 ### UI
 

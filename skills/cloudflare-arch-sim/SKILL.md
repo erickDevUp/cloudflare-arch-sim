@@ -27,20 +27,20 @@ Load this skill for repository changes or for using the simulator to design/eval
 | Goal | Authority | Required checks |
 |---|---|---|
 | Change the simulator codebase | `AGENTS.md` and `docs/agent-playbook.md`; owning source/tests | Focused/full tests; build, dist, pack, coverage, and smoke checks as applicable |
-| Design/evaluate an architecture | `docs/agent-operator.md`; `window.SIM_API` v1 | Load, set params, run, inspect, and export; record request IDs, errors, assumptions/provenance |
+| Design/evaluate an architecture | `docs/agent-operator.md`; `window.SIM_API` v1 | Check capabilities, validate, load, set params, run exact simulated seconds, inspect state/assessment, export provenance, and save only when persistence is intended |
 
 ## Execution Steps
 
 1. Choose repository mode or operator mode from the decision table.
 2. In repository mode, inspect the branch, source of truth, and tests; make the smallest owning-module change with a focused regression test.
-3. In operator mode, build/start the live channel, use `SIM_API.loadScenario/setParams/start/pause/reset/getState/exportScenario`, and inspect structured errors and warnings without editing simulator source.
+3. In operator mode, build/start the live channel, use `SIM_API.capabilities/validate/loadScenario/setParams/setSpeed/run/getState/exportScenario`, and use `save()` only for intentional persistence; record request IDs, run/revision identity, structured errors, dirty/save status, assumptions, and provenance.
 4. Run focused tests, `npm test`, and generated/package checks for repository changes; use Orca browser for UI changes.
 5. Review the diff or operator evidence, including assumptions and unsupported behavior.
 6. Commit repository work on the task branch or return design findings; report exact evidence without merging or publishing.
 
 ## Output Contract
 
-Return changed files or design findings, commands/results, request IDs/errors, generated-dist status, assumptions/provenance, CI/PR status when applicable, and limitations or skipped checks.
+Return changed files or design findings, commands/results, request IDs/errors, run/revision identity, generated-dist status, assumptions/provenance, save/conflict status, CI/PR status when applicable, and limitations or skipped checks.
 
 ## References
 
