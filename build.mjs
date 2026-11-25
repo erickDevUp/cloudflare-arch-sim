@@ -37,7 +37,13 @@ if (scenarioFile) {
   html = html.replace('<script src="app.js"></script>', () => `<script>\n${read('app.js')}\n</script>`);
 }
 
-fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
-const out = path.join(root, 'dist', 'cloudflare-arch-sim.html');
+const outFlag = process.argv.indexOf('--out');
+const output = outFlag >= 0 ? process.argv[outFlag + 1] : null;
+if (outFlag >= 0 && !output) {
+  console.error('Missing value for --out.');
+  process.exit(1);
+}
+const out = output ? path.resolve(output) : path.join(root, 'dist', 'cloudflare-arch-sim.html');
+fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log(`${out}  ${(html.length / 1024).toFixed(1)} KB  ${iconNames.length} icons${scenarioFile ? '  scenario: ' + scenarioFile : ''}`);
