@@ -1596,6 +1596,7 @@
           state.scenarioHash = storedHash;
           state.dirty = false;
           state.saveError = null;
+          if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           return;
         }
         const before = state.nodes.map(n => n.id).join('|');
