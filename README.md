@@ -27,8 +27,9 @@ the optional local [MCP stdio server](docs/mcp.md) without a browser or HTTP lis
 Start with [AGENTS.md](AGENTS.md), load [the project skill](skills/cloudflare-arch-sim/SKILL.md), and
 follow [the agent playbook](docs/agent-playbook.md). Use [the operator guide](docs/agent-operator.md)
 for browser `SIM_API` workflows or [the MCP guide](docs/mcp.md) for local stdio clients. Verify
-changes with `npm test`, `npm run check:dist`, and `npm run pack:check`; use Orca's browser for UI
-checks. Keep work on a task branch and leave merging and npm publication to the maintainer.
+changes with `npm run typecheck`, `npm run lint`, `npm test`, `npm run check:dist`, and
+`npm run pack:check`; use Orca's browser for UI checks. Keep work on a task branch and leave
+merging and npm publication to the maintainer.
 
 ## Engine model
 
@@ -286,8 +287,10 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 
 `npm test` covers pricing math, catalog/price parity, P0 audit fixtures, queue and Durable Object
 physics, model billing, schema validation, merge rules, the HTTP channel, CLI validation,
-browser/headless API behavior, MCP discovery, and dependency isolation. `npm run check:dist`
-verifies the tracked bundle against a fresh temporary build. Each package's `pack:check` script
+browser/headless API behavior, MCP discovery, and dependency isolation. `npm run typecheck`
+checks the shared state/API/MCP JavaScript, and `npm run lint` checks authored JavaScript for
+undefined, unused, and unreachable code. `npm run check:dist` verifies the tracked bundle against
+a fresh temporary build. Each package's `pack:check` script
 lists only its runtime files; `prepublishOnly` runs the tests and rebuilds the root bundle before
 publication. Prices are the values in `PRICING.dims` with `asOf: 2026-11-24`; adding a component
 or a price means updating `src/catalog.js` and `src/pricing.js` together.

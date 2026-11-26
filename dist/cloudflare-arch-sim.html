@@ -570,7 +570,7 @@ button{font:inherit;cursor:pointer}
     asOf: '2026-11-24', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
     plans: PLANS, dims: DIMS, monthlyCost, monthlyUsage, modelSpend
   };
-  root.PRICING = api;
+  /** @type {any} */ (root).PRICING = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
@@ -825,7 +825,12 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       return { scenario: null, error: 'Scenario: expected a JSON object', dropped: 1 };
     }
 
-    const scenario = { version: VERSION, name: 'Untitled scenario', nodes: [], edges: [] };
+    const scenario = {
+      version: VERSION,
+      name: 'Untitled scenario',
+      nodes: /** @type {any[]} */ ([]),
+      edges: /** @type {any[]} */ ([])
+    };
     // Unknown root fields are kept as-is so an edit never deletes them.
     Object.keys(raw).forEach(k => {
       if (ROOT_KEYS.indexOf(k) >= 0) return;

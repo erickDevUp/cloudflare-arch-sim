@@ -31,6 +31,8 @@
     "mcp": "node packages/mcp/mcp-server.mjs",
     "build": "node build.mjs",
     "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test:coverage": "node --experimental-test-coverage --test",
     "check:dist": "node check-dist.mjs",
     "pack:check": "npm pack --dry-run --json",
@@ -40,6 +42,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "lucide-static": "^1.77.0"
+    "@types/node": "^18.19.130",
+    "eslint": "^8.57.1",
+    "globals": "^16.5.0",
+    "lucide-static": "^1.77.0",
+    "typescript": "^5.9.3"
   }
 }
