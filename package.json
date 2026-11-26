@@ -3,15 +3,20 @@
   "version": "1.0.0",
   "description": "A drag-and-drop Cloudflare architecture simulator that renders **inside an Orca chat**.",
   "bin": {
-    "cloudflare-arch-sim": "cli.mjs"
+    "cloudflare-arch-sim": "cli.mjs",
+    "cloudflare-arch-sim-mcp": "mcp-server.mjs"
   },
   "files": [
     "cli.mjs",
+    "mcp-server.mjs",
     "serve.mjs",
     "scenario.json",
     "dist/cloudflare-arch-sim.html",
     "src/scenario.js",
     "src/catalog.js",
+    "src/engine.js",
+    "src/pricing.js",
+    "src/headless-service.js",
     "src/agent-api.js"
   ],
   "engines": {
@@ -19,6 +24,7 @@
   },
   "scripts": {
     "dev": "node cli.mjs",
+    "mcp": "node mcp-server.mjs",
     "build": "node build.mjs",
     "test": "node --test",
     "test:coverage": "node --experimental-test-coverage --test",
@@ -31,5 +37,14 @@
   "license": "ISC",
   "devDependencies": {
     "lucide-static": "^1.77.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": {
+      "@hono/node-server": "1.19.19"
+    }
   }
 }

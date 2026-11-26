@@ -1,4 +1,11 @@
-window.CATALOG = {
+(function (root, factory) {
+  const catalog = factory();
+  if (typeof module === 'object' && module.exports) module.exports = catalog;
+  if (root) root.CATALOG = catalog;
+})(typeof window !== 'undefined' ? window : null, function () {
+  'use strict';
+
+  const data = {
   groups: [
     { id: 'edge', label: 'Traffic & Edge', color: '#7c5cff' },
     { id: 'compute', label: 'Compute', color: '#00c2a8' },
@@ -179,4 +186,6 @@ window.CATALOG = {
       doc: 'https://tiendanube.github.io/api-documentation/intro'
     }
   }
-};
+  };
+  return data;
+});

@@ -1,6 +1,6 @@
 # Agent operator guide
 
-Use `window.SIM_API` version 1 to load, validate, edit, advance, inspect, export, and persist architectures without driving DOM controls. It is the stable browser-facing agent contract. `window.__SIM__`, HTTP `/scenario`, SSE, and DOM controls remain compatibility surfaces.
+Use `window.SIM_API` version 1 to load, validate, edit, advance, inspect, export, and persist architectures without driving DOM controls. It is the stable browser-facing agent contract. `window.__SIM__`, HTTP `/scenario`, SSE, and DOM controls remain compatibility surfaces. External MCP clients use the [local stdio adapter](mcp.md), which shares these semantics but has no filesystem persistence or remote transport.
 
 ## Quick path
 
@@ -105,6 +105,8 @@ Short aliases `load`, `set`, `state`, and `export` remain available.
 | `CHANNEL_UNAVAILABLE` | The page is static or cannot reach the scenario channel. |
 | `STORAGE_CONFLICT` | Stored content changed after the loaded revision, or opaque node data prevents a safe merge. |
 | `INTERNAL_ERROR` | The host threw unexpectedly. The message is included without a stack. |
+| `INVALID_ARGUMENTS` | MCP-only: tool input did not match its explicit schema. Includes `path` and `details.issues`. |
+| `UNKNOWN_TOOL` | MCP-only: the requested tool is not registered. |
 
 ### Atomicity and fail-closed rules
 
@@ -119,6 +121,7 @@ Short aliases `load`, `set`, `state`, and `export` remain available.
 - `run()` never reads `requestAnimationFrame` or wall-clock time. Chaos deadlines also use simulated time, so equal starting states and seconds produce equal assessment state.
 - `reset()` is runtime-only. It does not clear dirty state, save errors, scenario identity, plan, budget, base fee, or speed.
 - `save()` sends the loaded ETag as `If-Match`. A 2xx response clears `dirty` only if the scenario has not changed while the request was in flight. Failures keep `dirty: true` and expose a structured `saveError`.
+- MCP tool failures also include a JSON Pointer `error.path`. Schema validation happens before any service call, so malformed calls cannot mutate state. MCP loads are always strict and expose only `resetRuntime`; `persist` and non-strict loading are not available.
 
 The authoritative schema remains [src/scenario.js](../src/scenario.js). Defaults, editable ranges, enums, verified notes, and source links come from [src/catalog.js](../src/catalog.js). Legacy `workers_ai` nodes with external token prices still migrate to `external_model`.
 
@@ -129,12 +132,12 @@ The authoritative schema remains [src/scenario.js](../src/scenario.js). Defaults
 | Field | Meaning |
 |---|---|
 | `apiVersion`, `schemaVersion`, `modelVersion` | API, scenario schema, and rate-model identities. |
-| `scenarioRevision`, `scenarioHash` | Persisted revision and SHA-256 content hash; both are `null` while the current scenario is dirty. |
+| `scenarioRevision`, `scenarioHash` | Persisted revision and SHA-256 content hash; both are `null` while the current scenario is dirty. MCP always returns `null` because it does not persist. |
 | `runId` | Fresh identity for each load and reset. |
 | `time`, `running`, `speed` | Simulated seconds, loop state, and simulated-seconds per real-second multiplier. |
 | `plan`, `budget`, `baseFee` | Current Cloudflare plan and monthly inputs. |
 | `requestCount` | Source request arrivals accumulated over simulated time. |
-| `dirty`, `saving`, `saveError` | Persistence status for the current scenario. |
+| `dirty`, `saving`, `saveError` | Persistence status for the current scenario. MCP reports in-memory edits as dirty, never saving, with no save error. |
 | `scenario` | Canonical architecture currently loaded. |
 | `simulation` | Compatibility runtime block with time, counters, rates, chaos, plan inputs, and identity. |
 | `cloudflare` | Rate, spend, usage, monthly bill, complete allowances, overage, exceeded limits, unverified dimensions, and units. |
@@ -253,13 +256,17 @@ The server pins allowed loopback `Host` values and rejects foreign or `null` ori
 - Chaos is limited to predefined scenarios. Exact advancement integrates their simulated-time expiry but is not a general event scheduler.
 - There is no rewind or time-travel interface; `reset()` starts a new run identity.
 - Static HTML has no persistence; only `serve.mjs` provides the file-backed channel.
-- HTTP v1, subscriptions, MCP, and CLI JSON interfaces are not provided.
+- MCP v1 is local stdio only and has no filesystem save, merge, remote transport, subscriptions, chaos controls, or wall-clock loop. Its state is lost when the child process stops.
+- HTTP v1 and CLI JSON interfaces are not provided.
 - The API validates architecture and params, but cannot make modeled prices or capacity into measured production facts.
 
 ## References
 
 - [AGENTS.md](../AGENTS.md) — repository change workflow.
 - [agent-playbook.md](agent-playbook.md) — executable repository recipes.
+- [mcp.md](mcp.md) — local stdio tools, resources, prompt, configuration, and boundary.
+- [src/headless-service.js](../src/headless-service.js) — deterministic in-memory host.
+- [mcp-server.mjs](../mcp-server.mjs) — MCP stdio adapter.
 - [src/agent-api.js](../src/agent-api.js) — v1 validation, envelopes, snapshot, and factory.
 - [src/app.js](../src/app.js) — host wiring, exact clock, controls, persistence, and metrics.
 - [src/engine.js](../src/engine.js) — queue, retention, Durable Object, and exact-clock helpers.

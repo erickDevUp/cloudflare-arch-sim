@@ -21,6 +21,7 @@ Keep the branch clean except for intended changes. `check:dist` builds in a temp
 | Command | Use it for |
 |---|---|
 | `npm run dev -- --port 8788` | Local page plus file-backed scenario channel |
+| `npm run mcp` | Local MCP stdio server |
 | `node cli.mjs --help` | CLI flags and validation rules |
 | `node cli.mjs --path` | Absolute path to the bundled HTML |
 | `npm test -- tests/engine.test.mjs` | One focused test file |
@@ -44,6 +45,23 @@ curl --fail --silent --show-error http://127.0.0.1:8788/scenario >/dev/null
 ```
 
 Stop the first terminal with `Ctrl-C`. The default scenario remains [scenario.json](../scenario.json); the server does not rewrite it during these GET requests.
+
+## MCP stdio smoke test
+
+Run the SDK protocol proof:
+
+```sh
+npm test -- tests/headless-service.test.mjs tests/mcp-server.test.mjs
+```
+
+Check the direct entry without sending protocol input:
+
+```sh
+node mcp-server.mjs </dev/null
+```
+
+Both stdout and stderr must stay empty. For a real client workflow, use the configuration and
+examples in [docs/mcp.md](mcp.md). MCP v1 never writes `scenario.json` and does not open a listener.
 
 ## Change recipes
 
@@ -120,6 +138,14 @@ orca tab close --page <browserPageId> --json
 3. Replace `<browserPageId>` with the returned id. Exercise the changed control, take a snapshot after async updates, and confirm the console has no new errors.
 4. Close the browser tab and stop the server. Do not substitute a generic browser tool.
 
+### MCP
+
+1. Keep `mcp-server.mjs` thin and put deterministic state transitions in `src/headless-service.js`.
+2. Reuse `src/agent-api.js`, `src/engine.js`, and `src/pricing.js`; do not fork validation or billing.
+3. Extend `tests/headless-service.test.mjs` and `tests/mcp-server.test.mjs`, including the SDK stdio client test.
+4. Run `npm test`, `npm run build`, `npm run check:dist`, `npm run pack:check`, and the packed bin smoke check.
+5. Update [docs/mcp.md](mcp.md) and the browser boundary in [docs/agent-operator.md](agent-operator.md).
+
 ### Docs and agent tooling
 
 1. Update [README.md](../README.md), [AGENTS.md](../AGENTS.md), this playbook, or [the skill](../skills/cloudflare-arch-sim/SKILL.md) beside the workflow it explains.
@@ -148,7 +174,9 @@ npm run pack:check
 | Server warns that the page embeds a scenario | Rebuild without `--scenario` before testing the live channel. |
 | `POST /scenario` rejects an unknown type | GET the stored file, preserve the unknown node/data, and do not introduce a new unknown type. |
 | POST reports a node type conflict | Preserve the stored opaque node's extras or choose a new id; do not overwrite incompatible data. |
-| `pack:check` omits a runtime file | Update the `files` list in `package.json`, then rerun `npm run pack:check`. |
+| `pack:check` omits a runtime file | Update the `files` list in `package.json`; MCP needs `mcp-server.mjs`, `src/headless-service.js`, and all shared runtime modules. |
+| MCP client cannot parse stdout | Remove non-protocol logging; diagnostics belong on stderr. |
+| MCP state disappears | Expected: each child-process session is in memory; export the scenario before stopping the client. |
 | Orca reports a stale browser ref | Rerun `orca snapshot --page <browserPageId> --json` and use the new refs. |
 
 ## Delivery boundary
