@@ -28,6 +28,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, scenario, server, CLI, browser/headless APIs, MCP stdio, and UX helpers |
 | `docs/agent-operator.md` | Stable `window.SIM_API` v1 contract plus legacy HTTP/SSE operator behavior |
 | `docs/mcp.md` | MCP stdio configuration, tool/resource/prompt contract, examples, and v1 boundary |
+| `tests/` | Node built-in tests for engine, pricing, scenario, server, CLI, agent API, and UX helpers |
 | `docs/images/` | README screenshots |
 
 ## Entry points
@@ -127,7 +128,6 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 2. Preserve explicit strict schemas, structured `isError` envelopes with paths, deterministic request IDs, stdout protocol purity, and the local-only no-save boundary.
 3. Extend `tests/headless-service.test.mjs` and `packages/mcp/test/*.test.mjs`; keep the SDK client integration test as protocol proof.
 4. Run `npm test`, `npm run build`, `npm run check:dist`, `npm run pack:check`, and the direct/bin stdio smoke checks.
-
 ### UI
 
 1. Treat `src/index.html`, `src/styles.css`, `src/app.js`, and `src/ux.js` as the presentation layer; keep English copy.
