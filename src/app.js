@@ -1052,8 +1052,8 @@
 
   function sheetFocusables() {
     const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
-    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
-      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('details:not([open])'));
+    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href],summary', panel)
+      .filter(UX.sheetFocusable);
     if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
     return focusable;
   }
@@ -1357,7 +1357,7 @@
     state.saving = true;
     try {
       const available = http ? await channelReady : false;
-      if (!available || !channel) {
+      if (!available) {
         return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: 'Scenario channel is unavailable' });
       }
       const headers = { 'content-type': 'application/json', 'x-client-id': clientId };
@@ -1610,6 +1610,7 @@
         if (type.indexOf('json') < 0) {
           channelMode = 'local';
           pendingSave = false;
+          resolveChannelReady(false);
           setSave({ type: 'local' });
           return null;
         }
@@ -1627,15 +1628,19 @@
         subscribe();
         return r.json().then(s => {
           if (!s) return;
-          if (!booted) booted = applyScenario(s, true, storage);
-          else setStoredIdentity(storage);
+          if (UX.bootstrapApply(pendingSave, booted) === 'apply') {
+            booted = applyScenario(s, true, storage);
+          } else {
+            setStoredIdentity(storage);
+            booted = true;
+          }
         });
       }).then(() => {
         if (channelMode === 'live' && pendingSave) pushScenario();
       }).catch(() => {
         channelMode = 'error';
         setSave({ type: 'network' }, bootstrap, 'channel');
-      }).finally(() => resolveChannelReady(!!channel));
+      });
     };
     bootstrap();
   }

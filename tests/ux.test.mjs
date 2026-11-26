@@ -80,3 +80,24 @@ test('banner errors are scoped and channel failures take priority', () => {
   delete errors.save;
   assert.equal(ux.bannerError(errors), null);
 });
+
+test('sheet focusables include summaries even inside closed details', () => {
+  const el = (tag, opts) => ({
+    tagName: tag,
+    disabled: !!opts.disabled,
+    offsetParent: opts.offsetParent === false ? null : {},
+    closest: () => opts.closedDetails ? {} : null
+  });
+  assert.equal(ux.sheetFocusable(el('SUMMARY', { closedDetails: true })), true);
+  assert.equal(ux.sheetFocusable(el('A', { closedDetails: true })), false);
+  assert.equal(ux.sheetFocusable(el('A', {})), true);
+  assert.equal(ux.sheetFocusable(el('BUTTON', { disabled: true })), false);
+  assert.equal(ux.sheetFocusable(el('INPUT', { offsetParent: false })), false);
+});
+
+test('recovered bootstrap keeps a pending local edit instead of applying stored data', () => {
+  assert.equal(ux.bootstrapApply(false, false), 'apply');
+  assert.equal(ux.bootstrapApply(true, false), 'identity');
+  assert.equal(ux.bootstrapApply(false, true), 'identity');
+  assert.equal(ux.bootstrapApply(true, true), 'identity');
+});

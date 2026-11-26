@@ -2611,7 +2611,20 @@ window.CATALOG = {
     return errors && (errors.channel || errors.save || errors.copy) || null;
   }
 
-  const api = { saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError };
+  function sheetFocusable(el) {
+    return !el.disabled && el.offsetParent !== null &&
+      (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
+  }
+
+  function bootstrapApply(pendingSave, booted) {
+    if (pendingSave || booted) return 'identity';
+    return 'apply';
+  }
+
+  const api = {
+    saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError,
+    sheetFocusable, bootstrapApply
+  };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -3672,8 +3685,8 @@ window.CATALOG = {
 
   function sheetFocusables() {
     const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
-    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
-      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('details:not([open])'));
+    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href],summary', panel)
+      .filter(UX.sheetFocusable);
     if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
     return focusable;
   }
@@ -3977,7 +3990,7 @@ window.CATALOG = {
     state.saving = true;
     try {
       const available = http ? await channelReady : false;
-      if (!available || !channel) {
+      if (!available) {
         return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: 'Scenario channel is unavailable' });
       }
       const headers = { 'content-type': 'application/json', 'x-client-id': clientId };
@@ -4230,6 +4243,7 @@ window.CATALOG = {
         if (type.indexOf('json') < 0) {
           channelMode = 'local';
           pendingSave = false;
+          resolveChannelReady(false);
           setSave({ type: 'local' });
           return null;
         }
@@ -4247,15 +4261,19 @@ window.CATALOG = {
         subscribe();
         return r.json().then(s => {
           if (!s) return;
-          if (!booted) booted = applyScenario(s, true, storage);
-          else setStoredIdentity(storage);
+          if (UX.bootstrapApply(pendingSave, booted) === 'apply') {
+            booted = applyScenario(s, true, storage);
+          } else {
+            setStoredIdentity(storage);
+            booted = true;
+          }
         });
       }).then(() => {
         if (channelMode === 'live' && pendingSave) pushScenario();
       }).catch(() => {
         channelMode = 'error';
         setSave({ type: 'network' }, bootstrap, 'channel');
-      }).finally(() => resolveChannelReady(!!channel));
+      });
     };
     bootstrap();
   }

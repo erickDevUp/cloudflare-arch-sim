@@ -73,7 +73,20 @@
     return errors && (errors.channel || errors.save || errors.copy) || null;
   }
 
-  const api = { saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError };
+  function sheetFocusable(el) {
+    return !el.disabled && el.offsetParent !== null &&
+      (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
+  }
+
+  function bootstrapApply(pendingSave, booted) {
+    if (pendingSave || booted) return 'identity';
+    return 'apply';
+  }
+
+  const api = {
+    saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError,
+    sheetFocusable, bootstrapApply
+  };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
