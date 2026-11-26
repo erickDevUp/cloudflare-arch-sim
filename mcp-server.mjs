@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import './src/state-core.mjs';
 import API from './src/agent-api.js';
 import CATALOG from './src/catalog.js';
 import ENGINE from './src/engine.js';

@@ -16,6 +16,7 @@
     "src/catalog.js",
     "src/engine.js",
     "src/state-core.mjs",
+    "src/state-core.cjs",
     "src/pricing.js",
     "src/headless-service.js",
     "src/agent-api.js"

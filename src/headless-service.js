@@ -1,5 +1,5 @@
 (function (root, factory) {
-  const core = root && root.SIM_STATE_CORE || typeof globalThis !== 'undefined' && globalThis.SIM_STATE_CORE;
+  const core = typeof module === 'object' && module.exports ? require('./state-core.cjs') : root && root.SIM_STATE_CORE;
   const api = factory(core);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.SIM_HEADLESS = api;

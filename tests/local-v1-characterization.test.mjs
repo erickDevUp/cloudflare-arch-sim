@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import '../src/state-core.mjs';
 import API from '../src/agent-api.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -139,6 +139,20 @@ function canonical(value) {
   }
   return value;
 }
+
+test('Node consumers import state-dependent modules directly in fresh processes', () => {
+  assert.ok(fs.readFileSync(path.join(root, 'src/state-core.cjs'))
+    .equals(fs.readFileSync(path.join(root, 'src/state-core.mjs'))));
+  for (const modulePath of ['src/agent-api.js', 'src/headless-service.js']) {
+    const result = spawnSync(process.execPath, ['-e', 'require(' + JSON.stringify('./' + modulePath) + ')'], {
+      cwd: root,
+      encoding: 'utf8'
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.equal(result.stderr, '');
+  }
+});
 
 test('SIM_API v1 preserves its method surface, envelopes, error codes, and request IDs', async () => {
   const { window } = await browser(baseline());

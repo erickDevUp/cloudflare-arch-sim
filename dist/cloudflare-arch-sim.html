@@ -1497,8 +1497,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 <script>
 (function (root, factory) {
   const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.SIM_STATE_CORE = api;
-  else if (typeof globalThis !== 'undefined') globalThis.SIM_STATE_CORE = api;
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
 
@@ -1674,7 +1674,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 </script>
 <script>
 (function (root, factory) {
-  const core = root && root.SIM_STATE_CORE || typeof globalThis !== 'undefined' && globalThis.SIM_STATE_CORE;
+  const core = typeof module === 'object' && module.exports ? require('./state-core.cjs') : root && root.SIM_STATE_CORE;
   const api = factory(core);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.SIM_API_FACTORY = api;
@@ -2385,12 +2385,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       apiVersion: VERSION,
       schemaVersion: SCHEMA_VERSION,
       modelVersion: MODEL_VERSION,
-      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-      scenarioHash: identity.scenarioHash || null,
-      runId: identity.runId == null ? null : identity.runId,
-      dirty: !!identity.dirty,
-      saving: !!identity.saving,
-      saveError: identity.saveError || null,
+      ...identity,
       version: VERSION,
       scenario,
       time: simulation.time,

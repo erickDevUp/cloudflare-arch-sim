@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import '../src/state-core.mjs';
 import API from '../src/agent-api.js';
 import CATALOG from '../src/catalog.js';
 import ENGINE from '../src/engine.js';

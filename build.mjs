@@ -4,6 +4,8 @@ import path from 'node:path';
 const root = path.dirname(new URL(import.meta.url).pathname);
 const src = path.join(root, 'src');
 const read = f => fs.readFileSync(path.join(src, f), 'utf8');
+const stateCore = read('state-core.mjs');
+fs.writeFileSync(path.join(src, 'state-core.cjs'), stateCore);
 
 const iconNames = ['activity', 'globe', 'shield', 'shield-check', 'layers', 'zap', 'box',
   'list-ordered', 'database', 'key-round', 'archive', 'scan-search', 'route', 'sparkles', 'plug',
@@ -24,7 +26,7 @@ html = html.replace('<script src="catalog.js"></script>',
   () => `<script>\nwindow.ICONS = ${JSON.stringify(icons)};\n</script>\n<script>\n${read('catalog.js')}\n</script>`);
 html = html.replace('<script src="scenario.js"></script>', () => `<script>\n${read('scenario.js')}\n</script>`);
 html = html.replace('<script src="engine.js"></script>', () => `<script>\n${read('engine.js')}\n</script>`);
-html = html.replace('<script src="state-core.mjs"></script>', () => `<script>\n${read('state-core.mjs')}\n</script>`);
+html = html.replace('<script src="state-core.mjs"></script>', () => `<script>\n${stateCore}\n</script>`);
 html = html.replace('<script src="agent-api.js"></script>', () => `<script>\n${read('agent-api.js')}\n</script>`);
 
 const flag = process.argv.indexOf('--scenario');
