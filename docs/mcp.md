@@ -1,11 +1,11 @@
 # MCP stdio server
 
-`cloudflare-arch-sim-mcp` exposes the deterministic simulator to MCP clients over local stdio. It is an adapter over the existing `SIM_API` contract, engine, catalog, scenario validator, and pricing modules; it does not implement a second simulation.
+The `cloudflare-arch-sim-mcp` workspace exposes the deterministic simulator to MCP clients over local stdio. It is an adapter over the existing `SIM_API` contract, engine, catalog, scenario validator, and pricing modules; it does not implement a second simulation.
 
 ## Quick path
 
-1. Install dependencies with `npm ci` in this repository.
-2. Start the server with `npm run mcp` or `node mcp-server.mjs`.
+1. Install root and workspace dependencies with `npm ci` in this repository.
+2. Start the server with `npm run mcp` or `node packages/mcp/mcp-server.mjs`.
 3. Configure an MCP client to spawn that command.
 4. Call `sim_capabilities`, then follow the `assess_architecture` prompt.
 
@@ -14,13 +14,13 @@
   "mcpServers": {
     "cloudflare-arch-sim": {
       "command": "node",
-      "args": ["/absolute/path/to/cloudflare-arch-sim/mcp-server.mjs"]
+      "args": ["/absolute/path/to/cloudflare-arch-sim/packages/mcp/mcp-server.mjs"]
     }
   }
 }
 ```
 
-After the package is installed locally, the bin entry can be used instead:
+In a workspace checkout, npm links the MCP package bin into `node_modules/.bin`:
 
 ```json
 {
@@ -33,7 +33,9 @@ After the package is installed locally, the bin entry can be used instead:
 }
 ```
 
-The server requires Node 18 or newer and `@modelcontextprotocol/sdk` `^1.32.2`. stdout carries only MCP protocol frames; diagnostics go to stderr. The SDK's HTTP-only `@hono/node-server` dependency is pinned to Node 18-compatible `1.19.19`; its remaining moderate `serveStatic` advisories do not affect this stdio server because that adapter is never imported or started.
+The root `cloudflare-arch-sim` package intentionally does not expose this bin. Publishing the MCP workspace separately is deferred; this PR does not add a root-package wrapper.
+
+The MCP workspace requires Node 18 or newer and owns `@modelcontextprotocol/sdk` `^1.32.2` and `zod` `^4.6.7`; the root package has no runtime dependencies. stdout carries only MCP protocol frames; diagnostics go to stderr. The SDK's HTTP-only Hono adapter remains inside the MCP dependency tree and is never imported or started by this stdio server.
 
 ## Boundary
 
@@ -137,9 +139,10 @@ Inspect `state.structuredContent.data.nodes.queue.backlog`, `.drops`, warnings, 
 ## Verification
 
 ```sh
-npm test -- tests/headless-service.test.mjs tests/mcp-server.test.mjs
-node mcp-server.mjs </dev/null
+npm test -- tests/headless-service.test.mjs packages/mcp/test/*.test.mjs
+node packages/mcp/mcp-server.mjs </dev/null
 npm run pack:check
+npm run pack:check --workspace cloudflare-arch-sim-mcp
 ```
 
 The SDK integration test spawns this server over stdio and uses the MCP client to list/call every tool, read all resources, get the prompt, exercise structured failures, and prove invalid calls leave state unchanged. The direct-entry test confirms empty stdout and stderr when no protocol input is sent.
@@ -153,7 +156,7 @@ The SDK integration test spawns this server over stdio and uses the MCP client t
 
 ## References
 
-- [mcp-server.mjs](../mcp-server.mjs) — tool schemas, resources, prompt, and stdio entry.
+- [packages/mcp/mcp-server.mjs](../packages/mcp/mcp-server.mjs) — tool schemas, resources, prompt, and stdio entry.
 - [src/headless-service.js](../src/headless-service.js) — deterministic host around `SIM_API`.
 - [src/agent-api.js](../src/agent-api.js) — envelopes, strict validation, snapshots, and provenance.
 - [docs/agent-operator.md](agent-operator.md) — shared v1 semantics and browser contract.

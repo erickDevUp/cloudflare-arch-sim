@@ -11,6 +11,7 @@ npm test
 npm run build
 npm run check:dist
 npm run pack:check
+npm run pack:check --workspace cloudflare-arch-sim-mcp
 npm run test:coverage
 ```
 
@@ -51,13 +52,13 @@ Stop the first terminal with `Ctrl-C`. The default scenario remains [scenario.js
 Run the SDK protocol proof:
 
 ```sh
-npm test -- tests/headless-service.test.mjs tests/mcp-server.test.mjs
+npm test -- tests/headless-service.test.mjs packages/mcp/test/*.test.mjs
 ```
 
 Check the direct entry without sending protocol input:
 
 ```sh
-node mcp-server.mjs </dev/null
+node packages/mcp/mcp-server.mjs </dev/null
 ```
 
 Both stdout and stderr must stay empty. For a real client workflow, use the configuration and
@@ -140,10 +141,10 @@ orca tab close --page <browserPageId> --json
 
 ### MCP
 
-1. Keep `mcp-server.mjs` thin and put deterministic state transitions in `src/headless-service.js`.
+1. Keep `packages/mcp/mcp-server.mjs` thin and put deterministic state transitions in `src/headless-service.js`.
 2. Reuse `src/agent-api.js`, `src/engine.js`, and `src/pricing.js`; do not fork validation or billing.
-3. Extend `tests/headless-service.test.mjs` and `tests/mcp-server.test.mjs`, including the SDK stdio client test.
-4. Run `npm test`, `npm run build`, `npm run check:dist`, `npm run pack:check`, and the packed bin smoke check.
+3. Extend `tests/headless-service.test.mjs` and `packages/mcp/test/*.test.mjs`, including the SDK stdio client test.
+4. Run `npm test`, `npm run build`, `npm run check:dist`, both packages' `pack:check` scripts, and the packed MCP bin smoke check.
 5. Update [docs/mcp.md](mcp.md) and the browser boundary in [docs/agent-operator.md](agent-operator.md).
 
 ### Docs and agent tooling
@@ -174,7 +175,7 @@ npm run pack:check
 | Server warns that the page embeds a scenario | Rebuild without `--scenario` before testing the live channel. |
 | `POST /scenario` rejects an unknown type | GET the stored file, preserve the unknown node/data, and do not introduce a new unknown type. |
 | POST reports a node type conflict | Preserve the stored opaque node's extras or choose a new id; do not overwrite incompatible data. |
-| `pack:check` omits a runtime file | Update the `files` list in `package.json`; MCP needs `mcp-server.mjs`, `src/headless-service.js`, and all shared runtime modules. |
+| `pack:check` omits a runtime file | Update the owning `files` list: the MCP workspace ships `mcp-server.mjs`, while the root package ships `src/headless-service.js` and the shared runtime modules. |
 | MCP client cannot parse stdout | Remove non-protocol logging; diagnostics belong on stderr. |
 | MCP state disappears | Expected: each child-process session is in memory; export the scenario before stopping the client. |
 | Orca reports a stale browser ref | Rerun `orca snapshot --page <browserPageId> --json` and use the new refs. |

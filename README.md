@@ -135,20 +135,20 @@ computed token bill; it never enters the Cloudflare total above it.*
 **At this commit the npm package is not published yet** — there is no working `npx` command.
 Once it is published, install-free invocation will be `npx cloudflare-arch-sim`; until then,
 run the tools from a checkout with Node 18 or newer. `lucide-static` is a build-time icon
-dependency. The MCP server uses `@modelcontextprotocol/sdk` `^1.32.2` and `zod` at runtime; the
-static HTML remains dependency-free.
+dependency. The MCP workspace owns `@modelcontextprotocol/sdk` `^1.32.2` and `zod`; the root
+package has no runtime dependencies, and the static HTML remains dependency-free.
 
 ### Local development
 
 ```bash
-npm install              # build-time icons plus MCP runtime dependencies
+npm ci                  # root build-time icons plus MCP workspace dependencies
 node build.mjs           # -> dist/cloudflare-arch-sim.html (single offline file)
 # open dist/cloudflare-arch-sim.html in Orca, or use ::orca-visual in a chat
 
 npm run mcp                          # local MCP stdio server; stdout is protocol-only
 node serve.mjs --port 8788            # page + shared scenario channel on 127.0.0.1:8788
 node build.mjs --scenario scenario.json   # offline build with scenario.json embedded
-node --test                            # 122 tests: engine, pricing, model, scenario, server, CLI, APIs, and MCP
+node --test                            # engine, pricing, model, scenario, server, CLI, APIs, and MCP
 ```
 
 `node serve.mjs --port 8788` serves the page at `http://127.0.0.1:8788/`, the live `scenario.json`
@@ -170,20 +170,22 @@ npx cloudflare-arch-sim --help                # flag summary
 The CLI is a thin wrapper over `serve.mjs`: it serves the bundled `dist/cloudflare-arch-sim.html`
 plus the same `/scenario` (GET/POST) and `/events` endpoints, with loopback-only Host/Origin
 checks. `--path` prints the absolute path to the bundled HTML so you can open it in Orca or pass
-it to `::orca-visual`; it does not start a server. The package also ships the
-`cloudflare-arch-sim-mcp` bin, its headless service, and the engine/pricing/catalog/scenario/API
-modules shared with the browser.
+it to `::orca-visual`; it does not start a server. The root package also ships the headless service
+and the engine/pricing/catalog/scenario/API modules used by the separate MCP workspace. It does
+not ship the `cloudflare-arch-sim-mcp` bin.
 
 ## MCP stdio server
 
-Run `npm run mcp` or `node mcp-server.mjs` to expose the simulator to an MCP client. The server
-registers eleven `sim_*` tools, three resources (`scenario://default`, `catalog://nodes`, and
-`pricing://provenance`), and the `assess_architecture` prompt. It reuses the same strict
+Run `npm run mcp` or `node packages/mcp/mcp-server.mjs` to expose the simulator to an MCP client.
+The server registers eleven `sim_*` tools, three resources (`scenario://default`, `catalog://nodes`,
+and `pricing://provenance`), and the `assess_architecture` prompt. It reuses the same strict
 validation, deterministic clock, billing, diagnostics, and provenance as browser `SIM_API`.
 
 MCP v1 is local stdio only. It has no filesystem save, scenario merge, HTTP listener, or remote
-transport, and each child-process session starts from `scenario.json`. See [docs/mcp.md](docs/mcp.md)
-for client configuration, tool inputs, envelopes, and examples.
+transport, and each child-process session starts from `scenario.json`. The MCP workspace owns the
+`cloudflare-arch-sim-mcp` bin; exposing it from the root npm package is deferred until that
+workspace is published separately. See [docs/mcp.md](docs/mcp.md) for client configuration, tool
+inputs, envelopes, and examples.
 
 ## State channel — humans and agents edit the same scenario
 
@@ -272,24 +274,23 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 | `src/app.js` | Queueing engine, rendering, chaos, UI events, `window.__SIM__` and the channel client |
 | `src/agent-api.js` | Versioned API, pure validation/result helpers, provenance, and structured errors |
 | `src/headless-service.js` | Deterministic in-memory host shared by the MCP adapter and `SIM_API` semantics |
-| `mcp-server.mjs` | MCP stdio tools, resources, prompt, schemas, and `cloudflare-arch-sim-mcp` bin |
+| `packages/mcp/mcp-server.mjs` | MCP stdio tools, resources, prompt, schemas, and `cloudflare-arch-sim-mcp` workspace bin |
 | `serve.mjs` | Local page, JSON endpoint, SSE broadcast, atomic writes and Host/Origin checks |
 | `cli.mjs` | npm `bin`: flag parsing and delegation to `serve.mjs`, or `--path` to print the bundled HTML |
 | `build.mjs` | Inlines CSS/JS/icons into `dist/cloudflare-arch-sim.html`; optional `--scenario` snapshot |
 | `scenario.json` | Live source of truth when served by `serve.mjs` |
-| `tests/` | Node built-in tests for engine, pricing, model, scenario, server, CLI, browser/headless APIs, and MCP stdio |
+| `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, model, scenario, server, CLI, browser/headless APIs, and MCP stdio |
 | `docs/images/` | Screenshots used in this README; `dist/` is generated, not hand-edited |
 
 ## Verification and known gaps
 
-`npm test` passes all 122 tests on this branch (pricing math, catalog/price parity, P0 audit
-fixtures, queue and Durable Object physics, model billing, schema validation, merge rules, the HTTP
-channel, CLI validation, browser/headless API behavior, and an SDK MCP stdio integration test).
-`npm run check:dist` verifies the tracked bundle against a fresh temporary build, and
-`npm run pack:check` lists only the files the installed CLIs need; `prepublishOnly` runs the tests
-and rebuilds the bundle before publication. Prices are the values in `PRICING.dims` with
-`asOf: 2026-11-24`; adding a component or a price means updating `src/catalog.js` and
-`src/pricing.js` together.
+`npm test` covers pricing math, catalog/price parity, P0 audit fixtures, queue and Durable Object
+physics, model billing, schema validation, merge rules, the HTTP channel, CLI validation,
+browser/headless API behavior, MCP discovery, and dependency isolation. `npm run check:dist`
+verifies the tracked bundle against a fresh temporary build. Each package's `pack:check` script
+lists only its runtime files; `prepublishOnly` runs the tests and rebuilds the root bundle before
+publication. Prices are the values in `PRICING.dims` with `asOf: 2026-11-24`; adding a component
+or a price means updating `src/catalog.js` and `src/pricing.js` together.
 
 - The static HTML has no persistence of its own: reloading restarts from the embedded scenario
   (or the built-in template). Only `serve.mjs` provides the file-backed, SSE-driven loop; a plain
