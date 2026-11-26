@@ -37,7 +37,7 @@
     'Cycles and their dependent nodes receive zero traffic in the topological pass.',
     'Durable Object arrivals are evenly sharded and active duration is capped per object.',
     'Chaos events are limited to the predefined catalog scenarios.',
-    'HTTP v1, subscriptions, MCP, and CLI JSON interfaces are not provided.'
+    'HTTP v1 and CLI JSON interfaces are not provided.'
   ]);
   const hasOwn = (value, key) => Object.hasOwn(value, key);
   const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -945,6 +945,9 @@
           if (checked.options.provenance) data.provenance = snapshot.provenance;
           return { data };
         });
+      },
+      _fail(code, message, details) {
+        return request(++seq, () => ({ error: { code, message, details } }));
       },
       save() {
         return request(++seq, () => {

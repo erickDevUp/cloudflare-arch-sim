@@ -19,14 +19,16 @@ in a chat, or embed as one offline HTML file with no runtime dependencies.
 Open `dist/cloudflare-arch-sim.html` in Orca, or copy it into `$ORCA_CHAT_SCRATCH_DIR` and emit
 `::orca-visual{file="cloudflare-arch-sim.html"}` to render it in the conversation. The static file
 is the whole app: CSS, JavaScript and icons are inlined by `build.mjs`. The live, file-backed
-channel described below is an optional addition served by `serve.mjs`.
+channel described below is an optional addition served by `serve.mjs`. External AI agents can use
+the optional local [MCP stdio server](docs/mcp.md) without a browser or HTTP listener.
 
 ## Agent workflow
 
 Start with [AGENTS.md](AGENTS.md), load [the project skill](skills/cloudflare-arch-sim/SKILL.md), and
-follow [the agent playbook](docs/agent-playbook.md). Verify changes with `npm test`,
-`npm run check:dist`, and `npm run pack:check`; use Orca's browser for UI checks. Keep work on a
-task branch and leave merging and npm publication to the maintainer.
+follow [the agent playbook](docs/agent-playbook.md). Use [the operator guide](docs/agent-operator.md)
+for browser `SIM_API` workflows or [the MCP guide](docs/mcp.md) for local stdio clients. Verify
+changes with `npm test`, `npm run check:dist`, and `npm run pack:check`; use Orca's browser for UI
+checks. Keep work on a task branch and leave merging and npm publication to the maintainer.
 
 ## Engine model
 
@@ -133,18 +135,20 @@ computed token bill; it never enters the Cloudflare total above it.*
 **At this commit the npm package is not published yet** — there is no working `npx` command.
 Once it is published, install-free invocation will be `npx cloudflare-arch-sim`; until then,
 run the tools from a checkout with Node 18 or newer. `lucide-static` is a build-time icon
-dependency only; the published CLI has no runtime dependencies.
+dependency. The MCP server uses `@modelcontextprotocol/sdk` `^1.32.2` and `zod` at runtime; the
+static HTML remains dependency-free.
 
 ### Local development
 
 ```bash
-npm install              # one-time: build-time icons only, no runtime dependencies
+npm install              # build-time icons plus MCP runtime dependencies
 node build.mjs           # -> dist/cloudflare-arch-sim.html (single offline file)
 # open dist/cloudflare-arch-sim.html in Orca, or use ::orca-visual in a chat
 
+npm run mcp                          # local MCP stdio server; stdout is protocol-only
 node serve.mjs --port 8788            # page + shared scenario channel on 127.0.0.1:8788
 node build.mjs --scenario scenario.json   # offline build with scenario.json embedded
-node --test                            # 79 tests: engine, pricing, model, scenario, server, and CLI
+node --test                            # 122 tests: engine, pricing, model, scenario, server, CLI, APIs, and MCP
 ```
 
 `node serve.mjs --port 8788` serves the page at `http://127.0.0.1:8788/`, the live `scenario.json`
@@ -166,8 +170,20 @@ npx cloudflare-arch-sim --help                # flag summary
 The CLI is a thin wrapper over `serve.mjs`: it serves the bundled `dist/cloudflare-arch-sim.html`
 plus the same `/scenario` (GET/POST) and `/events` endpoints, with loopback-only Host/Origin
 checks. `--path` prints the absolute path to the bundled HTML so you can open it in Orca or pass
-it to `::orca-visual`; it does not start a server. The package ships only the CLI, server,
-scenario file, bundled HTML and the two `src` modules the server loads at runtime.
+it to `::orca-visual`; it does not start a server. The package also ships the
+`cloudflare-arch-sim-mcp` bin, its headless service, and the engine/pricing/catalog/scenario/API
+modules shared with the browser.
+
+## MCP stdio server
+
+Run `npm run mcp` or `node mcp-server.mjs` to expose the simulator to an MCP client. The server
+registers eleven `sim_*` tools, three resources (`scenario://default`, `catalog://nodes`, and
+`pricing://provenance`), and the `assess_architecture` prompt. It reuses the same strict
+validation, deterministic clock, billing, diagnostics, and provenance as browser `SIM_API`.
+
+MCP v1 is local stdio only. It has no filesystem save, scenario merge, HTTP listener, or remote
+transport, and each child-process session starts from `scenario.json`. See [docs/mcp.md](docs/mcp.md)
+for client configuration, tool inputs, envelopes, and examples.
 
 ## State channel — humans and agents edit the same scenario
 
@@ -186,7 +202,9 @@ and an optional non-negative `weight`. Unknown root/node/edge fields, unknown pa
 node types are kept verbatim, so an edit cannot silently delete data the app does not understand.
 Unknown types are preserved but not rendered, and cannot be *introduced* through POST.
 
-**Agent API:** `window.__SIM__ = { load, export, getState }`.
+**Agent APIs:** browser automation can use `window.__SIM__ = { load, export, getState }` or the
+structured `window.SIM_API` v1 contract documented in [the operator guide](docs/agent-operator.md).
+External MCP clients use the stdio adapter documented in [docs/mcp.md](docs/mcp.md).
 
 - `load(scenario)` validates and applies a scenario, then fits the view; returns `true` or
   `false`.
@@ -252,22 +270,25 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 | `src/pricing.js` | Plans, verified pricing dimensions, `asOf`/sources, monthly math, model bucket |
 | `src/scenario.js` | Pure schema shared by page, server and tests: validate, merge, `#s=` encode/decode, layout |
 | `src/app.js` | Queueing engine, rendering, chaos, UI events, `window.__SIM__` and the channel client |
+| `src/agent-api.js` | Versioned API, pure validation/result helpers, provenance, and structured errors |
+| `src/headless-service.js` | Deterministic in-memory host shared by the MCP adapter and `SIM_API` semantics |
+| `mcp-server.mjs` | MCP stdio tools, resources, prompt, schemas, and `cloudflare-arch-sim-mcp` bin |
 | `serve.mjs` | Local page, JSON endpoint, SSE broadcast, atomic writes and Host/Origin checks |
 | `cli.mjs` | npm `bin`: flag parsing and delegation to `serve.mjs`, or `--path` to print the bundled HTML |
 | `build.mjs` | Inlines CSS/JS/icons into `dist/cloudflare-arch-sim.html`; optional `--scenario` snapshot |
 | `scenario.json` | Live source of truth when served by `serve.mjs` |
-| `tests/` | `pricing`, `model`, `engine`, `scenario`, `serve` and `cli` test files (`node --test`) |
+| `tests/` | Node built-in tests for engine, pricing, model, scenario, server, CLI, browser/headless APIs, and MCP stdio |
 | `docs/images/` | Screenshots used in this README; `dist/` is generated, not hand-edited |
 
 ## Verification and known gaps
 
-`npm test` passes all 79 tests on this branch (pricing math, catalog/price parity, P0 audit
+`npm test` passes all 122 tests on this branch (pricing math, catalog/price parity, P0 audit
 fixtures, queue and Durable Object physics, model billing, schema validation, merge rules, the HTTP
-channel and CLI validation). `npm run check:dist` verifies the tracked bundle against a fresh
-temporary build, and `npm run pack:check` lists only the files the installed CLI needs;
-`prepublishOnly` runs the tests and rebuilds the bundle before publication. Prices are the values
-in `PRICING.dims` with `asOf: 2026-11-24`; adding a component or a price means updating
-`src/catalog.js` and
+channel, CLI validation, browser/headless API behavior, and an SDK MCP stdio integration test).
+`npm run check:dist` verifies the tracked bundle against a fresh temporary build, and
+`npm run pack:check` lists only the files the installed CLIs need; `prepublishOnly` runs the tests
+and rebuilds the bundle before publication. Prices are the values in `PRICING.dims` with
+`asOf: 2026-11-24`; adding a component or a price means updating `src/catalog.js` and
 `src/pricing.js` together.
 
 - The static HTML has no persistence of its own: reloading restarts from the embedded scenario
@@ -287,5 +308,7 @@ in `PRICING.dims` with `asOf: 2026-11-24`; adding a component or a price means u
   connection schedules or pending I/O.
 - Queue retries, dead-letter queues, per-message 64 KB chunks and producer-side 25 GB backlog
   limits are not modelled; the engine uses one deterministic FIFO service rate.
+- MCP v1 is process-local stdio only: it has no filesystem save, merge, remote transport, chaos
+  controls, or wall-clock loop. Stopping the server discards the session.
 - The channel is localhost-only by Host/Origin checks, not authenticated; do not expose the port
   to an untrusted network.
