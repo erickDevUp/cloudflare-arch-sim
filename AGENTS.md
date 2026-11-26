@@ -13,7 +13,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `src/app.js` | Simulation loop, rendering, chaos, state channel client, `window.SIM_API` host, and `window.__SIM__` |
 | `src/agent-api.js` | Versioned browser API, pure validation/result helpers, provenance, and structured errors |
 | `src/headless-service.js` | Deterministic in-memory simulator host using the existing API, engine, catalog, scenario, and pricing modules |
-| `mcp-server.mjs` | Local MCP stdio adapter, explicit tool schemas, resources, prompt, and bin entry |
+| `packages/mcp/mcp-server.mjs` | Local MCP stdio adapter, explicit tool schemas, resources, prompt, and bin entry |
 | `src/engine.js` | Pure queue capacity, forwarding, backlog, and retention helpers |
 | `src/state-core.mjs` | Pure identity, persistence-status, and runtime snapshot helpers shared by UI, API, and headless hosts; build generates the Node 18 CommonJS companion `src/state-core.cjs` |
 | `src/catalog.js` | Node types, defaults, editable ranges, verified notes, and source links |
@@ -24,7 +24,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `cli.mjs` | npm `bin` wrapper and agent-facing flag validation |
 | `build.mjs` | Inlines CSS, JavaScript, and icons into one offline HTML file |
 | `dist/cloudflare-arch-sim.html` | Generated package payload; never hand-edit |
-| `tests/` | Node built-in tests for engine, pricing, scenario, server, CLI, browser/headless APIs, and MCP stdio |
+| `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, scenario, server, CLI, browser/headless APIs, and MCP stdio |
 | `docs/agent-operator.md` | Stable `window.SIM_API` v1 contract plus legacy HTTP/SSE operator behavior |
 | `docs/mcp.md` | MCP stdio configuration, tool/resource/prompt contract, examples, and v1 boundary |
 | `docs/images/` | README screenshots |
@@ -35,7 +35,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - `node cli.mjs --path` prints the bundled HTML path; `node cli.mjs --help` prints CLI usage.
 - `node serve.mjs` runs the same server directly; tests use its exported `startServer`.
 - `window.SIM_API` exposes the version 1 capabilities/validate/load/set/plan/billing/run/state/export/save contract with structured results and exact simulated-time advancement.
-- `npm run mcp` starts `mcp-server.mjs` over local stdio; `cloudflare-arch-sim-mcp` is the package bin entry.
+- `npm run mcp` starts `packages/mcp/mcp-server.mjs` over local stdio; `cloudflare-arch-sim-mcp` is the MCP workspace bin, not a root-package bin.
 - `window.__SIM__` preserves the legacy `load`, `export`, and `getState` shapes for browser automation.
 - `npm run build` regenerates `dist/cloudflare-arch-sim.html`.
 
@@ -49,7 +49,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - `src/pricing.js` is the only pricing source of truth. Keep catalog price fields aligned with its dimensions.
 - `scenario.json` is the default scenario source of truth. Preserve unknown fields, params, and node types during edits.
 - `window.SIM_API` v1 fails closed on unsupported schema versions/nodes/params, returns structured results, uses exact simulated time for assessments, and never duplicates billing or engine math.
-- MCP v1 is an adapter over the same semantics. It is local stdio only, reserves stdout for protocol frames, sends diagnostics to stderr, and has no filesystem save, merge, network listener, or remote transport.
+- MCP v1 is an adapter over the same semantics. Its workspace owns the MCP SDK and schema dependencies; the root package does not. It is local stdio only, reserves stdout for protocol frames, sends diagnostics to stderr, and has no filesystem save, merge, network listener, or remote transport.
 - Scenario persistence is revisioned and atomic: v1 `save()` returns revision/hash only after 2xx, uses `If-Match`, and clears dirty only when the saved snapshot is still current.
 - `dist/` is generated. Commit it with source changes; CI validates freshness against a clean temporary build.
 - UI language is English. UI localization/copy work belongs to Phase 2 after P0.
@@ -65,17 +65,18 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `npm test` | Run all Node tests |
 | `npm run test:coverage` | Run tests with Node experimental coverage |
 | `npm run check:dist` | Compare tracked dist with a fresh temporary build |
-| `npm run pack:check` | Inspect the npm package with a dry run |
+| `npm run pack:check` | Inspect the root npm package with a dry run |
+| `npm run pack:check --workspace cloudflare-arch-sim-mcp` | Inspect the MCP workspace package with a dry run |
 
 ## Verification loop
 
 1. Confirm the current branch is not `main` and inspect `git status`.
-2. Run the focused tests for the changed area; for MCP work include `tests/headless-service.test.mjs` and `tests/mcp-server.test.mjs`.
+2. Run the focused tests for the changed area; for MCP work include `tests/headless-service.test.mjs` and `packages/mcp/test/*.test.mjs`.
 3. Run `npm test`.
 4. Run `npm run build`, review the generated diff, then run `npm run check:dist`.
 5. Run `npm run pack:check` and `npm run test:coverage`.
 6. Smoke-test `npm run dev -- --port 8788` with `curl` against `/` and `/scenario`, then stop it.
-7. For MCP changes, run `node mcp-server.mjs` and the packed bin entry; confirm stdout has no non-protocol output. The SDK client test is the main protocol proof.
+7. For MCP changes, run `node packages/mcp/mcp-server.mjs` and the packed MCP workspace bin; confirm stdout has no non-protocol output. The SDK client test is the main protocol proof.
 8. For UI changes, inspect the page in Orca's browser and check its console.
 9. Run `git diff --check` and review the final diff before committing.
 
@@ -119,9 +120,9 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 
 ### MCP
 
-1. Keep [mcp-server.mjs](mcp-server.mjs) as a thin stdio adapter over [src/headless-service.js](src/headless-service.js) and [src/agent-api.js](src/agent-api.js). Do not duplicate engine or billing logic.
+1. Keep [packages/mcp/mcp-server.mjs](packages/mcp/mcp-server.mjs) as a thin stdio adapter over [src/headless-service.js](src/headless-service.js) and [src/agent-api.js](src/agent-api.js). Do not duplicate engine or billing logic.
 2. Preserve explicit strict schemas, structured `isError` envelopes with paths, deterministic request IDs, stdout protocol purity, and the local-only no-save boundary.
-3. Extend `tests/headless-service.test.mjs` and `tests/mcp-server.test.mjs`; keep the SDK client integration test as protocol proof.
+3. Extend `tests/headless-service.test.mjs` and `packages/mcp/test/*.test.mjs`; keep the SDK client integration test as protocol proof.
 4. Run `npm test`, `npm run build`, `npm run check:dist`, `npm run pack:check`, and the direct/bin stdio smoke checks.
 
 ### UI

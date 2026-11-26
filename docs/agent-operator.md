@@ -266,7 +266,7 @@ The server pins allowed loopback `Host` values and rejects foreign or `null` ori
 - [agent-playbook.md](agent-playbook.md) — executable repository recipes.
 - [mcp.md](mcp.md) — local stdio tools, resources, prompt, configuration, and boundary.
 - [src/headless-service.js](../src/headless-service.js) — deterministic in-memory host.
-- [mcp-server.mjs](../mcp-server.mjs) — MCP stdio adapter.
+- [packages/mcp/mcp-server.mjs](../packages/mcp/mcp-server.mjs) — MCP stdio adapter.
 - [src/agent-api.js](../src/agent-api.js) — v1 validation, envelopes, snapshot, and factory.
 - [src/app.js](../src/app.js) — host wiring, exact clock, controls, persistence, and metrics.
 - [src/engine.js](../src/engine.js) — queue, retention, Durable Object, and exact-clock helpers.

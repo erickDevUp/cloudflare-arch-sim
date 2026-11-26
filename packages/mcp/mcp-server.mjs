@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import API from './src/agent-api.js';
-import CATALOG from './src/catalog.js';
-import ENGINE from './src/engine.js';
-import PRICING from './src/pricing.js';
-import SCENARIO from './src/scenario.js';
-import HEADLESS from './src/headless-service.js';
+import API from 'cloudflare-arch-sim/src/agent-api.js';
+import CATALOG from 'cloudflare-arch-sim/src/catalog.js';
+import ENGINE from 'cloudflare-arch-sim/src/engine.js';
+import PRICING from 'cloudflare-arch-sim/src/pricing.js';
+import SCENARIO from 'cloudflare-arch-sim/src/scenario.js';
+import HEADLESS from 'cloudflare-arch-sim/src/headless-service.js';
 
+const require = createRequire(import.meta.url);
 const noArgs = z.object({}).strict();
 const scenarioInput = z.record(z.string(), z.unknown())
   .describe('Version 1 scenario object with nodes and edges arrays; unknown root fields are preserved.');
@@ -259,7 +261,7 @@ export function createMcpServer(options = {}) {
   const catalog = options.catalog || CATALOG;
   const pricing = options.pricing || PRICING;
   const defaultScenario = options.defaultScenario === undefined
-    ? JSON.parse(fs.readFileSync(new URL('./scenario.json', import.meta.url), 'utf8'))
+    ? JSON.parse(fs.readFileSync(require.resolve('cloudflare-arch-sim/scenario.json'), 'utf8'))
     : options.defaultScenario;
   const service = options.service || HEADLESS.createHeadlessSimulator({
     scenario: SCENARIO,

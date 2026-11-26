@@ -64,7 +64,7 @@ Return changed files or design findings, commands/results, request IDs/errors, r
 - `../../AGENTS.md`
 - `../../docs/agent-operator.md`
 - `../../docs/mcp.md`
-- `../../mcp-server.mjs`
+- `../../packages/mcp/mcp-server.mjs`
 - `../../src/headless-service.js`
 - `../../docs/agent-playbook.md`
 - `../../src/agent-api.js`

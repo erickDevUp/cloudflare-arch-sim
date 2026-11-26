@@ -1,0 +1,26 @@
+{
+  "name": "cloudflare-arch-sim-mcp",
+  "version": "1.0.0",
+  "description": "Local stdio MCP adapter for the Cloudflare architecture simulator.",
+  "bin": {
+    "cloudflare-arch-sim-mcp": "mcp-server.mjs"
+  },
+  "files": [
+    "mcp-server.mjs"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node mcp-server.mjs",
+    "test": "node --test",
+    "test:coverage": "node --experimental-test-coverage --test",
+    "pack:check": "npm pack --dry-run --json"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "cloudflare-arch-sim": "1.0.0",
+    "zod": "^4.6.7"
+  }
+}
