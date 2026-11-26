@@ -62,6 +62,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `npm run dev -- --port 8788` | Start the local page and state channel |
 | `npm run mcp` | Start the local MCP stdio server |
 | `npm run build` | Regenerate the tracked offline bundle |
+| `npm run typecheck` | Check shared state/API/MCP JavaScript with TypeScript |
+| `npm run lint` | Check authored JavaScript for undefined, unused, and unreachable code |
 | `npm test` | Run all Node tests |
 | `npm run test:coverage` | Run tests with Node experimental coverage |
 | `npm run check:dist` | Compare tracked dist with a fresh temporary build |
@@ -72,7 +74,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 
 1. Confirm the current branch is not `main` and inspect `git status`.
 2. Run the focused tests for the changed area; for MCP work include `tests/headless-service.test.mjs` and `packages/mcp/test/*.test.mjs`.
-3. Run `npm test`.
+3. Run `npm run typecheck`, `npm run lint`, and `npm test`.
 4. Run `npm run build`, review the generated diff, then run `npm run check:dist`.
 5. Run `npm run pack:check` and `npm run test:coverage`.
 6. Smoke-test `npm run dev -- --port 8788` with `curl` against `/` and `/scenario`, then stop it.

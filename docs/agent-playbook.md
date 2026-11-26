@@ -7,6 +7,8 @@ Use this playbook to make a focused change and prove it works. Start with [AGENT
 ```sh
 git status --short --branch
 npm ci
+npm run typecheck
+npm run lint
 npm test
 npm run build
 npm run check:dist
@@ -26,6 +28,8 @@ Keep the branch clean except for intended changes. `check:dist` builds in a temp
 | `node cli.mjs --help` | CLI flags and validation rules |
 | `node cli.mjs --path` | Absolute path to the bundled HTML |
 | `npm test -- tests/engine.test.mjs` | One focused test file |
+| `npm run typecheck` | Check shared state/API/MCP JavaScript with TypeScript |
+| `npm run lint` | Check authored JavaScript for undefined, unused, and unreachable code |
 | `npm run build` | Regenerate the offline bundle |
 | `npm run check:dist` | Prove tracked dist matches source |
 | `npm run pack:check` | Inspect package contents without publishing |
@@ -156,6 +160,8 @@ orca tab close --page <browserPageId> --json
 
 ```sh
 git diff --check
+npm run typecheck
+npm run lint
 npm test
 npm run check:dist
 npm run pack:check

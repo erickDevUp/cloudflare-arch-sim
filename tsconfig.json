@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "globals.d.ts",
+    "src/state-core.mjs",
+    "src/agent-api.js",
+    "src/headless-service.js",
+    "src/engine.js",
+    "src/catalog.js",
+    "src/pricing.js",
+    "src/scenario.js",
+    "packages/mcp/mcp-server.mjs"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

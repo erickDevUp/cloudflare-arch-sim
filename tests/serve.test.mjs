@@ -423,7 +423,7 @@ test('POST rejects an opaque id reused by a different type with an accurate erro
 
 test('Host and Origin must be the loopback pair (DNS rebinding refused)', async () => {
   const dir = makeDir();
-  const { server, base } = await start(dir);
+  const { server } = await start(dir);
   const port = server.address().port;
   try {
     const evil = 'evil.example:' + port;

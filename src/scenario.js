@@ -50,7 +50,12 @@
       return { scenario: null, error: 'Scenario: expected a JSON object', dropped: 1 };
     }
 
-    const scenario = { version: VERSION, name: 'Untitled scenario', nodes: [], edges: [] };
+    const scenario = {
+      version: VERSION,
+      name: 'Untitled scenario',
+      nodes: /** @type {any[]} */ ([]),
+      edges: /** @type {any[]} */ ([])
+    };
     // Unknown root fields are kept as-is so an edit never deletes them.
     Object.keys(raw).forEach(k => {
       if (ROOT_KEYS.indexOf(k) >= 0) return;
