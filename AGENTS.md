@@ -15,6 +15,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `src/headless-service.js` | Deterministic in-memory simulator host using the existing API, engine, catalog, scenario, and pricing modules |
 | `mcp-server.mjs` | Local MCP stdio adapter, explicit tool schemas, resources, prompt, and bin entry |
 | `src/engine.js` | Pure queue capacity, forwarding, backlog, and retention helpers |
+| `src/state-core.mjs` | Pure identity, persistence-status, and runtime snapshot helpers shared by UI, API, and headless hosts |
 | `src/catalog.js` | Node types, defaults, editable ranges, verified notes, and source links |
 | `src/pricing.js` | Source of truth for plans, prices, `asOf`, sources, and spend math |
 | `src/scenario.js` | Scenario validation, lossless merge, layout, and `#s=` encoding |

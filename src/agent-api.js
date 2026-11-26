@@ -1,9 +1,12 @@
 (function (root, factory) {
-  const api = factory();
+  const core = root && root.SIM_STATE_CORE || typeof globalThis !== 'undefined' && globalThis.SIM_STATE_CORE;
+  const api = factory(core);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.SIM_API_FACTORY = api;
-})(typeof window !== 'undefined' ? window : null, function () {
+})(typeof window !== 'undefined' ? window : null, function (CORE) {
   'use strict';
+
+  if (!CORE) throw new Error('SIM_API state core is missing');
 
   const VERSION = 1;
   const SCHEMA_VERSION = 1;
@@ -554,7 +557,7 @@
     const catalog = host.catalog;
     const pricing = host.pricing;
     const model = host.getModel();
-    const identity = host.getIdentity();
+    const identity = CORE.identityState(host.getIdentity());
     const provenanceNodes = Object.fromEntries(scenario.nodes.map(node => {
       const def = hasOwn(catalog.types, node.type) ? catalog.types[node.type] : {};
       return [node.id, {
@@ -765,22 +768,6 @@
     return { data: buildSnapshot(simulation, scenario, host) };
   }
 
-  function controlState(host) {
-    const state = host.getSimulation();
-    const identity = host.getIdentity();
-    return {
-      running: state.running,
-      speed: state.speed,
-      time: state.time,
-      runId: identity.runId == null ? null : identity.runId,
-      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-      scenarioHash: identity.scenarioHash || null,
-      dirty: !!identity.dirty,
-      saving: !!identity.saving,
-      saveError: identity.saveError || null
-    };
-  }
-
   function capabilities(host) {
     return clone({
       apiVersion: VERSION,
@@ -806,15 +793,15 @@
     }
     let seq = 0;
     const loadedData = (validated, saved) => {
-      const identity = host.getIdentity();
+      const identity = CORE.identityState(host.getIdentity());
       return {
         scenario: host.getScenario(),
         warnings: validated.warnings,
         unsupported: validated.unsupported,
-        scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-        scenarioHash: identity.scenarioHash || null,
-        runId: identity.runId == null ? null : identity.runId,
-        dirty: !!identity.dirty,
+        scenarioRevision: identity.scenarioRevision,
+        scenarioHash: identity.scenarioHash,
+        runId: identity.runId,
+        dirty: identity.dirty,
         save: saved
       };
     };
@@ -882,7 +869,7 @@
       reset() {
         return request(++seq, () => {
           host.reset();
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       run(options) {
@@ -890,13 +877,13 @@
           const validated = validateRunOptions(options);
           if (validated.error) return { error: validated.error };
           host.run(validated.seconds);
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       pause() {
         return request(++seq, () => {
           host.pause();
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       setSpeed(speed) {
@@ -904,7 +891,7 @@
           const validated = validateSpeed(speed);
           if (validated.error) return { error: validated.error };
           host.setSpeed(validated.speed);
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       start(options) {
@@ -918,7 +905,7 @@
             if (validated.error) return { error: validated.error };
           }
           host.start(speed);
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       getState() {

@@ -1,9 +1,12 @@
 (function (root, factory) {
-  const api = factory();
+  const core = root && root.SIM_STATE_CORE || typeof globalThis !== 'undefined' && globalThis.SIM_STATE_CORE;
+  const api = factory(core);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.SIM_HEADLESS = api;
-})(typeof window !== 'undefined' ? window : null, function () {
+})(typeof window !== 'undefined' ? window : null, function (CORE) {
   'use strict';
+
+  if (!CORE) throw new Error('Headless simulator state core is missing');
 
   const hasOwn = (value, key) => Object.hasOwn(value, key);
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -100,10 +103,7 @@
     }
 
     function markDirty() {
-      identity.dirty = true;
-      identity.scenarioRevision = null;
-      identity.scenarioHash = null;
-      identity.saveError = null;
+      CORE.markDirty(identity);
     }
 
     function sourceRate() {
@@ -113,37 +113,7 @@
     }
 
     function simulationSnapshot() {
-      const nodes = Object.fromEntries(knownNodes(currentScenario).map(node => {
-        const result = runtime.res[node.id] || {};
-        return [node.id, {
-          type: node.type,
-          lambda: result.lambda || 0,
-          util: result.util || 0,
-          err: result.err || 0,
-          lat: result.lat || 0,
-          cost: result.cost || 0,
-          out: result.out || 0,
-          capacity: result.capacity || 0,
-          backlog: runtime.backlog[node.id] || 0,
-          drops: runtime.drops[node.id] || 0,
-          billedRequests: result.billedRequests || 0,
-          doGbS: result.doGbS || 0,
-          objects: result.objects || 0,
-          perObjectRate: result.perObjectRate || 0,
-          objectLimit: result.objectLimit || 0,
-          overloaded: !!result.overloaded
-        }];
-      }));
-      return clone(Object.assign({}, runtime, {
-        nodes,
-        chaos: Object.keys(runtime.chaos).filter(key => runtime.chaos[key] > runtime.time),
-        scenarioRevision: identity.scenarioRevision,
-        scenarioHash: identity.scenarioHash,
-        runId: identity.runId,
-        dirty: identity.dirty,
-        saving: identity.saving,
-        saveError: identity.saveError
-      }));
+      return clone(CORE.simulationSnapshot(runtime, knownNodes(currentScenario), identity));
     }
 
     function installScenario(scenario, options) {

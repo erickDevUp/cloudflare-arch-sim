@@ -24,6 +24,7 @@ html = html.replace('<script src="catalog.js"></script>',
   () => `<script>\nwindow.ICONS = ${JSON.stringify(icons)};\n</script>\n<script>\n${read('catalog.js')}\n</script>`);
 html = html.replace('<script src="scenario.js"></script>', () => `<script>\n${read('scenario.js')}\n</script>`);
 html = html.replace('<script src="engine.js"></script>', () => `<script>\n${read('engine.js')}\n</script>`);
+html = html.replace('<script src="state-core.mjs"></script>', () => `<script>\n${read('state-core.mjs')}\n</script>`);
 html = html.replace('<script src="agent-api.js"></script>', () => `<script>\n${read('agent-api.js')}\n</script>`);
 
 const flag = process.argv.indexOf('--scenario');
