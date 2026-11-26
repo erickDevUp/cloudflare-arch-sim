@@ -61,7 +61,19 @@
     }));
   }
 
-  const api = { saveStatus, nextTab, fieldProvenance, connectTargets };
+  function trapFocus(active, shiftKey, focusable) {
+    if (!focusable.length) return null;
+    const index = focusable.indexOf(active);
+    if (index < 0) return shiftKey ? focusable[focusable.length - 1] : focusable[0];
+    const step = shiftKey ? -1 : 1;
+    return focusable[(index + step + focusable.length) % focusable.length];
+  }
+
+  function bannerError(errors) {
+    return errors && (errors.channel || errors.save || errors.copy) || null;
+  }
+
+  const api = { saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

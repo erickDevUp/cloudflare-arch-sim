@@ -268,7 +268,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
   .body{display:block;position:relative;height:var(--h)}
   .stage{height:100%}
   .app.mobile .palette,.app.mobile .right{position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;max-height:72%;
-    z-index:30;transform:translateY(105%);visibility:hidden;transition:transform .2s ease,visibility .2s ease;
+    z-index:30;transform:translateY(105%);visibility:hidden;transition:transform .2s ease;
     overflow:auto;border-top:1px solid #33334a;border-left:0;border-right:0;border-radius:14px 14px 0 0;padding:0;
     box-shadow:0 -18px 50px rgba(0,0,0,.5)}
   .app.mobile.palette-open .palette,.app.mobile.right-open .right{transform:none;visibility:visible}
@@ -461,97 +461,97 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 
   const DIMS = [
     {
-      id: 'workersRequests', label: 'Workers requests', unit: 1e6, usageUnit: 'requests/month',
+      id: 'workersRequests', label: 'Workers requests', unit: 1e6,
       price: 0.30, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6, usageUnit: 'CPU-ms/month',
+      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6,
       price: 0.02, paidIncluded: 3e7, freePerRequest: 10,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'd1Rows', label: 'D1 rows read', unit: 1e6, usageUnit: 'rows read/month',
+      id: 'd1Rows', label: 'D1 rows read', unit: 1e6,
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.d1
     },
     {
-      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6, usageUnit: 'requests/month',
+      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
       price: 0.15, paidIncluded: 1e6, freeDaily: 100000, roundUp: true,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6, usageUnit: 'GB-s/month',
+      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
       price: 12.5, paidIncluded: 4e5, freeDaily: 13000, roundUp: true,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6, usageUnit: 'rows read/month',
+      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6,
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6, usageUnit: 'rows written/month',
+      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6,
       price: 1, paidIncluded: 50e6, freeDaily: 100000,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1, usageUnit: 'GB-month',
+      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1,
       price: 0.20, paidIncluded: 5, freeMonthly: 5,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'kvReads', label: 'KV reads', unit: 1e6, usageUnit: 'reads/month',
+      id: 'kvReads', label: 'KV reads', unit: 1e6,
       price: 0.50, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'queueOps', label: 'Queues operations', unit: 1e6, usageUnit: 'operations/month',
+      id: 'queueOps', label: 'Queues operations', unit: 1e6,
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
       verified: true, source: SOURCES.queues
     },
     {
-      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6, usageUnit: 'Class A operations/month',
+      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6,
       price: 4.50, paidIncluded: 1e6, freeMonthly: 1e6,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6, usageUnit: 'Class B operations/month',
+      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6,
       price: 0.36, paidIncluded: 1e7, freeMonthly: 1e7,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1, usageUnit: 'GB-month',
+      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1,
       price: 0.015, paidIncluded: 10, freeMonthly: 10,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'imagesTransformed', label: 'Images transformations', unit: 1000, usageUnit: 'transformations/month',
+      id: 'imagesTransformed', label: 'Images transformations', unit: 1000,
       price: 0.50, paidIncluded: 5000, freeMonthly: 5000,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'imagesStored', label: 'Images stored', unit: 100000, usageUnit: 'images/month',
+      id: 'imagesStored', label: 'Images stored', unit: 100000,
       price: 5, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'imagesDelivered', label: 'Images delivered', unit: 100000, usageUnit: 'images/month',
+      id: 'imagesDelivered', label: 'Images delivered', unit: 100000,
       price: 1, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000, usageUnit: 'minutes stored/month',
+      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000,
       price: 5, paidIncluded: 0, freeMonthly: 0, roundUp: true,
       verified: true, source: SOURCES.stream
     },
     {
-      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000, usageUnit: 'minutes delivered/month',
+      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000,
       price: 1, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.stream
     },
     {
-      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000, usageUnit: 'Neurons/month',
+      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000,
       price: 0.011, paidIncluded: 10000 * HOURS_PER_MONTH / 24, freeDaily: 10000,
       verified: true, source: SOURCES.workersAi
     }
@@ -644,7 +644,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
     asOf: '2026-11-24', hoursPerMonth: HOURS_PER_MONTH, sources: SOURCES,
     plans: PLANS, dims: DIMS, monthlyCost, monthlyUsage, modelSpend
   };
-  /** @type {any} */ (root).PRICING = api;
+  root.PRICING = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
@@ -653,14 +653,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" />","globe":"<svg class=\"lucide lucide-globe\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /> <path d=\"M2 12h20\" />","shield":"<svg class=\"lucide lucide-shield\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" />","shield-check":"<svg class=\"lucide lucide-shield-check\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /> <path d=\"m9 12 2 2 4-4\" />","layers":"<svg class=\"lucide lucide-layers\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","zap":"<svg class=\"lucide lucide-zap\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","box":"<svg class=\"lucide lucide-box\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\" /> <path d=\"m3.3 7 8.7 5 8.7-5\" /> <path d=\"M12 22V12\" />","list-ordered":"<svg class=\"lucide lucide-list-ordered\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11 5h10\" /> <path d=\"M11 12h10\" /> <path d=\"M11 19h10\" /> <path d=\"M4 4h1v5\" /> <path d=\"M4 9h2\" /> <path d=\"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02\" />","database":"<svg class=\"lucide lucide-database\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" />","key-round":"<svg class=\"lucide lucide-key-round\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","archive":"<svg class=\"lucide lucide-archive\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /> <path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /> <path d=\"M10 12h4\" />","scan-search":"<svg class=\"lucide lucide-scan-search\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" /> <path d=\"m16 16-1.9-1.9\" />","route":"<svg class=\"lucide lucide-route\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M9 5h8.5a1 1 0 010 7h-11a1 1 0 000 7H15\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <circle cx=\"6\" cy=\"5\" r=\"3\" />","sparkles":"<svg class=\"lucide lucide-sparkles\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /> <path d=\"M20 2v4\" /> <path d=\"M22 4h-4\" /> <circle cx=\"4\" cy=\"20\" r=\"2\" />","plug":"<svg class=\"lucide lucide-plug\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"M12 22v-5\" /> <path d=\"M15 8V2\" /> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\" /> <path d=\"M9 8V2\" />","image":"<svg class=\"lucide lucide-image\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /> <circle cx=\"9\" cy=\"9\" r=\"2\" /> <path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","video":"<svg class=\"lucide lucide-video\" xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" > <path d=\"m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5\" /> <rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\" />"};
 </script>
 <script>
-(function (root, factory) {
-  const catalog = factory();
-  if (typeof module === 'object' && module.exports) module.exports = catalog;
-  if (root) root.CATALOG = catalog;
-})(typeof window !== 'undefined' ? window : null, function () {
-  'use strict';
-
-  const data = {
+window.CATALOG = {
   groups: [
     { id: 'edge', label: 'Traffic & Edge', color: '#7c5cff' },
     { id: 'compute', label: 'Compute', color: '#00c2a8' },
@@ -841,9 +834,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       doc: 'https://tiendanube.github.io/api-documentation/intro'
     }
   }
-  };
-  return data;
-});
+};
 
 </script>
 <script>
@@ -899,12 +890,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       return { scenario: null, error: 'Scenario: expected a JSON object', dropped: 1 };
     }
 
-    const scenario = {
-      version: VERSION,
-      name: 'Untitled scenario',
-      nodes: /** @type {any[]} */ ([]),
-      edges: /** @type {any[]} */ ([])
-    };
+    const scenario = { version: VERSION, name: 'Untitled scenario', nodes: [], edges: [] };
     // Unknown root fields are kept as-is so an edit never deletes them.
     Object.keys(raw).forEach(k => {
       if (ROOT_KEYS.indexOf(k) >= 0) return;
@@ -1321,27 +1307,6 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     return { backlog: keptWait * cap, drops: expiredMsgs / dt };
   }
 
-  function advanceClock(runtime, seconds, step, settle) {
-    let remaining = seconds;
-    while (remaining > 0) {
-      const deadlines = Object.values(runtime.chaos || {})
-        .filter(value => typeof value === 'number' && isFinite(value) && value > runtime.time);
-      const until = deadlines.length ? Math.min.apply(null, deadlines) - runtime.time : Infinity;
-      const dt = Math.min(remaining, until);
-      const sample = step(dt, runtime.time) || {};
-      runtime.time += dt;
-      runtime.spent = (runtime.spent || 0) + (+sample.rate || 0) * dt;
-      runtime.requests = (runtime.requests || 0) + (+sample.requests || 0) * dt;
-      runtime.modelSpent = (runtime.modelSpent || 0) + (+sample.modelRate || 0) * dt;
-      Object.keys(runtime.chaos || {}).forEach(key => {
-        if (runtime.chaos[key] <= runtime.time) delete runtime.chaos[key];
-      });
-      remaining -= dt;
-      if (settle) settle(runtime.time);
-    }
-    return runtime;
-  }
-
   function erlangC(a, c) {
     const servers = Math.max(1, Math.round(c));
     if (servers <= 1) return Math.min(1, a);
@@ -1568,1147 +1533,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     return u;
   }
 
-  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, advanceClock, erlangC,
+  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, erlangC,
     durableObject, model429, compute, usage };
-});
-
-</script>
-<script>
-(function (root, factory) {
-  const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.SIM_STATE_CORE = api;
-})(typeof window !== 'undefined' ? window : null, function () {
-  'use strict';
-
-  /**
-   * @typedef {Object} StateIdentity
-   * @property {number | null} [scenarioRevision]
-   * @property {string | null} [scenarioHash]
-   * @property {string | null} [runId]
-   * @property {boolean} [dirty]
-   * @property {boolean} [saving]
-   * @property {{ code: string, message: string, details?: unknown } | null} [saveError]
-   */
-
-  /**
-   * @typedef {Object} RuntimeState
-   * @property {number} time
-   * @property {number} spent
-   * @property {number} rate
-   * @property {number} pathLat
-   * @property {boolean} running
-   * @property {number} speed
-   * @property {string} plan
-   * @property {number} baseFee
-   * @property {number} budget
-   * @property {number} requests
-   * @property {number} [requestCount]
-   * @property {number} modelSpent
-   * @property {number} cpuRate
-   * @property {Record<string, number>} backlog
-   * @property {Record<string, number>} drops
-   * @property {Record<string, Record<string, number | boolean>>} res
-   * @property {Record<string, number>} chaos
-   * @property {Record<string, unknown>} usage
-   * @property {Record<string, unknown>} monthly
-   * @property {Record<string, unknown>} modelSpend
-   */
-
-  /**
-   * @typedef {Object} ScenarioNode
-   * @property {string} id
-   * @property {string} type
-   */
-
-  /**
-   * @param {StateIdentity} identity
-   * @returns {StateIdentity}
-   */
-  function identityState(identity) {
-    return {
-      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-      scenarioHash: identity.scenarioHash || null,
-      runId: identity.runId == null ? null : identity.runId,
-      dirty: !!identity.dirty,
-      saving: !!identity.saving,
-      saveError: identity.saveError || null
-    };
-  }
-
-  /**
-   * @param {StateIdentity} state
-   */
-  function markDirty(state) {
-    state.dirty = true;
-    state.scenarioRevision = null;
-    state.scenarioHash = null;
-    state.saveError = null;
-  }
-
-  /**
-   * @param {StateIdentity} state
-   * @param {{ code: string, message: string, details?: unknown }} error
-   */
-  function saveFailure(state, error) {
-    state.dirty = true;
-    state.saveError = error;
-    return { error };
-  }
-
-  /**
-   * @param {{ revision?: unknown, hash?: unknown, etag?: unknown } | null} storage
-   */
-  function parseStoredIdentity(storage) {
-    const revision = storage && Number(storage.revision);
-    const hash = storage && typeof storage.hash === 'string' ? storage.hash : null;
-    return {
-      revision: Number.isInteger(revision) ? revision : null,
-      hash,
-      etag: storage && storage.etag || (hash ? '"' + hash + '"' : null)
-    };
-  }
-
-  /**
-   * @param {unknown} left
-   * @param {unknown} right
-   */
-  function sameScenario(left, right) {
-    return JSON.stringify(left) === JSON.stringify(right);
-  }
-
-  /**
-   * @param {RuntimeState} runtime
-   * @param {ScenarioNode[]} nodes
-   * @param {StateIdentity} identity
-   */
-  function simulationSnapshot(runtime, nodes, identity) {
-    const metrics = Object.create(null);
-    nodes.forEach(node => {
-      const result = runtime.res[node.id] || {};
-      metrics[node.id] = {
-        type: node.type,
-        lambda: result.lambda || 0,
-        util: result.util || 0,
-        err: result.err || 0,
-        lat: result.lat || 0,
-        cost: result.cost || 0,
-        out: result.out || 0,
-        capacity: result.capacity || 0,
-        backlog: runtime.backlog[node.id] || 0,
-        drops: runtime.drops[node.id] || 0,
-        billedRequests: result.billedRequests || 0,
-        doGbS: result.doGbS || 0,
-        objects: result.objects || 0,
-        perObjectRate: result.perObjectRate || 0,
-        objectLimit: result.objectLimit || 0,
-        overloaded: !!result.overloaded
-      };
-    });
-    return {
-      time: runtime.time,
-      spent: runtime.spent,
-      rate: runtime.rate,
-      pathLat: runtime.pathLat,
-      running: runtime.running,
-      speed: runtime.speed,
-      plan: runtime.plan,
-      baseFee: runtime.baseFee,
-      budget: runtime.budget,
-      requests: runtime.requests,
-      requestCount: runtime.requestCount == null ? runtime.requests : runtime.requestCount,
-      modelSpent: runtime.modelSpent,
-      cpuRate: runtime.cpuRate,
-      ...identityState(identity),
-      chaos: Object.keys(runtime.chaos).filter(key => runtime.chaos[key] > runtime.time),
-      usage: runtime.usage,
-      monthly: runtime.monthly,
-      modelSpend: runtime.modelSpend,
-      nodes: metrics
-    };
-  }
-
-  /**
-   * @param {Pick<RuntimeState, 'running' | 'speed' | 'time'>} simulation
-   * @param {StateIdentity} identity
-   */
-  function controlState(simulation, identity) {
-    const stored = identityState(identity);
-    return {
-      running: simulation.running,
-      speed: simulation.speed,
-      time: simulation.time,
-      runId: stored.runId,
-      scenarioRevision: stored.scenarioRevision,
-      scenarioHash: stored.scenarioHash,
-      dirty: stored.dirty,
-      saving: stored.saving,
-      saveError: stored.saveError
-    };
-  }
-
-  return { identityState, markDirty, saveFailure, parseStoredIdentity, sameScenario, simulationSnapshot, controlState };
-});
-
-</script>
-<script>
-(function (root, factory) {
-  const core = typeof module === 'object' && module.exports ? require('./state-core.cjs') : root && root.SIM_STATE_CORE;
-  const api = factory(core);
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.SIM_API_FACTORY = api;
-})(typeof window !== 'undefined' ? window : null, function (CORE) {
-  'use strict';
-
-  if (!CORE) throw new Error('SIM_API state core is missing');
-
-  const VERSION = 1;
-  const SCHEMA_VERSION = 1;
-  const MODEL_VERSION = 'rate-v1';
-  const LIMITS = Object.freeze({
-    maxSpeed: 7200,
-    maxRunSeconds: 31536000,
-    maxScenarioBytes: 1048576,
-    maxHashChars: 8000
-  });
-  const PLANS = Object.freeze(['free', 'paid', 'custom']);
-  const BILLING_LIMITS = Object.freeze({ baseFee: 0, budget: 1 });
-  const ERROR_CODES = Object.freeze({
-    INVALID_SCENARIO: 'INVALID_SCENARIO',
-    UNSUPPORTED_SCHEMA_VERSION: 'UNSUPPORTED_SCHEMA_VERSION',
-    UNSUPPORTED_NODE_TYPE: 'UNSUPPORTED_NODE_TYPE',
-    UNSUPPORTED_PARAMETER: 'UNSUPPORTED_PARAMETER',
-    PARAMETER_OUT_OF_RANGE: 'PARAMETER_OUT_OF_RANGE',
-    UNKNOWN_NODE: 'UNKNOWN_NODE',
-    INVALID_PARAMS: 'INVALID_PARAMS',
-    INVALID_OPTIONS: 'INVALID_OPTIONS',
-    INVALID_STATE: 'INVALID_STATE',
-    SAVE_FAILED: 'SAVE_FAILED',
-    CHANNEL_UNAVAILABLE: 'CHANNEL_UNAVAILABLE',
-    STORAGE_CONFLICT: 'STORAGE_CONFLICT',
-    INTERNAL_ERROR: 'INTERNAL_ERROR'
-  });
-  const LIMITATIONS = Object.freeze([
-    'Rate model only; not a load test or Cloudflare emulator.',
-    'Retries, variable batches, distributed coordination, storage/egress, and real provider capacity are not modeled.',
-    'Cycles and their dependent nodes receive zero traffic in the topological pass.',
-    'Durable Object arrivals are evenly sharded and active duration is capped per object.',
-    'Chaos events are limited to the predefined catalog scenarios.',
-    'HTTP v1 and CLI JSON interfaces are not provided.'
-  ]);
-  const hasOwn = (value, key) => Object.hasOwn(value, key);
-  const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
-  const finite = value => typeof value === 'number' && Number.isFinite(value);
-  const unsafeName = value => typeof value === 'string' && (value === '__proto__' || value in Object.prototype);
-  const clone = value => JSON.parse(JSON.stringify(value));
-
-  function success(requestId, data) {
-    return { ok: true, data, requestId };
-  }
-
-  function failure(requestId, code, message, details) {
-    const error = { code, message };
-    if (details !== undefined) error.details = details;
-    return { ok: false, error, requestId };
-  }
-
-  function finish(requestId, result) {
-    if (result && result.error) return failure(requestId, result.error.code, result.error.message, result.error.details);
-    return success(requestId, result.data);
-  }
-
-  function internalFailure(requestId, err) {
-    return failure(requestId, ERROR_CODES.INTERNAL_ERROR, 'SIM_API request failed', {
-      message: String((err && err.message) || err).split('\n')[0]
-    });
-  }
-
-  function request(seq, run) {
-    const requestId = 'sim-v1-' + String(seq).padStart(6, '0');
-    try {
-      const result = run();
-      if (result && typeof result.then === 'function') {
-        return result.then(value => finish(requestId, value), err => internalFailure(requestId, err));
-      }
-      return finish(requestId, result);
-    } catch (err) {
-      return internalFailure(requestId, err);
-    }
-  }
-
-  function effectiveType(node) {
-    if (node && node.type === 'workers_ai' && isObject(node.p) &&
-        (hasOwn(node.p, 'inPrice') || hasOwn(node.p, 'outPrice'))) return 'external_model';
-    return node && node.type;
-  }
-
-  function inspectParams(raw, catalog) {
-    const unsupported = [];
-    const invalid = [];
-    const outOfRange = [];
-    (raw.nodes || []).forEach((node, index) => {
-      if (!isObject(node) || !isObject(node.p)) return;
-      const type = effectiveType(node);
-      const def = hasOwn(catalog.types, type) ? catalog.types[type] : null;
-      if (!def) return;
-      const nodeId = typeof node.id === 'string' && node.id ? node.id : 'nodes[' + index + ']';
-      Object.keys(node.p).forEach(param => {
-        const value = node.p[param];
-        if (!hasOwn(def.p || {}, param)) {
-          unsupported.push({ nodeId, param });
-          return;
-        }
-        if (value === null && def.p[param] === null) return;
-        if (catalog.enums[param]) {
-          if (!catalog.enums[param].includes(value)) invalid.push({ nodeId, param, reason: 'not an allowed value' });
-          return;
-        }
-        if (!finite(value)) {
-          invalid.push({ nodeId, param, reason: 'expected a finite number' });
-          return;
-        }
-        const range = catalog.ranges[param];
-        if (range && (value < range[0] || value > range[1])) {
-          outOfRange.push({ nodeId, param, min: range[0], max: range[1] });
-        }
-      });
-    });
-    return { unsupported, invalid, outOfRange };
-  }
-
-  function validateScenario(raw, host, options) {
-    const strict = !options || options.strict !== false;
-    if (!isObject(raw)) {
-      return { error: { code: ERROR_CODES.INVALID_SCENARIO, message: 'Scenario must be an object' } };
-    }
-    let bytes;
-    try {
-      bytes = new TextEncoder().encode(JSON.stringify(raw)).length;
-    } catch (err) {
-      return { error: { code: ERROR_CODES.INVALID_SCENARIO, message: 'Scenario must be JSON-serializable' } };
-    }
-    if (bytes > LIMITS.maxScenarioBytes) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_SCENARIO,
-          message: 'Scenario exceeds the size limit',
-          details: { maxBytes: LIMITS.maxScenarioBytes, receivedBytes: bytes }
-        }
-      };
-    }
-    const warnings = [];
-    if (raw.version !== undefined && raw.version !== SCHEMA_VERSION) {
-      if (strict) {
-        return {
-          error: {
-            code: ERROR_CODES.UNSUPPORTED_SCHEMA_VERSION,
-            message: 'Unsupported scenario schema version',
-            details: { expected: SCHEMA_VERSION, received: raw.version }
-          }
-        };
-      }
-      warnings.push('Unsupported schema version normalized to ' + SCHEMA_VERSION);
-    }
-    if (!Array.isArray(raw.nodes)) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_SCENARIO,
-          message: 'Scenario nodes must be an array',
-          details: { field: 'nodes' }
-        }
-      };
-    }
-    const params = inspectParams(raw, host.catalog);
-    if (params.unsupported.length && strict) {
-      return {
-        error: {
-          code: ERROR_CODES.UNSUPPORTED_PARAMETER,
-          message: 'Scenario contains unsupported node params',
-          details: { params: params.unsupported }
-        }
-      };
-    }
-    if (params.invalid.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Scenario contains invalid node params',
-          details: { params: params.invalid }
-        }
-      };
-    }
-    if (params.outOfRange.length) {
-      return {
-        error: {
-          code: ERROR_CODES.PARAMETER_OUT_OF_RANGE,
-          message: 'Scenario contains out-of-range node params',
-          details: { params: params.outOfRange }
-        }
-      };
-    }
-    const validated = host.scenario.validate(raw, host.catalog);
-    if (!validated.scenario || validated.dropped > 0) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_SCENARIO,
-          message: validated.error || 'Scenario validation failed',
-          details: { dropped: validated.dropped || 0 }
-        }
-      };
-    }
-    const scenario = clone(validated.scenario);
-    const unsafeIds = scenario.nodes.filter(node => unsafeName(node.id)).map(node => node.id);
-    if (unsafeIds.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_SCENARIO,
-          message: 'Scenario contains unsafe node ids',
-          details: { nodeIds: unsafeIds }
-        }
-      };
-    }
-    const unsupportedNodes = scenario.nodes.filter(node => !hasOwn(host.catalog.types, node.type));
-    if (unsupportedNodes.length && strict) {
-      return {
-        error: {
-          code: ERROR_CODES.UNSUPPORTED_NODE_TYPE,
-          message: 'Scenario contains unsupported node types',
-          details: { nodes: unsupportedNodes.map(node => ({ id: node.id || null, type: node.type })) }
-        }
-      };
-    }
-    if (validated.error) warnings.push(validated.error);
-    const unsupported = [
-      ...unsupportedNodes.map(node => ({ kind: 'node_type', nodeId: node.id || null, type: node.type })),
-      ...params.unsupported.map(item => Object.assign({ kind: 'parameter' }, item))
-    ];
-    if (unsupported.length) warnings.push('Unsupported content preserved in non-strict mode');
-    return { scenario, warnings, unsupported };
-  }
-
-  function validateParamPatch(nodeId, patch, scenario, catalog) {
-    if (typeof nodeId !== 'string' || !nodeId || unsafeName(nodeId)) {
-      return { error: { code: ERROR_CODES.UNKNOWN_NODE, message: 'Node id must be a safe non-empty string' } };
-    }
-    const node = (scenario.nodes || []).find(item => item.id === nodeId);
-    if (!node || !hasOwn(catalog.types, node.type)) {
-      return {
-        error: {
-          code: ERROR_CODES.UNKNOWN_NODE,
-          message: 'Unknown node',
-          details: { nodeId }
-        }
-      };
-    }
-    if (!isObject(patch) || !Object.keys(patch).length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Params patch must be a non-empty object',
-          details: { nodeId }
-        }
-      };
-    }
-    const def = catalog.types[node.type];
-    const allowed = def.p || {};
-    const invalid = [];
-    const outOfRange = [];
-    const unsupported = [];
-    const safe = {};
-    Object.keys(patch).forEach(key => {
-      const value = patch[key];
-      if (!hasOwn(allowed, key)) {
-        unsupported.push(key);
-        return;
-      }
-      if (value === null && allowed[key] === null) {
-        safe[key] = null;
-        return;
-      }
-      if (catalog.enums[key]) {
-        if (!catalog.enums[key].includes(value)) invalid.push({ param: key, reason: 'not an allowed value' });
-        else safe[key] = value;
-        return;
-      }
-      if (!finite(value)) {
-        invalid.push({ param: key, reason: 'expected a finite number' });
-        return;
-      }
-      const range = catalog.ranges[key];
-      if (range && (value < range[0] || value > range[1])) {
-        outOfRange.push({ param: key, min: range[0], max: range[1] });
-        return;
-      }
-      safe[key] = value;
-    });
-    if (unsupported.length) {
-      return {
-        error: {
-          code: ERROR_CODES.UNSUPPORTED_PARAMETER,
-          message: 'Unsupported node params',
-          details: { nodeId, params: unsupported }
-        }
-      };
-    }
-    if (invalid.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Invalid node params',
-          details: { nodeId, params: invalid }
-        }
-      };
-    }
-    if (outOfRange.length) {
-      return {
-        error: {
-          code: ERROR_CODES.PARAMETER_OUT_OF_RANGE,
-          message: 'Node params are outside catalog ranges',
-          details: { nodeId, params: outOfRange }
-        }
-      };
-    }
-    return { patch: safe };
-  }
-
-  function validateBooleanOptions(options, allowed) {
-    if (options === undefined) return { options: {} };
-    if (!isObject(options)) {
-      return { error: { code: ERROR_CODES.INVALID_OPTIONS, message: 'Options must be an object' } };
-    }
-    const unknown = Object.keys(options).filter(key => !allowed.includes(key));
-    if (unknown.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_OPTIONS,
-          message: 'Unsupported options',
-          details: { options: unknown }
-        }
-      };
-    }
-    const invalid = allowed.filter(key => options[key] !== undefined && typeof options[key] !== 'boolean');
-    if (invalid.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_OPTIONS,
-          message: 'Boolean options required',
-          details: { options: invalid }
-        }
-      };
-    }
-    return { options: Object.fromEntries(allowed.map(key => [key, options[key]])) };
-  }
-
-  function validateSpeed(speed) {
-    if (!Number.isInteger(speed) || speed < 1 || speed > LIMITS.maxSpeed) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Speed must be an integer from 1 through ' + LIMITS.maxSpeed,
-          details: { speed }
-        }
-      };
-    }
-    return { speed };
-  }
-
-  function validatePlan(plan) {
-    if (!PLANS.includes(plan)) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Plan must be free, paid, or custom',
-          details: { plan, allowedPlans: PLANS.slice() }
-        }
-      };
-    }
-    return { plan };
-  }
-
-  function validateBillingPatch(patch) {
-    if (!isObject(patch) || !Object.keys(patch).length) {
-      return { error: { code: ERROR_CODES.INVALID_PARAMS, message: 'Billing inputs patch must be a non-empty object' } };
-    }
-    const unsupported = Object.keys(patch).filter(key => !hasOwn(BILLING_LIMITS, key));
-    if (unsupported.length) {
-      return {
-        error: {
-          code: ERROR_CODES.UNSUPPORTED_PARAMETER,
-          message: 'Unsupported billing inputs',
-          details: { params: unsupported }
-        }
-      };
-    }
-    const invalid = [];
-    const outOfRange = [];
-    const safe = {};
-    Object.keys(patch).forEach(key => {
-      const value = patch[key];
-      if (!finite(value)) {
-        invalid.push({ param: key, reason: 'expected a finite number' });
-      } else if (value < BILLING_LIMITS[key]) {
-        outOfRange.push({ param: key, min: BILLING_LIMITS[key] });
-      } else {
-        safe[key] = value;
-      }
-    });
-    if (invalid.length) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_PARAMS,
-          message: 'Invalid billing inputs',
-          details: { params: invalid }
-        }
-      };
-    }
-    if (outOfRange.length) {
-      return {
-        error: {
-          code: ERROR_CODES.PARAMETER_OUT_OF_RANGE,
-          message: 'Billing inputs are below their minimum values',
-          details: { params: outOfRange }
-        }
-      };
-    }
-    return { patch: safe };
-  }
-
-  function validateRunOptions(options) {
-    if (!isObject(options) || Object.keys(options).some(key => key !== 'seconds')) {
-      return { error: { code: ERROR_CODES.INVALID_OPTIONS, message: 'Run requires a seconds option' } };
-    }
-    if (!finite(options.seconds) || options.seconds <= 0 || options.seconds > LIMITS.maxRunSeconds) {
-      return {
-        error: {
-          code: ERROR_CODES.INVALID_OPTIONS,
-          message: 'Seconds must be finite and greater than zero',
-          details: { min: 0, max: LIMITS.maxRunSeconds, seconds: options.seconds }
-        }
-      };
-    }
-    return { seconds: options.seconds };
-  }
-
-  function cycleNodes(scenario) {
-    const nodes = new Map(scenario.nodes.map(node => [node.id, node]));
-    const indegree = new Map(scenario.nodes.map(node => [node.id, 0]));
-    const outgoing = new Map(scenario.nodes.map(node => [node.id, []]));
-    (scenario.edges || []).forEach(edge => {
-      if (!nodes.has(edge.from) || !nodes.has(edge.to)) return;
-      indegree.set(edge.to, indegree.get(edge.to) + 1);
-      outgoing.get(edge.from).push(edge.to);
-    });
-    const queue = scenario.nodes.filter(node => indegree.get(node.id) === 0).map(node => node.id);
-    const visited = new Set(queue);
-    while (queue.length) {
-      const id = queue.shift();
-      outgoing.get(id).forEach(to => {
-        indegree.set(to, indegree.get(to) - 1);
-        if (indegree.get(to) === 0) {
-          visited.add(to);
-          queue.push(to);
-        }
-      });
-    }
-    return scenario.nodes.filter(node => !visited.has(node.id)).map(node => node.id);
-  }
-
-  function unsupportedContent(scenario, catalog) {
-    const unsupported = [];
-    scenario.nodes.forEach(node => {
-      const def = hasOwn(catalog.types, node.type) ? catalog.types[node.type] : null;
-      if (!def) {
-        unsupported.push({ kind: 'node_type', nodeId: node.id || null, type: node.type });
-        return;
-      }
-      Object.keys(node.p || {}).forEach(param => {
-        if (!hasOwn(def.p || {}, param)) unsupported.push({ kind: 'parameter', nodeId: node.id, param });
-      });
-    });
-    return unsupported;
-  }
-
-  function stateWarnings(scenario, simulation, catalog) {
-    const warnings = [];
-    const unsupported = unsupportedContent(scenario, catalog);
-    if (unsupported.length) {
-      warnings.push({
-        code: 'UNSUPPORTED_CONTENT',
-        message: 'Unsupported content is excluded from simulation',
-        details: { unsupported }
-      });
-    }
-    const cyclic = cycleNodes(scenario);
-    if (cyclic.length) {
-      warnings.push({
-        code: 'CYCLE_DETECTED',
-        message: 'Cycle-dependent nodes receive zero traffic in the topological model',
-        details: { nodeIds: cyclic }
-      });
-    }
-    ((simulation.monthly && simulation.monthly.unverified) || []).forEach(id => {
-      warnings.push({ code: 'UNVERIFIED_PRICING', message: 'Pricing dimension is unverified', details: { dimension: id } });
-    });
-    if (scenario.nodes.some(node => node.type === 'external_model') && simulation.modelSpend && !simulation.modelSpend.set) {
-      warnings.push({
-        code: 'MODEL_SPEND_UNSET',
-        message: 'External model spend is unset until all token prices and counts are provided'
-      });
-    }
-    Object.entries(simulation.nodes || {}).forEach(([id, node]) => {
-      if (node.type === 'queues' && node.backlog > 0) {
-        warnings.push({ code: 'QUEUE_BACKLOG', message: 'Queue has a backlog', details: { nodeId: id, backlog: node.backlog } });
-      }
-      if (node.type === 'queues' && node.drops > 0) {
-        warnings.push({ code: 'QUEUE_EXPIRY', message: 'Queue is dropping expired messages', details: { nodeId: id, drops: node.drops } });
-      }
-      if (node.type === 'durable_objects' && node.overloaded) {
-        warnings.push({ code: 'DURABLE_OBJECT_OVERLOAD', message: 'Durable Object is overloaded', details: { nodeId: id } });
-      }
-    });
-    return warnings;
-  }
-
-  function nodeMetrics(node) {
-    const metrics = {
-      type: node.type,
-      lambda: node.lambda || 0,
-      out: node.out || 0,
-      util: node.util || 0,
-      err: node.err || 0,
-      lat: node.lat || 0,
-      cost: node.cost || 0,
-      units: {
-        lambda: 'requests/s', out: 'requests/s', util: 'fraction', err: 'fraction',
-        lat: 'seconds', cost: 'USD/s'
-      }
-    };
-    if (node.type === 'queues') {
-      metrics.capacity = node.capacity || 0;
-      metrics.backlog = node.backlog || 0;
-      metrics.drops = node.drops || 0;
-      metrics.units.capacity = 'requests/s';
-      metrics.units.backlog = 'messages';
-      metrics.units.drops = 'messages/s';
-    }
-    if (node.type === 'durable_objects') {
-      metrics.billedRequests = node.billedRequests || 0;
-      metrics.doGbS = node.doGbS || 0;
-      metrics.objects = node.objects || 0;
-      metrics.perObjectRate = node.perObjectRate || 0;
-      metrics.objectLimit = node.objectLimit || 0;
-      metrics.overloaded = !!node.overloaded;
-      metrics.units.billedRequests = 'requests/s';
-      metrics.units.doGbS = 'GB-s/month';
-      metrics.units.objects = 'count';
-      metrics.units.perObjectRate = 'requests/s';
-      metrics.units.objectLimit = 'requests/s';
-    }
-    return metrics;
-  }
-
-  function buildSnapshot(simulation, scenario, host) {
-    const catalog = host.catalog;
-    const pricing = host.pricing;
-    const model = host.getModel();
-    const identity = CORE.identityState(host.getIdentity());
-    const provenanceNodes = Object.fromEntries(scenario.nodes.map(node => {
-      const def = hasOwn(catalog.types, node.type) ? catalog.types[node.type] : {};
-      return [node.id, {
-        type: node.type,
-        verified: !!def.verified,
-        verifiedNote: def.verified || null,
-        classification: def.verified ? 'verified_platform_fact' : 'unverified_model_assumption',
-        source: def.doc || null,
-        note: def.note || null,
-        params: Object.fromEntries(Object.entries(node.p || {}).map(([key, value]) => [
-          key, { value, classification: 'editable_model_assumption' }
-        ]))
-      }];
-    }));
-    const assumptions = [
-      {
-        id: 'requestsPerUserPerMonth',
-        value: model.requestsPerUserPerMonth,
-        unit: 'requests/user/month',
-        classification: 'editable_model_assumption'
-      },
-      {
-        id: 'hoursPerMonth',
-        value: pricing.hoursPerMonth,
-        unit: 'hours/month',
-        classification: 'verified_pricing_convention',
-        source: 'src/pricing.js'
-      },
-      ...scenario.nodes.flatMap(node => Object.keys(node.p || {}).map(param => ({
-        id: 'node.' + node.id + '.' + param,
-        value: node.p[param],
-        classification: 'editable_model_assumption'
-      })))
-    ];
-    const plan = simulation.plan;
-    const daysPerMonth = pricing.hoursPerMonth / 24;
-    const units = Object.fromEntries(pricing.dims.map(dim => [dim.id, {
-      unit: plan === 'free' && dim.freePerRequest != null
-        ? dim.usageUnit.replace('/month', '/request')
-        : plan === 'free' && dim.freeDaily != null
-          ? dim.usageUnit.replace('/month', '/day')
-          : dim.usageUnit,
-      billingUnit: dim.unit,
-      period: plan === 'free'
-        ? dim.freePerRequest != null ? 'per request' : dim.freeDaily != null ? 'per day' : 'per month'
-        : 'per month',
-      price: dim.price,
-      currency: 'USD',
-      verified: dim.verified,
-      source: dim.source
-    }]));
-    const nodes = Object.fromEntries(Object.entries(simulation.nodes || {}).map(([id, node]) => [id, nodeMetrics(node)]));
-    const warnings = stateWarnings(scenario, simulation, catalog);
-    const modelSpend = simulation.modelSpend || { set: false, total: 0 };
-    const requestCount = simulation.requestCount == null ? simulation.requests || 0 : simulation.requestCount;
-    const modelAssessment = {
-      set: !!modelSpend.set,
-      monthly: modelSpend.total || 0,
-      accumulated: simulation.modelSpent || 0,
-      perRequest: modelSpend.set && requestCount > 0 ? (simulation.modelSpent || 0) / requestCount : null,
-      priceInputs: scenario.nodes.filter(node => node.type === 'external_model').map(node => ({
-        nodeId: node.id,
-        inPrice: node.p.inPrice,
-        outPrice: node.p.outPrice,
-        inTokens: node.p.inTokens,
-        outTokens: node.p.outTokens
-      })),
-      units: { monthly: 'USD/month', accumulated: 'USD', perRequest: 'USD/request' }
-    };
-    const monthly = simulation.monthly || {};
-    const usage = simulation.usage || {};
-    const allowances = pricing.dims.map(dim => {
-      const line = (monthly.lines || []).find(item => item.id === dim.id);
-      const monthlyUsed = line ? line.used : usage[dim.id] || 0;
-      let used = monthlyUsed;
-      let included = null;
-      let over = null;
-      let billable = null;
-      let cost = null;
-      let allowanceStatus = 'included';
-      let reason;
-      if (plan === 'free') {
-        included = dim.freePerRequest != null
-          ? dim.freePerRequest
-          : dim.freeDaily != null ? dim.freeDaily : dim.freeMonthly;
-        used = dim.freePerRequest != null
-          ? line ? line.used : usage.cpuMsPerRequest || 0
-          : dim.freeDaily != null ? monthlyUsed / daysPerMonth : monthlyUsed;
-        over = dim.freeDaily != null ? used > included : line ? line.over : used > included;
-        billable = 0;
-        cost = 0;
-      } else if (plan === 'paid') {
-        included = dim.paidIncluded;
-        over = line ? line.over : monthlyUsed > included;
-        billable = line ? line.billable || 0 : 0;
-        cost = line ? line.cost || 0 : 0;
-      } else {
-        allowanceStatus = 'not_applicable';
-        reason = 'Custom plan has no included allowances; per-dimension billable and cost are not allocated because monthly.total uses the aggregate live rate.';
-      }
-      const allowance = {
-        id: dim.id,
-        label: dim.label,
-        unit: units[dim.id].unit,
-        period: units[dim.id].period,
-        used,
-        included,
-        over,
-        exceeded: over == null ? null : over > 0,
-        billable,
-        cost,
-        allowanceStatus,
-        verified: dim.verified
-      };
-      if (reason) allowance.reason = reason;
-      return allowance;
-    });
-    const exceeded = allowances.filter(item => item.exceeded === true);
-    const cloudflare = {
-      rate: simulation.rate || 0,
-      spent: simulation.spent || 0,
-      usage: simulation.usage || {},
-      monthly,
-      allowances,
-      overage: monthly.overage || 0,
-      exceeded,
-      unverified: monthly.unverified || [],
-      units
-    };
-    const diagnostics = {
-      warnings,
-      unsupported: unsupportedContent(scenario, catalog),
-      assumptions,
-      limitations: LIMITATIONS.slice()
-    };
-    const provenance = {
-      asOf: pricing.asOf,
-      hoursPerMonth: pricing.hoursPerMonth,
-      sources: pricing.sources,
-      dimensions: pricing.dims,
-      pricing: {
-        asOf: pricing.asOf,
-        hoursPerMonth: pricing.hoursPerMonth,
-        sources: pricing.sources,
-        dimensions: pricing.dims
-      },
-      nodes: provenanceNodes
-    };
-    return clone({
-      apiVersion: VERSION,
-      schemaVersion: SCHEMA_VERSION,
-      modelVersion: MODEL_VERSION,
-      ...identity,
-      version: VERSION,
-      scenario,
-      time: simulation.time,
-      running: simulation.running,
-      speed: simulation.speed,
-      plan: simulation.plan,
-      budget: simulation.budget,
-      baseFee: simulation.baseFee,
-      requestCount,
-      units: {
-        time: 'simulated seconds', spent: 'USD', rate: 'USD/s', pathLat: 'seconds',
-        requestCount: 'requests', budget: 'USD/month', baseFee: 'USD/month', speed: 'simulated seconds/real second'
-      },
-      simulation: {
-        time: simulation.time,
-        running: simulation.running,
-        speed: simulation.speed,
-        spent: simulation.spent,
-        rate: simulation.rate,
-        pathLat: simulation.pathLat,
-        requestCount,
-        requests: simulation.requests == null ? requestCount : simulation.requests,
-        modelSpent: simulation.modelSpent,
-        cpuRate: simulation.cpuRate,
-        baseFee: simulation.baseFee,
-        budget: simulation.budget,
-        chaos: simulation.chaos
-      },
-      cloudflare,
-      model: modelAssessment,
-      nodes,
-      diagnostics,
-      unsupported: diagnostics.unsupported,
-      limitations: diagnostics.limitations,
-      provenance,
-      usage: cloudflare.usage,
-      monthly: cloudflare.monthly,
-      modelSpend: { set: modelAssessment.set, total: modelAssessment.monthly },
-      warnings,
-      assumptions
-    });
-  }
-
-  function stateResult(host) {
-    const scenario = host.getScenario();
-    const simulation = host.getSimulation();
-    if (!isObject(scenario) || !Array.isArray(scenario.nodes) || !isObject(simulation) || !isObject(simulation.nodes)) {
-      return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current simulation state is invalid' } };
-    }
-    return { data: buildSnapshot(simulation, scenario, host) };
-  }
-
-  function capabilities(host) {
-    return clone({
-      apiVersion: VERSION,
-      schemaVersion: SCHEMA_VERSION,
-      modelVersion: MODEL_VERSION,
-      deterministicClock: true,
-      clock: 'simulated-seconds',
-      supportedNodeTypes: Object.keys(host.catalog.types).sort(),
-      limits: LIMITS,
-      persistence: host.getChannelStatus(),
-      methods: ['capabilities', 'validate', 'loadScenario', 'setParams', 'setPlan', 'setBillingInputs',
-        'start', 'pause', 'reset', 'run', 'setSpeed', 'getState', 'exportScenario', 'save',
-        'load', 'set', 'state', 'export']
-    });
-  }
-
-  function createAgentApi(host) {
-    if (!host || !host.scenario || !host.catalog || !host.pricing || !host.getScenario ||
-        !host.getSimulation || !host.getIdentity || !host.getModel || !host.loadScenario ||
-        !host.setParams || !host.setPlan || !host.setBillingInputs || !host.start || !host.pause || !host.reset || !host.run ||
-        !host.setSpeed || !host.saveScenario || !host.getChannelStatus) {
-      throw new Error('SIM_API host is incomplete');
-    }
-    let seq = 0;
-    const loadedData = (validated, saved) => {
-      const identity = CORE.identityState(host.getIdentity());
-      return {
-        scenario: host.getScenario(),
-        warnings: validated.warnings,
-        unsupported: validated.unsupported,
-        scenarioRevision: identity.scenarioRevision,
-        scenarioHash: identity.scenarioHash,
-        runId: identity.runId,
-        dirty: identity.dirty,
-        save: saved
-      };
-    };
-    const api = {
-      version: VERSION,
-      apiVersion: VERSION,
-      capabilities() {
-        return request(++seq, () => ({ data: capabilities(host) }));
-      },
-      validate(raw) {
-        return request(++seq, () => {
-          const validated = validateScenario(raw, host, { strict: true });
-          if (validated.error) return { error: validated.error };
-          return { data: { valid: true, scenario: validated.scenario, warnings: validated.warnings, unsupported: validated.unsupported } };
-        });
-      },
-      loadScenario(raw, options) {
-        return request(++seq, () => {
-          const checked = validateBooleanOptions(options, ['resetRuntime', 'persist', 'strict']);
-          if (checked.error) return { error: checked.error };
-          const resetRuntime = checked.options.resetRuntime !== false;
-          const persist = checked.options.persist === true;
-          const strict = checked.options.strict !== false;
-          const validated = validateScenario(raw, host, { strict });
-          if (validated.error) return { error: validated.error };
-          const install = saved => {
-            if (saved && saved.scenario) validated.scenario = saved.scenario;
-            host.loadScenario(validated.scenario, { resetRuntime, persisted: persist });
-            return { data: loadedData(validated, saved) };
-          };
-          if (!persist) return install(null);
-          return Promise.resolve(host.saveScenario(validated.scenario)).then(result => {
-            if (result.error) return { error: result.error };
-            return install(result.data);
-          });
-        });
-      },
-      setParams(nodeId, params) {
-        return request(++seq, () => {
-          const scenario = host.getScenario();
-          if (!isObject(scenario) || !Array.isArray(scenario.nodes)) {
-            return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current scenario is invalid' } };
-          }
-          const validated = validateParamPatch(nodeId, params, scenario, host.catalog);
-          if (validated.error) return { error: validated.error };
-          return { data: host.setParams(nodeId, validated.patch) };
-        });
-      },
-      setPlan(plan) {
-        return request(++seq, () => {
-          const validated = validatePlan(plan);
-          if (validated.error) return { error: validated.error };
-          host.setPlan(validated.plan);
-          return stateResult(host);
-        });
-      },
-      setBillingInputs(patch) {
-        return request(++seq, () => {
-          const validated = validateBillingPatch(patch);
-          if (validated.error) return { error: validated.error };
-          host.setBillingInputs(validated.patch);
-          return stateResult(host);
-        });
-      },
-      reset() {
-        return request(++seq, () => {
-          host.reset();
-          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
-        });
-      },
-      run(options) {
-        return request(++seq, () => {
-          const validated = validateRunOptions(options);
-          if (validated.error) return { error: validated.error };
-          host.run(validated.seconds);
-          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
-        });
-      },
-      pause() {
-        return request(++seq, () => {
-          host.pause();
-          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
-        });
-      },
-      setSpeed(speed) {
-        return request(++seq, () => {
-          const validated = validateSpeed(speed);
-          if (validated.error) return { error: validated.error };
-          host.setSpeed(validated.speed);
-          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
-        });
-      },
-      start(options) {
-        return request(++seq, () => {
-          if (options !== undefined && (!isObject(options) || Object.keys(options).some(key => key !== 'speed'))) {
-            return { error: { code: ERROR_CODES.INVALID_OPTIONS, message: 'Start only accepts an optional speed' } };
-          }
-          const speed = options && options.speed;
-          if (speed !== undefined) {
-            const validated = validateSpeed(speed);
-            if (validated.error) return { error: validated.error };
-          }
-          host.start(speed);
-          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
-        });
-      },
-      getState() {
-        return request(++seq, () => stateResult(host));
-      },
-      exportScenario(options) {
-        return request(++seq, () => {
-          const checked = validateBooleanOptions(options, ['assessment', 'provenance']);
-          if (checked.error) return { error: checked.error };
-          const scenario = host.getScenario();
-          const validated = validateScenario(scenario, host, { strict: true });
-          if (validated.error) return { error: validated.error };
-          if (!checked.options.assessment && !checked.options.provenance) return { data: clone(validated.scenario) };
-          const snapshot = buildSnapshot(host.getSimulation(), validated.scenario, host);
-          const data = { scenario: snapshot.scenario };
-          if (checked.options.assessment) {
-            data.assessment = {
-              cloudflare: snapshot.cloudflare,
-              model: snapshot.model,
-              nodes: snapshot.nodes,
-              diagnostics: snapshot.diagnostics
-            };
-          }
-          if (checked.options.provenance) data.provenance = snapshot.provenance;
-          return { data };
-        });
-      },
-      _fail(code, message, details) {
-        return request(++seq, () => ({ error: { code, message, details } }));
-      },
-      save() {
-        return request(++seq, () => {
-          const scenario = host.getScenario();
-          const validated = validateScenario(scenario, host, { strict: true });
-          if (validated.error) return { error: validated.error };
-          return Promise.resolve(host.saveScenario(validated.scenario)).then(result => {
-            if (result.error) return { error: result.error };
-            return { data: result.data };
-          });
-        });
-      }
-    };
-    api.load = (raw, options) => api.loadScenario(raw, options);
-    api.set = (nodeId, params) => api.setParams(nodeId, params);
-    api.state = () => api.getState();
-    api.export = options => api.exportScenario(options);
-    return api;
-  }
-
-  return {
-    VERSION, SCHEMA_VERSION, MODEL_VERSION, LIMITS, ERROR_CODES,
-    success, failure, validateScenario, validateParamPatch, validatePlan, validateBillingPatch, validateRunOptions,
-    buildSnapshot, createAgentApi
-  };
 });
 
 </script>
@@ -2776,7 +1602,19 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     }));
   }
 
-  const api = { saveStatus, nextTab, fieldProvenance, connectTargets };
+  function trapFocus(active, shiftKey, focusable) {
+    if (!focusable.length) return null;
+    const index = focusable.indexOf(active);
+    if (index < 0) return shiftKey ? focusable[focusable.length - 1] : focusable[0];
+    const step = shiftKey ? -1 : 1;
+    return focusable[(index + step + focusable.length) % focusable.length];
+  }
+
+  function bannerError(errors) {
+    return errors && (errors.channel || errors.save || errors.copy) || null;
+  }
+
+  const api = { saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -2787,7 +1625,6 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
   const QE = window.QUEUE_ENGINE;
-  const CORE = window.SIM_STATE_CORE;
   const UX = window.UX;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
@@ -3698,6 +2535,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     render();
   }, { passive: false });
 
+  let refocusing = false;
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && openSheet) {
       ev.preventDefault();
@@ -3705,14 +2543,12 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       return;
     }
     if (ev.key === 'Tab' && openSheet) {
-      const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
-      const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
-        .filter(el => !el.disabled && el.offsetParent !== null);
-      if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
-      if (focusable.length) {
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
-        else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+      const target = UX.trapFocus(document.activeElement, ev.shiftKey, sheetFocusables());
+      if (target) {
+        ev.preventDefault();
+        refocusing = true;
+        target.focus({ preventScroll: true });
+        refocusing = false;
       }
     }
     if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
@@ -3720,6 +2556,17 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     if (!state.sel) return;
     ev.preventDefault();
     deleteSelected();
+  });
+  document.addEventListener('focusin', ev => {
+    if (!openSheet || refocusing) return;
+    const focusable = sheetFocusables();
+    if (focusable.indexOf(ev.target) >= 0) return;
+    const target = UX.trapFocus(ev.target, false, focusable);
+    if (target) {
+      refocusing = true;
+      target.focus({ preventScroll: true });
+      refocusing = false;
+    }
   });
 
   let rz = null;
@@ -3759,13 +2606,24 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     $('#close-inspector').hidden = !isMobile;
   }
 
+  function sheetFocusables() {
+    const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
+    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
+      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('details:not([open])'));
+    if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
+    return focusable;
+  }
+
   function openMobileSheet(name, focusPanel) {
     if (!mobile.matches) return;
     app.classList.toggle('palette-open', name === 'palette');
     app.classList.toggle('right-open', name === 'right');
     openSheet = name;
     syncPanels();
-    if (focusPanel) (name === 'palette' ? $('#search') : $('#close-inspector')).focus();
+    if (focusPanel) requestAnimationFrame(() => {
+      if (openSheet !== name) return;
+      (name === 'palette' ? $('#search') : $('#close-inspector')).focus({ preventScroll: true });
+    });
   }
 
   function closeMobileSheet() {
@@ -3843,13 +2701,30 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   }
 
   function simState() {
+    // Units: time is simulated seconds, spent/rate are USD and USD/s,
+    // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
+    const nodes = {};
+    state.nodes.forEach(n => {
+      const r = state.res[n.id] || {};
+      nodes[n.id] = {
+        type: n.type, lambda: r.lambda || 0, util: r.util || 0,
+        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
+        out: r.out || 0, capacity: r.capacity || 0,
+        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0,
+        billedRequests: r.billedRequests || 0, doGbS: r.doGbS || 0,
+        objects: r.objects || 0, perObjectRate: r.perObjectRate || 0,
+        objectLimit: r.objectLimit || 0, overloaded: !!r.overloaded
+      };
+    });
     const usage = dimUsage();
     const monthly = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
       baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
     }));
-    return CORE.simulationSnapshot(Object.assign({}, state, {
-      usage, monthly, modelSpend: modelBucket()
-    }), state.nodes, state);
+    return {
+      time: state.t, spent: state.spent, rate: state.rate,
+      pathLat: state.pathLat, running: state.running, plan: state.plan,
+      usage, monthly, modelSpend: modelBucket(), nodes
+    };
   }
 
   function applyScenario(raw, doFit) {
@@ -3888,70 +2763,68 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   const clientId = Math.random().toString(36).slice(2);
   let saveTimer = null;
   let channel = null;
-  let live = false;
+  let subscribe = null;
+  let channelMode = http ? 'checking' : 'local';
   let pendingSave = false;
   let saveRevision = 0;
-  let retryAction = null;
+  const bannerErrors = {};
   let saveState = UX.saveStatus({ type: 'local' });
 
-  function setStoredIdentity(storage) {
-    const parsed = CORE.parseStoredIdentity(storage);
-    storedRevision = parsed.revision;
-    storedHash = parsed.hash;
-    storedEtag = parsed.etag;
+  function renderBannerError() {
+    const error = UX.bannerError(bannerErrors);
+    $('#channel-error-text').textContent = error ? error.message : '';
+    $('#error-retry').hidden = !(error && error.retry);
+    $('#channel-error').hidden = !error;
   }
 
-  function markDirty() {
-    CORE.markDirty(state);
+  function showError(message, retry, scope) {
+    bannerErrors[scope || 'save'] = { message, retry: retry || null };
+    renderBannerError();
   }
 
-  function saveFailure(error) {
-    return CORE.saveFailure(state, error);
-  }
-
-  function showError(message, retry) {
-    $('#channel-error-text').textContent = message;
-    retryAction = retry || null;
-    $('#error-retry').hidden = !retryAction;
-    $('#channel-error').hidden = false;
-  }
-
-  function clearError() {
-    $('#channel-error').hidden = true;
-    $('#channel-error-text').textContent = '';
-    $('#error-retry').hidden = true;
-    retryAction = null;
+  function clearError(scope) {
+    delete bannerErrors[scope];
+    renderBannerError();
   }
 
   function renderSaveState() {
     const el = $('#save-status');
     el.textContent = saveState.message;
     el.dataset.phase = saveState.phase;
-    if (saveState.phase === 'error') showError(saveState.message, saveState.retryable ? retryAction : null);
-    else clearError();
   }
 
-  function setSave(event, retry) {
+  function setSave(event, retry, scope) {
     saveState = UX.saveStatus(event);
-    retryAction = retry || null;
+    if (saveState.phase === 'error') {
+      showError(saveState.message, saveState.retryable ? retry : null, scope || 'save');
+    } else if (bannerErrors.save) {
+      clearError('save');
+    }
     renderSaveState();
   }
 
   function pushScenario() {
-    if (!http) return;
+    if (!http || channelMode === 'local') {
+      pendingSave = false;
+      if (channelMode === 'local') setSave({ type: 'local' });
+      return;
+    }
     pendingSave = true;
     const revision = ++saveRevision;
-    setSave({ type: 'saving' });
     clearTimeout(saveTimer);
+    if (channelMode !== 'live') return;
+    setSave({ type: 'saving' });
     saveTimer = setTimeout(() => saveNow(revision), 400);
   }
 
   function saveNow(revision) {
     revision = revision || saveRevision;
-    if (!live) {
-      setSave({ type: 'checking' });
+    if (channelMode === 'local') {
+      pendingSave = false;
+      setSave({ type: 'local' });
       return;
     }
+    if (channelMode !== 'live') return;
     setSave({ type: 'saving' });
     fetch('/scenario', {
       method: 'POST',
@@ -3962,6 +2835,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       if (r.ok) {
         pendingSave = false;
         setSave({ type: 'saved' });
+        if (!channel) subscribe();
         return;
       }
       const fail = body => {
@@ -3986,11 +2860,18 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       ta.remove();
-      if (ok) toast(successMessage);
-      else showError('Copy failed. Select and copy the text manually.');
+      if (ok) {
+        clearError('copy');
+        toast(successMessage);
+      } else {
+        showError('Copy failed. Select and copy the text manually.', null, 'copy');
+      }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => toast(successMessage), fallback);
+      navigator.clipboard.writeText(text).then(() => {
+        clearError('copy');
+        toast(successMessage);
+      }, fallback);
     } else {
       fallback();
     }
@@ -4003,7 +2884,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   function copyLink() {
     const encoded = window.SCENARIO.encode(currentScenario());
     if (!encoded) {
-      showError('Link is too large (8,000-character limit). Use Copy JSON instead.');
+      showError('Link is too large (8,000-character limit). Use Copy JSON instead.', null, 'copy');
       toast('Link is too large. Use Copy JSON instead.');
       return;
     }
@@ -4013,8 +2894,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   $('#copy-json').addEventListener('click', copyJson);
   $('#copy-link').addEventListener('click', copyLink);
   $('#error-retry').addEventListener('click', () => {
-    const action = retryAction;
-    if (action) action();
+    const error = UX.bannerError(bannerErrors);
+    if (error && error.retry) error.retry();
   });
   renderSaveState();
 
@@ -4024,37 +2905,6 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     getState: simState
   };
 
-  window.SIM_API = window.SIM_API_FACTORY.createAgentApi({
-    scenario: window.SCENARIO,
-    catalog: window.CATALOG,
-    pricing: PRICING,
-    getScenario: currentScenario,
-    getSimulation: simState,
-    getIdentity: () => CORE.identityState(state),
-    getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
-    loadScenario: (s, options) => installScenario(s, true, null, options),
-    setParams: setNodeParams,
-    setPlan,
-    setBillingInputs,
-    start: speed => {
-      if (speed !== undefined) setSpeed(speed);
-      setRunning(true);
-    },
-    pause: () => setRunning(false),
-    reset: resetApiRuntime,
-    run: runSimulation,
-    setSpeed,
-    saveScenario: scenario => {
-      clearTimeout(saveTimer);
-      return saveScenario(scenario);
-    },
-    getChannelStatus: () => ({
-      available: !!channel,
-      saving: state.saving,
-      revision: storedRevision,
-      hash: storedHash
-    })
-  });
   renderPalette();
   loadTemplate();
   $('#budget').value = state.budget;
@@ -4073,27 +2923,20 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   });
 
   if (http) {
-    const subscribe = () => {
+    subscribe = () => {
       if (channel) return;
       const source = new EventSource('/events');
       channel = source;
       source.onopen = () => {
         if (channel !== source) return;
+        clearError('channel');
         if (!pendingSave) setSave({ type: 'saved' });
       };
       source.onmessage = ev => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
-        const storage = { revision: msg.revision, hash: msg.hash, etag: msg.hash ? '"' + msg.hash + '"' : null };
-        if (CORE.sameScenario(msg.scenario, currentScenario())) {
-          setStoredIdentity(storage);
-          state.scenarioRevision = storedRevision;
-          state.scenarioHash = storedHash;
-          state.dirty = false;
-          state.saveError = null;
-          return;
-        }
+        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) return;
         const before = state.nodes.map(n => n.id).join('|');
         if (applyScenario(msg.scenario, false)) {
           booted = true;
@@ -4105,29 +2948,35 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       source.onerror = () => {
         source.close();
         if (channel === source) channel = null;
-        setSave({ type: 'disconnected' }, () => subscribe());
+        setSave({ type: 'disconnected' }, () => subscribe(), 'channel');
       };
     };
     const bootstrap = () => {
+      channelMode = 'checking';
+      clearError('channel');
       setSave({ type: 'checking' });
       return fetch('/scenario').then(r => {
         const type = r.headers.get('content-type') || '';
         if (type.indexOf('json') < 0) {
+          channelMode = 'local';
+          pendingSave = false;
           setSave({ type: 'local' });
           return null;
         }
         if (!r.ok) {
-          setSave({ type: 'unavailable', status: r.status }, bootstrap);
+          channelMode = 'error';
+          setSave({ type: 'unavailable', status: r.status }, bootstrap, 'channel');
           return null;
         }
-        live = true;
+        channelMode = 'live';
         subscribe();
         return r.json();
       }).then(s => {
         if (s && !booted) applyScenario(s, true);
-        if (live && pendingSave) pushScenario();
+        if (channelMode === 'live' && pendingSave) pushScenario();
       }).catch(() => {
-        setSave({ type: 'network' }, bootstrap);
+        channelMode = 'error';
+        setSave({ type: 'network' }, bootstrap, 'channel');
       });
     };
     bootstrap();

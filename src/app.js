@@ -2,7 +2,6 @@
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
   const QE = window.QUEUE_ENGINE;
-  const CORE = window.SIM_STATE_CORE;
   const UX = window.UX;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
@@ -913,6 +912,7 @@
     render();
   }, { passive: false });
 
+  let refocusing = false;
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && openSheet) {
       ev.preventDefault();
@@ -920,14 +920,12 @@
       return;
     }
     if (ev.key === 'Tab' && openSheet) {
-      const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
-      const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
-        .filter(el => !el.disabled && el.offsetParent !== null);
-      if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
-      if (focusable.length) {
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
-        else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+      const target = UX.trapFocus(document.activeElement, ev.shiftKey, sheetFocusables());
+      if (target) {
+        ev.preventDefault();
+        refocusing = true;
+        target.focus({ preventScroll: true });
+        refocusing = false;
       }
     }
     if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
@@ -935,6 +933,17 @@
     if (!state.sel) return;
     ev.preventDefault();
     deleteSelected();
+  });
+  document.addEventListener('focusin', ev => {
+    if (!openSheet || refocusing) return;
+    const focusable = sheetFocusables();
+    if (focusable.indexOf(ev.target) >= 0) return;
+    const target = UX.trapFocus(ev.target, false, focusable);
+    if (target) {
+      refocusing = true;
+      target.focus({ preventScroll: true });
+      refocusing = false;
+    }
   });
 
   let rz = null;
@@ -974,13 +983,24 @@
     $('#close-inspector').hidden = !isMobile;
   }
 
+  function sheetFocusables() {
+    const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
+    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href]', panel)
+      .filter(el => !el.disabled && el.offsetParent !== null && !el.closest('details:not([open])'));
+    if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
+    return focusable;
+  }
+
   function openMobileSheet(name, focusPanel) {
     if (!mobile.matches) return;
     app.classList.toggle('palette-open', name === 'palette');
     app.classList.toggle('right-open', name === 'right');
     openSheet = name;
     syncPanels();
-    if (focusPanel) (name === 'palette' ? $('#search') : $('#close-inspector')).focus();
+    if (focusPanel) requestAnimationFrame(() => {
+      if (openSheet !== name) return;
+      (name === 'palette' ? $('#search') : $('#close-inspector')).focus({ preventScroll: true });
+    });
   }
 
   function closeMobileSheet() {
@@ -1058,13 +1078,30 @@
   }
 
   function simState() {
+    // Units: time is simulated seconds, spent/rate are USD and USD/s,
+    // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
+    const nodes = {};
+    state.nodes.forEach(n => {
+      const r = state.res[n.id] || {};
+      nodes[n.id] = {
+        type: n.type, lambda: r.lambda || 0, util: r.util || 0,
+        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
+        out: r.out || 0, capacity: r.capacity || 0,
+        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0,
+        billedRequests: r.billedRequests || 0, doGbS: r.doGbS || 0,
+        objects: r.objects || 0, perObjectRate: r.perObjectRate || 0,
+        objectLimit: r.objectLimit || 0, overloaded: !!r.overloaded
+      };
+    });
     const usage = dimUsage();
     const monthly = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
       baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
     }));
-    return CORE.simulationSnapshot(Object.assign({}, state, {
-      usage, monthly, modelSpend: modelBucket()
-    }), state.nodes, state);
+    return {
+      time: state.t, spent: state.spent, rate: state.rate,
+      pathLat: state.pathLat, running: state.running, plan: state.plan,
+      usage, monthly, modelSpend: modelBucket(), nodes
+    };
   }
 
   function applyScenario(raw, doFit) {
@@ -1103,70 +1140,68 @@
   const clientId = Math.random().toString(36).slice(2);
   let saveTimer = null;
   let channel = null;
-  let live = false;
+  let subscribe = null;
+  let channelMode = http ? 'checking' : 'local';
   let pendingSave = false;
   let saveRevision = 0;
-  let retryAction = null;
+  const bannerErrors = {};
   let saveState = UX.saveStatus({ type: 'local' });
 
-  function setStoredIdentity(storage) {
-    const parsed = CORE.parseStoredIdentity(storage);
-    storedRevision = parsed.revision;
-    storedHash = parsed.hash;
-    storedEtag = parsed.etag;
+  function renderBannerError() {
+    const error = UX.bannerError(bannerErrors);
+    $('#channel-error-text').textContent = error ? error.message : '';
+    $('#error-retry').hidden = !(error && error.retry);
+    $('#channel-error').hidden = !error;
   }
 
-  function markDirty() {
-    CORE.markDirty(state);
+  function showError(message, retry, scope) {
+    bannerErrors[scope || 'save'] = { message, retry: retry || null };
+    renderBannerError();
   }
 
-  function saveFailure(error) {
-    return CORE.saveFailure(state, error);
-  }
-
-  function showError(message, retry) {
-    $('#channel-error-text').textContent = message;
-    retryAction = retry || null;
-    $('#error-retry').hidden = !retryAction;
-    $('#channel-error').hidden = false;
-  }
-
-  function clearError() {
-    $('#channel-error').hidden = true;
-    $('#channel-error-text').textContent = '';
-    $('#error-retry').hidden = true;
-    retryAction = null;
+  function clearError(scope) {
+    delete bannerErrors[scope];
+    renderBannerError();
   }
 
   function renderSaveState() {
     const el = $('#save-status');
     el.textContent = saveState.message;
     el.dataset.phase = saveState.phase;
-    if (saveState.phase === 'error') showError(saveState.message, saveState.retryable ? retryAction : null);
-    else clearError();
   }
 
-  function setSave(event, retry) {
+  function setSave(event, retry, scope) {
     saveState = UX.saveStatus(event);
-    retryAction = retry || null;
+    if (saveState.phase === 'error') {
+      showError(saveState.message, saveState.retryable ? retry : null, scope || 'save');
+    } else if (bannerErrors.save) {
+      clearError('save');
+    }
     renderSaveState();
   }
 
   function pushScenario() {
-    if (!http) return;
+    if (!http || channelMode === 'local') {
+      pendingSave = false;
+      if (channelMode === 'local') setSave({ type: 'local' });
+      return;
+    }
     pendingSave = true;
     const revision = ++saveRevision;
-    setSave({ type: 'saving' });
     clearTimeout(saveTimer);
+    if (channelMode !== 'live') return;
+    setSave({ type: 'saving' });
     saveTimer = setTimeout(() => saveNow(revision), 400);
   }
 
   function saveNow(revision) {
     revision = revision || saveRevision;
-    if (!live) {
-      setSave({ type: 'checking' });
+    if (channelMode === 'local') {
+      pendingSave = false;
+      setSave({ type: 'local' });
       return;
     }
+    if (channelMode !== 'live') return;
     setSave({ type: 'saving' });
     fetch('/scenario', {
       method: 'POST',
@@ -1177,6 +1212,7 @@
       if (r.ok) {
         pendingSave = false;
         setSave({ type: 'saved' });
+        if (!channel) subscribe();
         return;
       }
       const fail = body => {
@@ -1201,11 +1237,18 @@
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       ta.remove();
-      if (ok) toast(successMessage);
-      else showError('Copy failed. Select and copy the text manually.');
+      if (ok) {
+        clearError('copy');
+        toast(successMessage);
+      } else {
+        showError('Copy failed. Select and copy the text manually.', null, 'copy');
+      }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => toast(successMessage), fallback);
+      navigator.clipboard.writeText(text).then(() => {
+        clearError('copy');
+        toast(successMessage);
+      }, fallback);
     } else {
       fallback();
     }
@@ -1218,7 +1261,7 @@
   function copyLink() {
     const encoded = window.SCENARIO.encode(currentScenario());
     if (!encoded) {
-      showError('Link is too large (8,000-character limit). Use Copy JSON instead.');
+      showError('Link is too large (8,000-character limit). Use Copy JSON instead.', null, 'copy');
       toast('Link is too large. Use Copy JSON instead.');
       return;
     }
@@ -1228,8 +1271,8 @@
   $('#copy-json').addEventListener('click', copyJson);
   $('#copy-link').addEventListener('click', copyLink);
   $('#error-retry').addEventListener('click', () => {
-    const action = retryAction;
-    if (action) action();
+    const error = UX.bannerError(bannerErrors);
+    if (error && error.retry) error.retry();
   });
   renderSaveState();
 
@@ -1239,37 +1282,6 @@
     getState: simState
   };
 
-  window.SIM_API = window.SIM_API_FACTORY.createAgentApi({
-    scenario: window.SCENARIO,
-    catalog: window.CATALOG,
-    pricing: PRICING,
-    getScenario: currentScenario,
-    getSimulation: simState,
-    getIdentity: () => CORE.identityState(state),
-    getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
-    loadScenario: (s, options) => installScenario(s, true, null, options),
-    setParams: setNodeParams,
-    setPlan,
-    setBillingInputs,
-    start: speed => {
-      if (speed !== undefined) setSpeed(speed);
-      setRunning(true);
-    },
-    pause: () => setRunning(false),
-    reset: resetApiRuntime,
-    run: runSimulation,
-    setSpeed,
-    saveScenario: scenario => {
-      clearTimeout(saveTimer);
-      return saveScenario(scenario);
-    },
-    getChannelStatus: () => ({
-      available: !!channel,
-      saving: state.saving,
-      revision: storedRevision,
-      hash: storedHash
-    })
-  });
   renderPalette();
   loadTemplate();
   $('#budget').value = state.budget;
@@ -1288,27 +1300,20 @@
   });
 
   if (http) {
-    const subscribe = () => {
+    subscribe = () => {
       if (channel) return;
       const source = new EventSource('/events');
       channel = source;
       source.onopen = () => {
         if (channel !== source) return;
+        clearError('channel');
         if (!pendingSave) setSave({ type: 'saved' });
       };
       source.onmessage = ev => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
-        const storage = { revision: msg.revision, hash: msg.hash, etag: msg.hash ? '"' + msg.hash + '"' : null };
-        if (CORE.sameScenario(msg.scenario, currentScenario())) {
-          setStoredIdentity(storage);
-          state.scenarioRevision = storedRevision;
-          state.scenarioHash = storedHash;
-          state.dirty = false;
-          state.saveError = null;
-          return;
-        }
+        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) return;
         const before = state.nodes.map(n => n.id).join('|');
         if (applyScenario(msg.scenario, false)) {
           booted = true;
@@ -1320,29 +1325,35 @@
       source.onerror = () => {
         source.close();
         if (channel === source) channel = null;
-        setSave({ type: 'disconnected' }, () => subscribe());
+        setSave({ type: 'disconnected' }, () => subscribe(), 'channel');
       };
     };
     const bootstrap = () => {
+      channelMode = 'checking';
+      clearError('channel');
       setSave({ type: 'checking' });
       return fetch('/scenario').then(r => {
         const type = r.headers.get('content-type') || '';
         if (type.indexOf('json') < 0) {
+          channelMode = 'local';
+          pendingSave = false;
           setSave({ type: 'local' });
           return null;
         }
         if (!r.ok) {
-          setSave({ type: 'unavailable', status: r.status }, bootstrap);
+          channelMode = 'error';
+          setSave({ type: 'unavailable', status: r.status }, bootstrap, 'channel');
           return null;
         }
-        live = true;
+        channelMode = 'live';
         subscribe();
         return r.json();
       }).then(s => {
         if (s && !booted) applyScenario(s, true);
-        if (live && pendingSave) pushScenario();
+        if (channelMode === 'live' && pendingSave) pushScenario();
       }).catch(() => {
-        setSave({ type: 'network' }, bootstrap);
+        channelMode = 'error';
+        setSave({ type: 'network' }, bootstrap, 'channel');
       });
     };
     bootstrap();

@@ -54,3 +54,29 @@ test('keyboard connect targets exclude the source and use accessible names', () 
   ]);
   assert.deepEqual(ux.connectTargets([], 'a'), []);
 });
+
+test('sheet focus trap cycles the ordered set and redirects escaped focus', () => {
+  const focusable = ['retry', 'close', 'costs', 'connect'];
+  assert.equal(ux.trapFocus('retry', true, focusable), 'connect');
+  assert.equal(ux.trapFocus('connect', false, focusable), 'retry');
+  assert.equal(ux.trapFocus('close', true, focusable), 'retry');
+  assert.equal(ux.trapFocus('close', false, focusable), 'costs');
+  assert.equal(ux.trapFocus('zoom', false, focusable), 'retry');
+  assert.equal(ux.trapFocus('zoom', true, focusable), 'connect');
+  assert.equal(ux.trapFocus('close', false, []), null);
+});
+
+test('banner errors are scoped and channel failures take priority', () => {
+  const save = { message: 'Save failed' };
+  const copy = { message: 'Link too large' };
+  const channel = { message: 'Disconnected' };
+  const errors = { save, copy };
+  assert.equal(ux.bannerError(errors), save);
+  delete errors.copy;
+  assert.equal(ux.bannerError(errors), save);
+  errors.channel = channel;
+  assert.equal(ux.bannerError(errors), channel);
+  delete errors.channel;
+  delete errors.save;
+  assert.equal(ux.bannerError(errors), null);
+});

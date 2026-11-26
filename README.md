@@ -72,10 +72,11 @@ merging and npm publication to the maintainer.
 - **Chaos uses real time.** The 429, DO eviction, D1 write storm, cache miss, store 402 and
   webhook buttons set expiry with `performance.now()` in **real seconds** (8–12 s depending on
   the button), independently of the simulation-speed multiplier.
-- **Verified vs assumption.** The inspector labels documented defaults `Verified default · editable`
-  when `src/catalog.js` carries a `verified` note and a source link. Workload parameters remain
-  `Editable assumption`; those fields are editable and keep the simulator honest about what is
-  a verified limit and what is a guess.
+- **Verified vs assumption.** The inspector groups documented prices and limits under
+  **Verified prices & limits** when `src/catalog.js` carries a `verified` note and source link.
+  Documented default values show **Verified default · editable**; workload values show
+  **Editable assumptions**. Components without verified notes say **Editable assumptions**, so a
+  node-level source never implies that every field is verified.
 
 ## Cost model
 

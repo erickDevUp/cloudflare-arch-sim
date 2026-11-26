@@ -260,7 +260,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
   .body{display:block;position:relative;height:var(--h)}
   .stage{height:100%}
   .app.mobile .palette,.app.mobile .right{position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;max-height:72%;
-    z-index:30;transform:translateY(105%);visibility:hidden;transition:transform .2s ease,visibility .2s ease;
+    z-index:30;transform:translateY(105%);visibility:hidden;transition:transform .2s ease;
     overflow:auto;border-top:1px solid #33334a;border-left:0;border-right:0;border-radius:14px 14px 0 0;padding:0;
     box-shadow:0 -18px 50px rgba(0,0,0,.5)}
   .app.mobile.palette-open .palette,.app.mobile.right-open .right{transform:none;visibility:visible}
