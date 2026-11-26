@@ -27,16 +27,31 @@ Load this skill for repository changes or for using the simulator to design/eval
 | Goal | Authority | Required checks |
 |---|---|---|
 | Change the simulator codebase | `AGENTS.md` and `docs/agent-playbook.md`; owning source/tests | Focused/full tests; build, dist, pack, coverage, and smoke checks as applicable |
-| Design/evaluate an architecture | `docs/agent-operator.md`; `window.SIM_API` v1 | Check capabilities, validate, load, set params, run exact simulated seconds, inspect state/assessment, export provenance, and save only when persistence is intended |
+| Design/evaluate an architecture | `docs/agent-operator.md`; `window.SIM_API` v1 | Check capabilities, validate, load, set params and plan/billing inputs, run exact simulated seconds, inspect state/assessment, export provenance, and save only when persistence is intended |
 
 ## Execution Steps
 
 1. Choose repository mode or operator mode from the decision table.
 2. In repository mode, inspect the branch, source of truth, and tests; make the smallest owning-module change with a focused regression test.
-3. In operator mode, build/start the live channel, use `SIM_API.capabilities/validate/loadScenario/setParams/setSpeed/run/getState/exportScenario`, and use `save()` only for intentional persistence; record request IDs, run/revision identity, structured errors, dirty/save status, assumptions, and provenance.
+3. In operator mode, build/start the live channel, use `SIM_API.capabilities/validate/loadScenario/setParams/setPlan/setBillingInputs/setSpeed/run/getState/exportScenario`, and use `save()` only for intentional persistence; record request IDs, run/revision identity, structured errors, dirty/save status, assumptions, and provenance.
 4. Run focused tests, `npm test`, and generated/package checks for repository changes; use Orca browser for UI changes.
 5. Review the diff or operator evidence, including assumptions and unsupported behavior.
 6. Commit repository work on the task branch or return design findings; report exact evidence without merging or publishing.
+
+## Plan and billing example
+
+Use the machine contract instead of DOM controls:
+
+```js
+const api = window.SIM_API;
+const free = api.setPlan('free');
+const custom = api.setPlan('custom');
+const billed = api.setBillingInputs({ baseFee: 25, budget: 1000 });
+if (!free.ok || !custom.ok || !billed.ok) throw new Error('Plan or billing update failed');
+const snapshot = api.getState().data;
+```
+
+Compare `snapshot.cloudflare.allowances` and `snapshot.cloudflare.monthly` across Free, Paid, and Custom. Invalid plans or billing patches return structured errors without changing state.
 
 ## Output Contract
 

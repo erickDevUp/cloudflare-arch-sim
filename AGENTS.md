@@ -30,7 +30,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - `npm run dev` starts `cli.mjs`, which serves the bundled page and state channel on loopback.
 - `node cli.mjs --path` prints the bundled HTML path; `node cli.mjs --help` prints CLI usage.
 - `node serve.mjs` runs the same server directly; tests use its exported `startServer`.
-- `window.SIM_API` exposes the version 1 capabilities/validate/load/set/run/state/export/save contract with structured results and exact simulated-time advancement.
+- `window.SIM_API` exposes the version 1 capabilities/validate/load/set/plan/billing/run/state/export/save contract with structured results and exact simulated-time advancement.
 - `window.__SIM__` preserves the legacy `load`, `export`, and `getState` shapes for browser automation.
 - `npm run build` regenerates `dist/cloudflare-arch-sim.html`.
 

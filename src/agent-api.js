@@ -14,6 +14,8 @@
     maxScenarioBytes: 1048576,
     maxHashChars: 8000
   });
+  const PLANS = Object.freeze(['free', 'paid', 'custom']);
+  const BILLING_LIMITS = Object.freeze({ baseFee: 0, budget: 1 });
   const ERROR_CODES = Object.freeze({
     INVALID_SCENARIO: 'INVALID_SCENARIO',
     UNSUPPORTED_SCHEMA_VERSION: 'UNSUPPORTED_SCHEMA_VERSION',
@@ -351,6 +353,67 @@
       };
     }
     return { speed };
+  }
+
+  function validatePlan(plan) {
+    if (!PLANS.includes(plan)) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Plan must be free, paid, or custom',
+          details: { plan, allowedPlans: PLANS.slice() }
+        }
+      };
+    }
+    return { plan };
+  }
+
+  function validateBillingPatch(patch) {
+    if (!isObject(patch) || !Object.keys(patch).length) {
+      return { error: { code: ERROR_CODES.INVALID_PARAMS, message: 'Billing inputs patch must be a non-empty object' } };
+    }
+    const unsupported = Object.keys(patch).filter(key => !hasOwn(BILLING_LIMITS, key));
+    if (unsupported.length) {
+      return {
+        error: {
+          code: ERROR_CODES.UNSUPPORTED_PARAMETER,
+          message: 'Unsupported billing inputs',
+          details: { params: unsupported }
+        }
+      };
+    }
+    const invalid = [];
+    const outOfRange = [];
+    const safe = {};
+    Object.keys(patch).forEach(key => {
+      const value = patch[key];
+      if (!finite(value)) {
+        invalid.push({ param: key, reason: 'expected a finite number' });
+      } else if (value < BILLING_LIMITS[key]) {
+        outOfRange.push({ param: key, min: BILLING_LIMITS[key] });
+      } else {
+        safe[key] = value;
+      }
+    });
+    if (invalid.length) {
+      return {
+        error: {
+          code: ERROR_CODES.INVALID_PARAMS,
+          message: 'Invalid billing inputs',
+          details: { params: invalid }
+        }
+      };
+    }
+    if (outOfRange.length) {
+      return {
+        error: {
+          code: ERROR_CODES.PARAMETER_OUT_OF_RANGE,
+          message: 'Billing inputs are below their minimum values',
+          details: { params: outOfRange }
+        }
+      };
+    }
+    return { patch: safe };
   }
 
   function validateRunOptions(options) {
@@ -693,6 +756,15 @@
     });
   }
 
+  function stateResult(host) {
+    const scenario = host.getScenario();
+    const simulation = host.getSimulation();
+    if (!isObject(scenario) || !Array.isArray(scenario.nodes) || !isObject(simulation) || !isObject(simulation.nodes)) {
+      return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current simulation state is invalid' } };
+    }
+    return { data: buildSnapshot(simulation, scenario, host) };
+  }
+
   function controlState(host) {
     const state = host.getSimulation();
     const identity = host.getIdentity();
@@ -719,15 +791,16 @@
       supportedNodeTypes: Object.keys(host.catalog.types).sort(),
       limits: LIMITS,
       persistence: host.getChannelStatus(),
-      methods: ['capabilities', 'validate', 'loadScenario', 'setParams', 'start', 'pause', 'reset',
-        'run', 'setSpeed', 'getState', 'exportScenario', 'save', 'load', 'set', 'state', 'export']
+      methods: ['capabilities', 'validate', 'loadScenario', 'setParams', 'setPlan', 'setBillingInputs',
+        'start', 'pause', 'reset', 'run', 'setSpeed', 'getState', 'exportScenario', 'save',
+        'load', 'set', 'state', 'export']
     });
   }
 
   function createAgentApi(host) {
     if (!host || !host.scenario || !host.catalog || !host.pricing || !host.getScenario ||
         !host.getSimulation || !host.getIdentity || !host.getModel || !host.loadScenario ||
-        !host.setParams || !host.start || !host.pause || !host.reset || !host.run ||
+        !host.setParams || !host.setPlan || !host.setBillingInputs || !host.start || !host.pause || !host.reset || !host.run ||
         !host.setSpeed || !host.saveScenario || !host.getChannelStatus) {
       throw new Error('SIM_API host is incomplete');
     }
@@ -790,6 +863,22 @@
           return { data: host.setParams(nodeId, validated.patch) };
         });
       },
+      setPlan(plan) {
+        return request(++seq, () => {
+          const validated = validatePlan(plan);
+          if (validated.error) return { error: validated.error };
+          host.setPlan(validated.plan);
+          return stateResult(host);
+        });
+      },
+      setBillingInputs(patch) {
+        return request(++seq, () => {
+          const validated = validateBillingPatch(patch);
+          if (validated.error) return { error: validated.error };
+          host.setBillingInputs(validated.patch);
+          return stateResult(host);
+        });
+      },
       reset() {
         return request(++seq, () => {
           host.reset();
@@ -833,14 +922,7 @@
         });
       },
       getState() {
-        return request(++seq, () => {
-          const scenario = host.getScenario();
-          const simulation = host.getSimulation();
-          if (!isObject(scenario) || !Array.isArray(scenario.nodes) || !isObject(simulation) || !isObject(simulation.nodes)) {
-            return { error: { code: ERROR_CODES.INVALID_STATE, message: 'Current simulation state is invalid' } };
-          }
-          return { data: buildSnapshot(simulation, scenario, host) };
-        });
+        return request(++seq, () => stateResult(host));
       },
       exportScenario(options) {
         return request(++seq, () => {
@@ -885,7 +967,7 @@
 
   return {
     VERSION, SCHEMA_VERSION, MODEL_VERSION, LIMITS, ERROR_CODES,
-    success, failure, validateScenario, validateParamPatch, validateRunOptions,
+    success, failure, validateScenario, validateParamPatch, validatePlan, validateBillingPatch, validateRunOptions,
     buildSnapshot, createAgentApi
   };
 });

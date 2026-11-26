@@ -75,6 +75,8 @@ All methods are synchronous except `save()` and `loadScenario(..., { persist: tr
 | `validate(raw)` | `{ valid, scenario, warnings, unsupported }` | Strict, non-mutating validation with the same checks as a default load. |
 | `loadScenario(raw, options?)` | `{ scenario, warnings, unsupported, scenarioRevision, scenarioHash, runId, dirty, save }` | Defaults to `{ resetRuntime: true, strict: true, persist: false }`; installs atomically and returns a fresh `runId`. |
 | `setParams(nodeId, patch)` | `{ nodeId, params }` | Validates the whole patch before updating one node. Marks the scenario dirty. |
+| `setPlan(plan)` | Updated `getState()` snapshot | Accepts `free`, `paid`, or `custom`; recomputes billing and plan-derived allowances without resetting runtime. |
+| `setBillingInputs(patch)` | Updated `getState()` snapshot | Atomically patches finite `baseFee >= 0` and/or `budget >= 1`. Custom monthly cost uses `baseFee`; `budget` is the Custom assessment threshold. |
 | `setSpeed(speed)` | Runtime identity/control state | Accepts an integer from 1 through 7200. |
 | `start(options?)` | Runtime identity/control state | Starts the human wall-clock loop. Optional `{ speed }`. |
 | `pause()` | Runtime identity/control state | Stops advancement without resetting counters. |
@@ -93,10 +95,10 @@ Short aliases `load`, `set`, `state`, and `export` remain available.
 | `INVALID_SCENARIO` | Root shape, serialization, size, node/edge data, defaults, or lossy normalization failed. |
 | `UNSUPPORTED_SCHEMA_VERSION` | Strict validation received a schema version other than 1. |
 | `UNSUPPORTED_NODE_TYPE` | Strict validation received a node type outside the catalog. |
-| `UNSUPPORTED_PARAMETER` | A scenario param or patch key is not defined for that node type. |
-| `PARAMETER_OUT_OF_RANGE` | A numeric param is outside its catalog range. |
+| `UNSUPPORTED_PARAMETER` | A scenario param, node patch key, or billing patch key is not supported. |
+| `PARAMETER_OUT_OF_RANGE` | A numeric node param or billing input is outside its allowed range. |
 | `UNKNOWN_NODE` | `setParams` targeted a missing or unsafe node id. |
-| `INVALID_PARAMS` | A param value, patch, or speed is malformed or outside an enum. |
+| `INVALID_PARAMS` | A node param, plan, billing patch, billing value, or speed is malformed or outside an enum. |
 | `INVALID_OPTIONS` | Method options are malformed or contain unknown keys. |
 | `INVALID_STATE` | The current scenario or simulation snapshot is not usable. |
 | `SAVE_FAILED` | The channel rejected the save, returned an invalid result, or failed locally. |
@@ -112,7 +114,8 @@ Short aliases `load`, `set`, `state`, and `export` remain available.
 - `nodes` must be an array. Empty scenarios are valid. Unsafe `Object.prototype` node ids are rejected.
 - `loadScenario` always returns a fresh `runId`. With `resetRuntime: true` it also stops running and clears time, spend, requests, model spend, chaos, Queue backlog, and drops. With `false`, runtime state is preserved while architecture changes.
 - `persist: true` saves before installing. A failed save leaves the previous local architecture and runtime unchanged.
-- `setParams`, `loadScenario` without `persist`, and `exportScenario` do not write to `/scenario`.
+- `setParams`, `setPlan`, `setBillingInputs`, `loadScenario` without `persist`, and `exportScenario` do not write to `/scenario`.
+- `setPlan` and `setBillingInputs` validate before mutation. They update plan assessment inputs only; architecture, runtime counters, run identity, and scenario persistence identity stay unchanged. Billing values remain available across plan switches.
 - `run()` never reads `requestAnimationFrame` or wall-clock time. Chaos deadlines also use simulated time, so equal starting states and seconds produce equal assessment state.
 - `reset()` is runtime-only. It does not clear dirty state, save errors, scenario identity, plan, budget, base fee, or speed.
 - `save()` sends the loaded ETag as `If-Match`. A 2xx response clears `dirty` only if the scenario has not changed while the request was in flight. Failures keep `dirty: true` and expose a structured `saveError`.
@@ -182,6 +185,25 @@ Model `traffic -> workers -> queues -> workers -> r2`. Set Queue concurrency/lat
 ### AI retrieval
 
 Model `traffic -> workers -> ai_gateway -> workers_ai` with a `workers -> vectorize` branch. Native Workers AI contributes Neuron usage to Cloudflare spend. Use `external_model` only for third-party token spend, and populate all four token fields before treating `model.set` as true. Compare `model.monthly`, `model.accumulated`, `model.perRequest`, and `model.priceInputs` separately from `cloudflare.monthly`.
+
+### Plan and Custom billing
+
+Compare plan semantics through `SIM_API` only; do not drive the plan selector or Custom inputs:
+
+```js
+const free = api.setPlan('free');
+if (!free.ok) throw new Error(free.error.message);
+
+const custom = api.setPlan('custom');
+if (!custom.ok) throw new Error(custom.error.message);
+
+const billed = api.setBillingInputs({ baseFee: 25, budget: 1000 });
+if (!billed.ok) throw new Error(billed.error.message);
+
+const snapshot = api.getState().data;
+```
+
+Inspect `snapshot.cloudflare.allowances` for each plan's units, periods, included amounts, exceeded flags, billable units, and costs. Custom keeps per-dimension `billable` and `cost` as `null`; `snapshot.cloudflare.monthly.total` is `baseFee + rateMonthly`.
 
 ### Persistence and conflict recovery
 

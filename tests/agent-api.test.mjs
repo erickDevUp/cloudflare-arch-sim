@@ -77,6 +77,12 @@ function makeHost(input = candidate()) {
       }
     }
   };
+  const refreshBilling = () => {
+    simulation.monthly = PRICING.monthlyCost(simulation.plan, Object.assign({}, simulation.usage, {
+      baseFee: simulation.baseFee,
+      rateMonthly: PRICING.monthlyUsage(simulation.rate)
+    }));
+  };
   const resetRuntime = () => {
     Object.assign(simulation, {
       time: 0, running: false, spent: 0, requests: 0, requestCount: 0,
@@ -112,6 +118,14 @@ function makeHost(input = candidate()) {
       identity.scenarioHash = null;
       identity.saveError = null;
       return { nodeId, params: clone(node.p) };
+    },
+    setPlan: plan => {
+      simulation.plan = plan;
+      refreshBilling();
+    },
+    setBillingInputs: patch => {
+      Object.assign(simulation, patch);
+      refreshBilling();
     },
     start: speed => {
       if (speed !== undefined) simulation.speed = speed;
@@ -189,6 +203,8 @@ test('capabilities advertise versions, node types, limits, and deterministic clo
   assert.equal(result.data.limits.maxSpeed, 7200);
   assert.equal(result.data.limits.maxRunSeconds, 31536000);
   assert.equal(result.data.persistence.available, true);
+  assert.ok(result.data.methods.includes('setPlan'));
+  assert.ok(result.data.methods.includes('setBillingInputs'));
 });
 
 test('validate is strict, structured, and non-mutating', () => {
@@ -388,6 +404,136 @@ test('setParams validates the whole patch before updating one node', () => {
     assert.equal(result.ok, false);
     assert.equal(result.error.code, code);
     assert.deepEqual(host.getScenario(), before);
+  });
+});
+
+test('setPlan recomputes Free, Paid, and Custom billing and allowance semantics', () => {
+  const host = makeHost();
+  const daysPerMonth = PRICING.hoursPerMonth / 24;
+  const usage = {
+    workersRequests: 15000000,
+    workersCpuMs: 26280000000,
+    cpuMsPerRequest: 12,
+    doRequests: 1500000
+  };
+  Object.assign(host.runtime, {
+    usage, rate: 0.01, time: 42, spent: 3, requests: 7, requestCount: 7
+  });
+  const sim = API.createAgentApi(host);
+  const scenario = host.getScenario();
+  const runId = host.getIdentity().runId;
+
+  const free = sim.setPlan('free');
+  assert.equal(free.ok, true);
+  assert.deepEqual(free.data, sim.getState().data);
+  const freeState = free.data;
+  const freeById = id => freeState.cloudflare.allowances.find(item => item.id === id);
+  assert.equal(freeState.plan, 'free');
+  assert.equal(freeState.monthly.plan, 'free');
+  assert.equal(freeState.monthly.total, 0);
+  assert.equal(freeById('workersRequests').unit, 'requests/day');
+  assert.equal(freeById('workersRequests').period, 'per day');
+  assert.equal(freeById('workersRequests').used, 15000000 / daysPerMonth);
+  assert.equal(freeById('workersRequests').included, 100000);
+  assert.equal(freeById('workersRequests').exceeded, true);
+  assert.equal(freeById('workersRequests').billable, 0);
+  assert.equal(freeById('workersRequests').cost, 0);
+  assert.equal(freeById('workersCpuMs').unit, 'CPU-ms/request');
+  assert.equal(freeById('workersCpuMs').period, 'per request');
+  assert.equal(freeById('workersCpuMs').used, 12);
+  assert.equal(freeById('workersCpuMs').included, 10);
+  assert.equal(freeById('workersCpuMs').exceeded, true);
+  assert.equal(freeById('workersCpuMs').billable, 0);
+  assert.equal(freeById('workersCpuMs').cost, 0);
+  assert.deepEqual(freeState.cloudflare.exceeded.map(item => item.id), ['workersRequests', 'workersCpuMs']);
+
+  const paid = sim.setPlan('paid');
+  assert.equal(paid.ok, true);
+  assert.deepEqual(paid.data, sim.getState().data);
+  const paidState = paid.data;
+  const paidById = id => paidState.cloudflare.allowances.find(item => item.id === id);
+  assert.equal(paidState.plan, 'paid');
+  assert.equal(paidState.monthly.plan, 'paid');
+  assert.equal(paidById('workersRequests').unit, 'requests/month');
+  assert.equal(paidById('workersRequests').period, 'per month');
+  assert.equal(paidById('workersRequests').billable, 5000000);
+  assert.equal(paidById('workersRequests').cost, 1.5);
+  assert.equal(paidById('workersCpuMs').over, 26250000000);
+  assert.equal(paidById('workersCpuMs').exceeded, true);
+  assert.equal(paidById('workersCpuMs').billable, 26250000000);
+  assert.equal(paidById('workersCpuMs').cost, 525);
+  assert.equal(paidById('doRequests').billable, 1000000);
+  assert.equal(paidById('doRequests').cost, 0.15);
+  assert.equal(paidState.monthly.total, 531.65);
+  assert.deepEqual(paidState.cloudflare.exceeded.map(item => item.id), ['workersRequests', 'workersCpuMs', 'doRequests']);
+
+  const custom = sim.setPlan('custom');
+  assert.equal(custom.ok, true);
+  assert.deepEqual(custom.data, sim.getState().data);
+  const customState = custom.data;
+  const customById = id => customState.cloudflare.allowances.find(item => item.id === id);
+  assert.equal(customState.plan, 'custom');
+  assert.equal(customState.monthly.plan, 'custom');
+  assert.equal(customState.monthly.total, PRICING.monthlyUsage(0.01));
+  assert.equal(customById('workersRequests').included, null);
+  assert.equal(customById('workersRequests').over, null);
+  assert.equal(customById('workersRequests').exceeded, null);
+  assert.equal(customById('workersRequests').billable, null);
+  assert.equal(customById('workersRequests').cost, null);
+  assert.deepEqual(customState.cloudflare.exceeded, []);
+  assert.deepEqual(customState.scenario, scenario);
+  assert.equal(customState.runId, runId);
+  assert.equal(customState.time, 42);
+  assert.equal(customState.simulation.spent, 3);
+  assert.equal(customState.requestCount, 7);
+  assert.equal(customState.dirty, false);
+  assert.equal(customState.scenarioRevision, 7);
+});
+
+test('setPlan rejects invalid values without changing state', () => {
+  const host = makeHost();
+  const sim = API.createAgentApi(host);
+  const before = sim.getState().data;
+  ['FREE', 'enterprise', '', null, undefined, 1, {}, []].forEach(plan => {
+    const result = sim.setPlan(plan);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, API.ERROR_CODES.INVALID_PARAMS);
+    assert.deepEqual(sim.getState().data, before);
+  });
+});
+
+test('setBillingInputs updates Custom atomically and rejects invalid patches', () => {
+  const host = makeHost();
+  host.runtime.rate = 0.01;
+  const sim = API.createAgentApi(host);
+  sim.setPlan('custom');
+  const updated = sim.setBillingInputs({ baseFee: 25, budget: 100 });
+  assert.equal(updated.ok, true);
+  assert.deepEqual(updated.data, sim.getState().data);
+  assert.equal(updated.data.plan, 'custom');
+  assert.equal(updated.data.baseFee, 25);
+  assert.equal(updated.data.budget, 100);
+  assert.equal(updated.data.monthly.base, 25);
+  assert.equal(updated.data.monthly.total, 25 + PRICING.monthlyUsage(0.01));
+
+  const before = sim.getState().data;
+  const invalid = [
+    [null, API.ERROR_CODES.INVALID_PARAMS],
+    [[], API.ERROR_CODES.INVALID_PARAMS],
+    [{}, API.ERROR_CODES.INVALID_PARAMS],
+    [{ rateMonthly: 1 }, API.ERROR_CODES.UNSUPPORTED_PARAMETER],
+    [{ baseFee: 10, budget: 100, extra: true }, API.ERROR_CODES.UNSUPPORTED_PARAMETER],
+    [{ baseFee: -1 }, API.ERROR_CODES.PARAMETER_OUT_OF_RANGE],
+    [{ baseFee: 10, budget: 0 }, API.ERROR_CODES.PARAMETER_OUT_OF_RANGE],
+    [{ baseFee: '10' }, API.ERROR_CODES.INVALID_PARAMS],
+    [{ budget: Number.NaN }, API.ERROR_CODES.INVALID_PARAMS],
+    [{ baseFee: Infinity }, API.ERROR_CODES.INVALID_PARAMS]
+  ];
+  invalid.forEach(([patch, code]) => {
+    const result = sim.setBillingInputs(patch);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, code);
+    assert.deepEqual(sim.getState().data, before);
   });
 });
 

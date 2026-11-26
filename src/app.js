@@ -624,6 +624,24 @@
     $('#k-modelreq').textContent = !ms.set ? 'unset' : state.requests > 0 ? perReq(state.modelSpent / state.requests) : '\u2014';
   }
 
+  function syncBillingControls() {
+    $('#plan').value = state.plan;
+    $('#budget').value = state.budget;
+    $('#basefee').value = state.baseFee;
+  }
+
+  function setPlan(plan) {
+    state.plan = plan;
+    syncBillingControls();
+    renderCost();
+  }
+
+  function setBillingInputs(patch) {
+    Object.assign(state, patch);
+    syncBillingControls();
+    renderCost();
+  }
+
   let drag = null, link = null, pan = null;
 
   function onNodeDown(ev) {
@@ -872,9 +890,9 @@
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
-  $('#budget').addEventListener('change', e => { state.budget = Math.max(1, parseFloat(e.target.value) || 1); renderCost(); });
-  $('#plan').addEventListener('change', e => { state.plan = e.target.value; renderCost(); });
-  $('#basefee').addEventListener('change', e => { state.baseFee = Math.max(0, parseFloat(e.target.value) || 0); renderCost(); });
+  $('#budget').addEventListener('change', e => setBillingInputs({ budget: Math.max(1, parseFloat(e.target.value) || 1) }));
+  $('#plan').addEventListener('change', e => setPlan(e.target.value));
+  $('#basefee').addEventListener('change', e => setBillingInputs({ baseFee: Math.max(0, parseFloat(e.target.value) || 0) }));
   $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
   $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
     '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
@@ -1240,6 +1258,8 @@
     getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
     loadScenario: (s, options) => installScenario(s, true, null, options),
     setParams: setNodeParams,
+    setPlan,
+    setBillingInputs,
     start: speed => {
       if (speed !== undefined) setSpeed(speed);
       setRunning(true);
@@ -1262,9 +1282,7 @@
 
   renderPalette();
   loadTemplate();
-  $('#budget').value = state.budget;
-  $('#plan').value = state.plan;
-  $('#basefee').value = state.baseFee;
+  syncBillingControls();
 
   let booted = false;
   const hashMatch = /^#s=(.+)$/.exec(location.hash);
