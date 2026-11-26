@@ -11,6 +11,9 @@ test('save status distinguishes saving, saved, rejection, server and network fai
   assert.equal(ux.saveStatus({ type: 'local' }).message, 'Local only');
   assert.equal(ux.saveStatus({ type: 'saving' }).phase, 'saving');
   assert.equal(ux.saveStatus({ type: 'saved' }).message, 'All changes saved');
+  assert.deepEqual(ux.saveStatus({ type: 'unsaved' }), {
+    phase: 'unsaved', message: 'Unsaved changes', retryable: false
+  });
   assert.deepEqual(ux.saveStatus({ type: 'rejected', message: 'bad scenario' }), {
     phase: 'error', message: 'Scenario not saved: bad scenario', retryable: false
   });

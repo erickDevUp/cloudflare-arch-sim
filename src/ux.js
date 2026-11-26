@@ -12,6 +12,7 @@
       case 'checking': return { phase: 'saving', message: 'Checking live channel…', retryable: false };
       case 'saving': return { phase: 'saving', message: 'Saving scenario…', retryable: false };
       case 'saved': return { phase: 'saved', message: 'All changes saved', retryable: false };
+      case 'unsaved': return { phase: 'unsaved', message: 'Unsaved changes', retryable: false };
       case 'rejected': return { phase: 'error', message: 'Scenario not saved: ' + event.message, retryable: false };
       case 'http': return {
         phase: 'error',

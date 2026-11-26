@@ -2562,6 +2562,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       case 'checking': return { phase: 'saving', message: 'Checking live channel…', retryable: false };
       case 'saving': return { phase: 'saving', message: 'Saving scenario…', retryable: false };
       case 'saved': return { phase: 'saved', message: 'All changes saved', retryable: false };
+      case 'unsaved': return { phase: 'unsaved', message: 'Unsaved changes', retryable: false };
       case 'rejected': return { phase: 'error', message: 'Scenario not saved: ' + event.message, retryable: false };
       case 'http': return {
         phase: 'error',
@@ -3996,6 +3997,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     state.scenarioRevision = null;
     state.scenarioHash = null;
     state.saveError = null;
+    if (!pendingSave) setSave({ type: 'unsaved' });
   }
 
   function saveFailure(error) {
@@ -4086,7 +4088,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
           else setSave({ type: 'http', status: status || 500 }, retry);
         } else {
           pendingSave = false;
-          setSave({ type: 'saved' });
+          setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           if (!channel) subscribe();
         }
       });
@@ -4103,7 +4105,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       return;
     }
     pendingSave = false;
-    setSave({ type: 'saved' });
+    setSave({ type: state.dirty ? 'unsaved' : 'saved' });
     if (!channel) subscribe();
   }
   function copyText(text, successMessage) {
@@ -4190,7 +4192,10 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     setSpeed,
     saveScenario: scenario => {
       clearTimeout(saveTimer);
-      return saveScenario(scenario);
+      return saveScenario(scenario).then(result => {
+        if (!result.error) applySaveResult(result);
+        return result;
+      });
     },
     getChannelStatus: () => ({
       available: !!channel,
@@ -4224,7 +4229,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       source.onopen = () => {
         if (channel !== source) return;
         clearError('channel');
-        if (!pendingSave) setSave({ type: 'saved' });
+        if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
       };
       source.onmessage = ev => {
         let msg;
@@ -4243,7 +4248,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         if (applyScenario(msg.scenario, false, storage)) {
           booted = true;
           if (state.nodes.map(n => n.id).join('|') !== before) fit();
-          if (!pendingSave) setSave({ type: 'saved' });
+          if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           toast('Scenario updated from the server');
         }
       };

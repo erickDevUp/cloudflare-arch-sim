@@ -1351,6 +1351,7 @@
     state.scenarioRevision = null;
     state.scenarioHash = null;
     state.saveError = null;
+    if (!pendingSave) setSave({ type: 'unsaved' });
   }
 
   function saveFailure(error) {
@@ -1441,7 +1442,7 @@
           else setSave({ type: 'http', status: status || 500 }, retry);
         } else {
           pendingSave = false;
-          setSave({ type: 'saved' });
+          setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           if (!channel) subscribe();
         }
       });
@@ -1458,7 +1459,7 @@
       return;
     }
     pendingSave = false;
-    setSave({ type: 'saved' });
+    setSave({ type: state.dirty ? 'unsaved' : 'saved' });
     if (!channel) subscribe();
   }
   function copyText(text, successMessage) {
@@ -1545,7 +1546,10 @@
     setSpeed,
     saveScenario: scenario => {
       clearTimeout(saveTimer);
-      return saveScenario(scenario);
+      return saveScenario(scenario).then(result => {
+        if (!result.error) applySaveResult(result);
+        return result;
+      });
     },
     getChannelStatus: () => ({
       available: !!channel,
@@ -1579,7 +1583,7 @@
       source.onopen = () => {
         if (channel !== source) return;
         clearError('channel');
-        if (!pendingSave) setSave({ type: 'saved' });
+        if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
       };
       source.onmessage = ev => {
         let msg;
@@ -1598,7 +1602,7 @@
         if (applyScenario(msg.scenario, false, storage)) {
           booted = true;
           if (state.nodes.map(n => n.id).join('|') !== before) fit();
-          if (!pendingSave) setSave({ type: 'saved' });
+          if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           toast('Scenario updated from the server');
         }
       };
