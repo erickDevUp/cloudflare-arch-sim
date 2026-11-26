@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // State channel server: serves the built page, the scenario JSON and an SSE stream.
 // No dependencies; Node 18+.
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -11,10 +12,13 @@ const require = createRequire(import.meta.url);
 const SCENARIO = require('./src/scenario.js');
 const root = path.dirname(fileURLToPath(import.meta.url));
 
-function send(res, code, type, body) {
-  res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
+function send(res, code, type, body, headers) {
+  res.writeHead(code, Object.assign({ 'content-type': type, 'cache-control': 'no-store' }, headers || {}));
   res.end(body);
 }
+
+const hashText = text => createHash('sha256').update(text).digest('hex');
+const etagFor = hash => '"' + hash + '"';
 
 const opaqueNodes = (scenario, catalog) =>
   scenario.nodes.filter(n => !Object.hasOwn(catalog.types, n.type));
@@ -51,6 +55,7 @@ export function createServer(options) {
   const catalog = options.catalog;
   const clients = new Set();
   const log = options.log || console;
+  let revision = 1;
   const extraHost = options.allowedHost && options.allowedHost !== '0.0.0.0' && options.allowedHost !== '::'
     ? String(options.allowedHost).toLowerCase()
     : null;
@@ -102,7 +107,12 @@ export function createServer(options) {
         const { error } = SCENARIO.validate(JSON.parse(stored), catalog);
         if (error) log.warn(error);
       } catch (e) { /* parse already passed */ }
-      return send(res, 200, 'application/json', stored);
+      const hash = hashText(stored);
+      return send(res, 200, 'application/json', stored, {
+        etag: etagFor(hash),
+        'x-scenario-revision': String(revision),
+        'x-scenario-hash': hash
+      });
     }
 
     if (url.pathname === '/scenario' && req.method === 'POST') {
@@ -130,11 +140,23 @@ export function createServer(options) {
           return send(res, 400, 'application/json', JSON.stringify({ error: error || 'Scenario: invalid' }));
         }
         const stored = storedScenario(scenarioPath, catalog);
+        const storedText = readStored(scenarioPath);
+        const storedHash = storedText === null ? null : hashText(storedText);
+        const storedEtag = storedHash === null ? null : etagFor(storedHash);
+        if (req.headers['if-match'] && req.headers['if-match'] !== storedEtag) {
+          return send(res, 409, 'application/json', JSON.stringify({
+            code: 'STORAGE_CONFLICT',
+            error: 'Scenario: storage changed since the loaded revision',
+            revision,
+            hash: storedHash
+          }));
+        }
         // A type reuse whose stored data cannot be preserved is a conflict,
         // not a merge; reject it with both types named instead of dropping data.
         const conflict = SCENARIO.mergeConflict(scenario, stored, catalog);
         if (conflict) {
           return send(res, 400, 'application/json', JSON.stringify({
+            code: 'STORAGE_CONFLICT',
             error: 'Scenario: node "' + conflict.id + '" type conflict: stored "' + conflict.storedType +
               '" cannot be replaced by "' + conflict.incomingType + '" without dropping its unknown data'
           }));
@@ -166,10 +188,12 @@ export function createServer(options) {
           }
         }
         const merged = SCENARIO.merge(scenario, stored, catalog);
+        const text = JSON.stringify(merged, null, 2) + '\n';
+        const hash = hashText(text);
         const tmp = scenarioPath + '.' + process.pid + '.' + Date.now() + '.tmp';
         try {
           fs.mkdirSync(path.dirname(scenarioPath), { recursive: true });
-          fs.writeFileSync(tmp, JSON.stringify(merged, null, 2) + '\n');
+          fs.writeFileSync(tmp, text);
           fs.renameSync(tmp, scenarioPath);
         } catch (err) {
           try { fs.unlinkSync(tmp); } catch (e) { /* nothing to clean */ }
@@ -177,11 +201,21 @@ export function createServer(options) {
           log.warn('Cannot write ' + scenarioPath + ': ' + message);
           return send(res, 500, 'application/json', JSON.stringify({ error: 'Scenario: write failed: ' + message }));
         }
-        const chunk = 'data: ' + JSON.stringify({ clientId: req.headers['x-client-id'] || '', scenario: merged }) + '\n\n';
+        revision++;
+        const eventId = 'scenario-' + revision;
+        const chunk = 'data: ' + JSON.stringify({
+          clientId: req.headers['x-client-id'] || '', scenario: merged, revision, hash, eventId
+        }) + '\n\n';
         clients.forEach(client => {
           if (!client.writableEnded) client.write(chunk);
         });
-        return send(res, 200, 'application/json', JSON.stringify({ ok: true, warning: error }));
+        return send(res, 200, 'application/json', JSON.stringify({
+          ok: true, warning: error, revision, hash, eventId, scenario: merged
+        }), {
+          etag: etagFor(hash),
+          'x-scenario-revision': String(revision),
+          'x-scenario-hash': hash
+        });
       });
       return;
     }

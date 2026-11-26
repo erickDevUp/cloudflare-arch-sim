@@ -10,7 +10,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 |---|---|
 | `src/index.html` | Page structure and script/style entry points |
 | `src/styles.css` | Layout, dark theme, and responsive presentation |
-| `src/app.js` | Simulation loop, rendering, chaos, state channel client, and `window.__SIM__` |
+| `src/app.js` | Simulation loop, rendering, chaos, state channel client, `window.SIM_API` host, and `window.__SIM__` |
+| `src/agent-api.js` | Versioned browser API, pure validation/result helpers, provenance, and structured errors |
 | `src/engine.js` | Pure queue capacity, forwarding, backlog, and retention helpers |
 | `src/catalog.js` | Node types, defaults, editable ranges, verified notes, and source links |
 | `src/pricing.js` | Source of truth for plans, prices, `asOf`, sources, and spend math |
@@ -20,8 +21,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `cli.mjs` | npm `bin` wrapper and agent-facing flag validation |
 | `build.mjs` | Inlines CSS, JavaScript, and icons into one offline HTML file |
 | `dist/cloudflare-arch-sim.html` | Generated package payload; never hand-edit |
-| `tests/` | Node built-in tests for engine, pricing, scenario, server, and CLI |
-| `docs/agent-operator.md` | Experimental agent-as-operator contract for scenario design and evaluation |
+| `tests/` | Node built-in tests for engine, pricing, scenario, server, CLI, and the agent API |
+| `docs/agent-operator.md` | Stable `window.SIM_API` v1 contract plus legacy HTTP/SSE operator behavior |
 | `docs/images/` | README screenshots |
 
 ## Entry points
@@ -29,7 +30,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - `npm run dev` starts `cli.mjs`, which serves the bundled page and state channel on loopback.
 - `node cli.mjs --path` prints the bundled HTML path; `node cli.mjs --help` prints CLI usage.
 - `node serve.mjs` runs the same server directly; tests use its exported `startServer`.
-- `window.__SIM__` exposes `load`, `export`, and `getState` to browser automation.
+- `window.SIM_API` exposes the version 1 capabilities/validate/load/set/plan/billing/run/state/export/save contract with structured results and exact simulated-time advancement.
+- `window.__SIM__` preserves the legacy `load`, `export`, and `getState` shapes for browser automation.
 - `npm run build` regenerates `dist/cloudflare-arch-sim.html`.
 
 ## Simulator invariants
@@ -41,6 +43,8 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 - Cloudflare usage, spend, overage, and projections exclude non-Cloudflare nodes. Model-token spend stays in a separate bucket.
 - `src/pricing.js` is the only pricing source of truth. Keep catalog price fields aligned with its dimensions.
 - `scenario.json` is the default scenario source of truth. Preserve unknown fields, params, and node types during edits.
+- `window.SIM_API` v1 fails closed on unsupported schema versions/nodes/params, returns structured results, uses exact simulated time for assessments, and never duplicates billing or engine math.
+- Scenario persistence is revisioned and atomic: v1 `save()` returns revision/hash only after 2xx, uses `If-Match`, and clears dirty only when the saved snapshot is still current.
 - `dist/` is generated. Commit it with source changes; CI validates freshness against a clean temporary build.
 - UI language is English. UI localization/copy work belongs to Phase 2 after P0.
 
@@ -96,6 +100,14 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 2. Preserve M/M/c, cache forwarding, full fan-out, simulated-time backlog, and retention semantics.
 3. Extend `tests/engine.test.mjs` with the smallest regression case.
 4. Run `npm test`, `npm run build`, and `npm run check:dist`.
+
+### Agent API
+
+1. Keep pure validation, result envelopes, request IDs, and provenance in [src/agent-api.js](src/agent-api.js); inject host functions for Node tests.
+2. Wire `src/app.js` to existing compute, queue, Durable Object, pricing, and control functions. Do not duplicate engine or billing logic.
+3. Preserve `window.__SIM__` return shapes and keep HTTP `/scenario`/SSE unversioned unless a separate task adds HTTP v1.
+4. Extend `tests/agent-api.test.mjs` for contract, error, atomicity, provenance, save conflicts, deterministic advancement, and compatibility behavior.
+5. Run `npm test`, `npm run build`, and `npm run check:dist`; exercise static site, Queue, AI retrieval, validation, reset, and save workflows in Orca's browser using only `window.SIM_API`.
 
 ### UI
 

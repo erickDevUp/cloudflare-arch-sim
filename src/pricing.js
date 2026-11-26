@@ -23,97 +23,97 @@
 
   const DIMS = [
     {
-      id: 'workersRequests', label: 'Workers requests', unit: 1e6,
+      id: 'workersRequests', label: 'Workers requests', unit: 1e6, usageUnit: 'requests/month',
       price: 0.30, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6,
+      id: 'workersCpuMs', label: 'Workers CPU', unit: 1e6, usageUnit: 'CPU-ms/month',
       price: 0.02, paidIncluded: 3e7, freePerRequest: 10,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'd1Rows', label: 'D1 rows read', unit: 1e6,
+      id: 'd1Rows', label: 'D1 rows read', unit: 1e6, usageUnit: 'rows read/month',
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.d1
     },
     {
-      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6,
+      id: 'doRequests', label: 'Durable Objects requests', unit: 1e6, usageUnit: 'requests/month',
       price: 0.15, paidIncluded: 1e6, freeDaily: 100000, roundUp: true,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6,
+      id: 'doGbS', label: 'Durable Objects duration', unit: 1e6, usageUnit: 'GB-s/month',
       price: 12.5, paidIncluded: 4e5, freeDaily: 13000, roundUp: true,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6,
+      id: 'doSqlRowsRead', label: 'DO SQLite rows read', unit: 1e6, usageUnit: 'rows read/month',
       price: 0.001, paidIncluded: 25e9, freeDaily: 5e6,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6,
+      id: 'doSqlRowsWritten', label: 'DO SQLite rows written', unit: 1e6, usageUnit: 'rows written/month',
       price: 1, paidIncluded: 50e6, freeDaily: 100000,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1,
+      id: 'doSqlStoredGb', label: 'DO SQLite stored data', unit: 1, usageUnit: 'GB-month',
       price: 0.20, paidIncluded: 5, freeMonthly: 5,
       verified: true, source: SOURCES.durableObjects
     },
     {
-      id: 'kvReads', label: 'KV reads', unit: 1e6,
+      id: 'kvReads', label: 'KV reads', unit: 1e6, usageUnit: 'reads/month',
       price: 0.50, paidIncluded: 1e7, freeDaily: 100000,
       verified: true, source: SOURCES.workers
     },
     {
-      id: 'queueOps', label: 'Queues operations', unit: 1e6,
+      id: 'queueOps', label: 'Queues operations', unit: 1e6, usageUnit: 'operations/month',
       price: 0.40, paidIncluded: 1e6, freeDaily: 10000,
       verified: true, source: SOURCES.queues
     },
     {
-      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6,
+      id: 'r2ClassA', label: 'R2 Class A operations', unit: 1e6, usageUnit: 'Class A operations/month',
       price: 4.50, paidIncluded: 1e6, freeMonthly: 1e6,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6,
+      id: 'r2ClassB', label: 'R2 Class B operations', unit: 1e6, usageUnit: 'Class B operations/month',
       price: 0.36, paidIncluded: 1e7, freeMonthly: 1e7,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1,
+      id: 'r2StorageGb', label: 'R2 Standard storage', unit: 1, usageUnit: 'GB-month',
       price: 0.015, paidIncluded: 10, freeMonthly: 10,
       verified: true, source: SOURCES.r2
     },
     {
-      id: 'imagesTransformed', label: 'Images transformations', unit: 1000,
+      id: 'imagesTransformed', label: 'Images transformations', unit: 1000, usageUnit: 'transformations/month',
       price: 0.50, paidIncluded: 5000, freeMonthly: 5000,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'imagesStored', label: 'Images stored', unit: 100000,
+      id: 'imagesStored', label: 'Images stored', unit: 100000, usageUnit: 'images/month',
       price: 5, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'imagesDelivered', label: 'Images delivered', unit: 100000,
+      id: 'imagesDelivered', label: 'Images delivered', unit: 100000, usageUnit: 'images/month',
       price: 1, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.images
     },
     {
-      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000,
+      id: 'streamStoredMinutes', label: 'Stream minutes stored', unit: 1000, usageUnit: 'minutes stored/month',
       price: 5, paidIncluded: 0, freeMonthly: 0, roundUp: true,
       verified: true, source: SOURCES.stream
     },
     {
-      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000,
+      id: 'streamDeliveredMinutes', label: 'Stream minutes delivered', unit: 1000, usageUnit: 'minutes delivered/month',
       price: 1, paidIncluded: 0, freeMonthly: 0,
       verified: true, source: SOURCES.stream
     },
     {
-      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000,
+      id: 'workersAiNeurons', label: 'Workers AI Neurons', unit: 1000, usageUnit: 'Neurons/month',
       price: 0.011, paidIncluded: 10000 * HOURS_PER_MONTH / 24, freeDaily: 10000,
       verified: true, source: SOURCES.workersAi
     }

@@ -50,6 +50,27 @@
     return { backlog: keptWait * cap, drops: expiredMsgs / dt };
   }
 
+  function advanceClock(runtime, seconds, step, settle) {
+    let remaining = seconds;
+    while (remaining > 0) {
+      const deadlines = Object.values(runtime.chaos || {})
+        .filter(value => typeof value === 'number' && isFinite(value) && value > runtime.time);
+      const until = deadlines.length ? Math.min.apply(null, deadlines) - runtime.time : Infinity;
+      const dt = Math.min(remaining, until);
+      const sample = step(dt, runtime.time) || {};
+      runtime.time += dt;
+      runtime.spent = (runtime.spent || 0) + (+sample.rate || 0) * dt;
+      runtime.requests = (runtime.requests || 0) + (+sample.requests || 0) * dt;
+      runtime.modelSpent = (runtime.modelSpent || 0) + (+sample.modelRate || 0) * dt;
+      Object.keys(runtime.chaos || {}).forEach(key => {
+        if (runtime.chaos[key] <= runtime.time) delete runtime.chaos[key];
+      });
+      remaining -= dt;
+      if (settle) settle(runtime.time);
+    }
+    return runtime;
+  }
+
   function erlangC(a, c) {
     const servers = Math.max(1, Math.round(c));
     if (servers <= 1) return Math.min(1, a);
@@ -276,6 +297,6 @@
     return u;
   }
 
-  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, erlangC,
+  return { DEFAULT_RETENTION, MODEL, capacity, forward, queueWait, step, advanceClock, erlangC,
     durableObject, model429, compute, usage };
 });

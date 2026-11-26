@@ -47,6 +47,23 @@ test('retention 0 disables expiry: backlog grows unbounded, nothing drops', () =
   assert.equal(unlimited.drops, 0);
 });
 
+test('advanceClock integrates exact simulated time and splits at chaos expiry', () => {
+  const runtime = { time: 0, spent: 0, requests: 0, modelSpent: 0, chaos: { m429: 5 } };
+  const segments = [];
+  const settled = [];
+  QE.advanceClock(runtime, 10, (dt, time) => {
+    segments.push([dt, time]);
+    return { rate: time < 5 ? 2 : 4, requests: time < 5 ? 3 : 5, modelRate: time < 5 ? 1 : 2 };
+  }, time => settled.push(time));
+  assert.deepEqual(segments, [[5, 0], [5, 5]]);
+  assert.deepEqual(settled, [5, 10]);
+  assert.equal(runtime.time, 10);
+  assert.equal(runtime.spent, 30);
+  assert.equal(runtime.requests, 40);
+  assert.equal(runtime.modelSpent, 15);
+  assert.deepEqual(runtime.chaos, {});
+});
+
 test('Erlang wait stays continuous across the 400-server cap', () => {
   const wait = c => QE.erlangC(200, c) / (c - 200);
   const below = wait(399);
