@@ -1498,9 +1498,190 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.SIM_API_FACTORY = api;
+  if (root) root.SIM_STATE_CORE = api;
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
+
+  /**
+   * @typedef {Object} StateIdentity
+   * @property {number | null} [scenarioRevision]
+   * @property {string | null} [scenarioHash]
+   * @property {string | null} [runId]
+   * @property {boolean} [dirty]
+   * @property {boolean} [saving]
+   * @property {{ code: string, message: string, details?: unknown } | null} [saveError]
+   */
+
+  /**
+   * @typedef {Object} RuntimeState
+   * @property {number} time
+   * @property {number} spent
+   * @property {number} rate
+   * @property {number} pathLat
+   * @property {boolean} running
+   * @property {number} speed
+   * @property {string} plan
+   * @property {number} baseFee
+   * @property {number} budget
+   * @property {number} requests
+   * @property {number} [requestCount]
+   * @property {number} modelSpent
+   * @property {number} cpuRate
+   * @property {Record<string, number>} backlog
+   * @property {Record<string, number>} drops
+   * @property {Record<string, Record<string, number | boolean>>} res
+   * @property {Record<string, number>} chaos
+   * @property {Record<string, unknown>} usage
+   * @property {Record<string, unknown>} monthly
+   * @property {Record<string, unknown>} modelSpend
+   */
+
+  /**
+   * @typedef {Object} ScenarioNode
+   * @property {string} id
+   * @property {string} type
+   */
+
+  /**
+   * @param {StateIdentity} identity
+   * @returns {StateIdentity}
+   */
+  function identityState(identity) {
+    return {
+      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
+      scenarioHash: identity.scenarioHash || null,
+      runId: identity.runId == null ? null : identity.runId,
+      dirty: !!identity.dirty,
+      saving: !!identity.saving,
+      saveError: identity.saveError || null
+    };
+  }
+
+  /**
+   * @param {StateIdentity} state
+   */
+  function markDirty(state) {
+    state.dirty = true;
+    state.scenarioRevision = null;
+    state.scenarioHash = null;
+    state.saveError = null;
+  }
+
+  /**
+   * @param {StateIdentity} state
+   * @param {{ code: string, message: string, details?: unknown }} error
+   */
+  function saveFailure(state, error) {
+    state.dirty = true;
+    state.saveError = error;
+    return { error };
+  }
+
+  /**
+   * @param {{ revision?: unknown, hash?: unknown, etag?: unknown } | null} storage
+   */
+  function parseStoredIdentity(storage) {
+    const revision = storage && Number(storage.revision);
+    const hash = storage && typeof storage.hash === 'string' ? storage.hash : null;
+    return {
+      revision: Number.isInteger(revision) ? revision : null,
+      hash,
+      etag: storage && storage.etag || (hash ? '"' + hash + '"' : null)
+    };
+  }
+
+  /**
+   * @param {unknown} left
+   * @param {unknown} right
+   */
+  function sameScenario(left, right) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  /**
+   * @param {RuntimeState} runtime
+   * @param {ScenarioNode[]} nodes
+   * @param {StateIdentity} identity
+   */
+  function simulationSnapshot(runtime, nodes, identity) {
+    const metrics = Object.create(null);
+    nodes.forEach(node => {
+      const result = runtime.res[node.id] || {};
+      metrics[node.id] = {
+        type: node.type,
+        lambda: result.lambda || 0,
+        util: result.util || 0,
+        err: result.err || 0,
+        lat: result.lat || 0,
+        cost: result.cost || 0,
+        out: result.out || 0,
+        capacity: result.capacity || 0,
+        backlog: runtime.backlog[node.id] || 0,
+        drops: runtime.drops[node.id] || 0,
+        billedRequests: result.billedRequests || 0,
+        doGbS: result.doGbS || 0,
+        objects: result.objects || 0,
+        perObjectRate: result.perObjectRate || 0,
+        objectLimit: result.objectLimit || 0,
+        overloaded: !!result.overloaded
+      };
+    });
+    return {
+      time: runtime.time,
+      spent: runtime.spent,
+      rate: runtime.rate,
+      pathLat: runtime.pathLat,
+      running: runtime.running,
+      speed: runtime.speed,
+      plan: runtime.plan,
+      baseFee: runtime.baseFee,
+      budget: runtime.budget,
+      requests: runtime.requests,
+      requestCount: runtime.requestCount == null ? runtime.requests : runtime.requestCount,
+      modelSpent: runtime.modelSpent,
+      cpuRate: runtime.cpuRate,
+      ...identityState(identity),
+      chaos: Object.keys(runtime.chaos).filter(key => runtime.chaos[key] > runtime.time),
+      usage: runtime.usage,
+      monthly: runtime.monthly,
+      modelSpend: runtime.modelSpend,
+      nodes: metrics
+    };
+  }
+
+  /**
+   * @param {Pick<RuntimeState, 'running' | 'speed' | 'time'>} simulation
+   * @param {StateIdentity} identity
+   */
+  function controlState(simulation, identity) {
+    const stored = identityState(identity);
+    return {
+      running: simulation.running,
+      speed: simulation.speed,
+      time: simulation.time,
+      runId: stored.runId,
+      scenarioRevision: stored.scenarioRevision,
+      scenarioHash: stored.scenarioHash,
+      dirty: stored.dirty,
+      saving: stored.saving,
+      saveError: stored.saveError
+    };
+  }
+
+  return { identityState, markDirty, saveFailure, parseStoredIdentity, sameScenario, simulationSnapshot, controlState };
+});
+
+</script>
+<script>
+(function (root, factory) {
+  const core = typeof module === 'object' && module.exports ? require('./state-core.cjs') : root && root.SIM_STATE_CORE;
+  const api = factory(core);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.SIM_API_FACTORY = api;
+})(typeof window !== 'undefined' ? window : null, function (CORE) {
+  'use strict';
+
+  if (!CORE) throw new Error('SIM_API state core is missing');
 
   const VERSION = 1;
   const SCHEMA_VERSION = 1;
@@ -2051,7 +2232,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     const catalog = host.catalog;
     const pricing = host.pricing;
     const model = host.getModel();
-    const identity = host.getIdentity();
+    const identity = CORE.identityState(host.getIdentity());
     const provenanceNodes = Object.fromEntries(scenario.nodes.map(node => {
       const def = hasOwn(catalog.types, node.type) ? catalog.types[node.type] : {};
       return [node.id, {
@@ -2204,12 +2385,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       apiVersion: VERSION,
       schemaVersion: SCHEMA_VERSION,
       modelVersion: MODEL_VERSION,
-      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-      scenarioHash: identity.scenarioHash || null,
-      runId: identity.runId == null ? null : identity.runId,
-      dirty: !!identity.dirty,
-      saving: !!identity.saving,
-      saveError: identity.saveError || null,
+      ...identity,
       version: VERSION,
       scenario,
       time: simulation.time,
@@ -2262,22 +2438,6 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     return { data: buildSnapshot(simulation, scenario, host) };
   }
 
-  function controlState(host) {
-    const state = host.getSimulation();
-    const identity = host.getIdentity();
-    return {
-      running: state.running,
-      speed: state.speed,
-      time: state.time,
-      runId: identity.runId == null ? null : identity.runId,
-      scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-      scenarioHash: identity.scenarioHash || null,
-      dirty: !!identity.dirty,
-      saving: !!identity.saving,
-      saveError: identity.saveError || null
-    };
-  }
-
   function capabilities(host) {
     return clone({
       apiVersion: VERSION,
@@ -2303,15 +2463,15 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     }
     let seq = 0;
     const loadedData = (validated, saved) => {
-      const identity = host.getIdentity();
+      const identity = CORE.identityState(host.getIdentity());
       return {
         scenario: host.getScenario(),
         warnings: validated.warnings,
         unsupported: validated.unsupported,
-        scenarioRevision: identity.scenarioRevision == null ? null : identity.scenarioRevision,
-        scenarioHash: identity.scenarioHash || null,
-        runId: identity.runId == null ? null : identity.runId,
-        dirty: !!identity.dirty,
+        scenarioRevision: identity.scenarioRevision,
+        scenarioHash: identity.scenarioHash,
+        runId: identity.runId,
+        dirty: identity.dirty,
         save: saved
       };
     };
@@ -2379,7 +2539,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       reset() {
         return request(++seq, () => {
           host.reset();
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       run(options) {
@@ -2387,13 +2547,13 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
           const validated = validateRunOptions(options);
           if (validated.error) return { error: validated.error };
           host.run(validated.seconds);
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       pause() {
         return request(++seq, () => {
           host.pause();
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       setSpeed(speed) {
@@ -2401,7 +2561,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
           const validated = validateSpeed(speed);
           if (validated.error) return { error: validated.error };
           host.setSpeed(validated.speed);
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       start(options) {
@@ -2415,7 +2575,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
             if (validated.error) return { error: validated.error };
           }
           host.start(speed);
-          return { data: controlState(host) };
+          return { data: CORE.controlState(host.getSimulation(), host.getIdentity()) };
         });
       },
       getState() {
@@ -2478,6 +2638,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
   const QE = window.QUEUE_ENGINE;
+  const CORE = window.SIM_STATE_CORE;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -3448,35 +3609,13 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   }
 
   function simState() {
-    // Units: time is simulated seconds, spent/rate are USD and USD/s,
-    // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
-    const nodes = Object.create(null);
-    state.nodes.forEach(n => {
-      const r = state.res[n.id] || {};
-      nodes[n.id] = {
-        type: n.type, lambda: r.lambda || 0, util: r.util || 0,
-        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
-        out: r.out || 0, capacity: r.capacity || 0,
-        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0,
-        billedRequests: r.billedRequests || 0, doGbS: r.doGbS || 0,
-        objects: r.objects || 0, perObjectRate: r.perObjectRate || 0,
-        objectLimit: r.objectLimit || 0, overloaded: !!r.overloaded
-      };
-    });
     const usage = dimUsage();
     const monthly = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
       baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
     }));
-    return {
-      time: state.time, spent: state.spent, rate: state.rate,
-      pathLat: state.pathLat, running: state.running, speed: state.speed, plan: state.plan,
-      baseFee: state.baseFee, budget: state.budget, requests: state.requests, requestCount: state.requests,
-      modelSpent: state.modelSpent, cpuRate: state.cpuRate,
-      scenarioRevision: state.scenarioRevision, scenarioHash: state.scenarioHash,
-      runId: state.runId, dirty: state.dirty, saving: state.saving, saveError: state.saveError,
-      chaos: Object.keys(state.chaos).filter(k => state.chaos[k] > state.time),
-      usage, monthly, modelSpend: modelBucket(), nodes
-    };
+    return CORE.simulationSnapshot(Object.assign({}, state, {
+      usage, monthly, modelSpend: modelBucket()
+    }), state.nodes, state);
   }
 
   function installScenario(s, doFit, warning, options) {
@@ -3599,23 +3738,18 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   if (!http) resolveChannelReady(false);
 
   function setStoredIdentity(storage) {
-    const revision = storage && Number(storage.revision);
-    storedRevision = Number.isInteger(revision) ? revision : null;
-    storedHash = storage && typeof storage.hash === 'string' ? storage.hash : null;
-    storedEtag = storage && storage.etag || (storedHash ? '"' + storedHash + '"' : null);
+    const parsed = CORE.parseStoredIdentity(storage);
+    storedRevision = parsed.revision;
+    storedHash = parsed.hash;
+    storedEtag = parsed.etag;
   }
 
   function markDirty() {
-    state.dirty = true;
-    state.scenarioRevision = null;
-    state.scenarioHash = null;
-    state.saveError = null;
+    CORE.markDirty(state);
   }
 
   function saveFailure(error) {
-    state.dirty = true;
-    state.saveError = error;
-    return { error };
+    return CORE.saveFailure(state, error);
   }
 
   async function postScenario(scenario, body) {
@@ -3723,14 +3857,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     pricing: PRICING,
     getScenario: currentScenario,
     getSimulation: simState,
-    getIdentity: () => ({
-      scenarioRevision: state.scenarioRevision,
-      scenarioHash: state.scenarioHash,
-      runId: state.runId,
-      dirty: state.dirty,
-      saving: state.saving,
-      saveError: state.saveError
-    }),
+    getIdentity: () => CORE.identityState(state),
     getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
     loadScenario: (s, options) => installScenario(s, true, null, options),
     setParams: setNodeParams,
@@ -3781,7 +3908,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
         const storage = { revision: msg.revision, hash: msg.hash, etag: msg.hash ? '"' + msg.hash + '"' : null };
-        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) {
+        if (CORE.sameScenario(msg.scenario, currentScenario())) {
           setStoredIdentity(storage);
           state.scenarioRevision = storedRevision;
           state.scenarioHash = storedHash;
