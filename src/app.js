@@ -1294,9 +1294,15 @@
   let storedHash = null;
   let storedEtag = null;
   let saveQueue = Promise.resolve();
-  let resolveChannelReady;
-  const channelReady = new Promise(resolve => { resolveChannelReady = resolve; });
-  if (!http) resolveChannelReady(false);
+  let channelReady;
+  const newChannelReady = () => {
+    let resolve;
+    channelReady = new Promise(r => { resolve = r; });
+    channelReady.resolve = resolve;
+    return channelReady;
+  };
+  newChannelReady();
+  if (!http) channelReady.resolve(false);
   const bannerErrors = {};
   let saveState = UX.saveStatus({ type: 'local' });
 
@@ -1355,8 +1361,9 @@
 
   async function postScenario(scenario, body) {
     state.saving = true;
+    const ready = channelReady;
     try {
-      const available = http ? await channelReady : false;
+      const available = http ? await ready : false;
       if (!available) {
         return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: 'Scenario channel is unavailable' });
       }
@@ -1568,7 +1575,7 @@
       if (channel) return;
       const source = new EventSource('/events');
       channel = source;
-      resolveChannelReady(true);
+      channelReady.resolve(true);
       source.onopen = () => {
         if (channel !== source) return;
         clearError('channel');
@@ -1602,6 +1609,7 @@
       };
     };
     const bootstrap = () => {
+      const ready = newChannelReady();
       channelMode = 'checking';
       clearError('channel');
       setSave({ type: 'checking' });
@@ -1610,12 +1618,13 @@
         if (type.indexOf('json') < 0) {
           channelMode = 'local';
           pendingSave = false;
-          resolveChannelReady(false);
+          ready.resolve(false);
           setSave({ type: 'local' });
           return null;
         }
         if (!r.ok) {
           channelMode = 'error';
+          ready.resolve(false);
           setSave({ type: 'unavailable', status: r.status }, bootstrap, 'channel');
           return null;
         }
@@ -1639,6 +1648,7 @@
         if (channelMode === 'live' && pendingSave) pushScenario();
       }).catch(() => {
         channelMode = 'error';
+        ready.resolve(false);
         setSave({ type: 'network' }, bootstrap, 'channel');
       });
     };
