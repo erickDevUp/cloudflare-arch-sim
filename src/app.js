@@ -1637,7 +1637,7 @@
         subscribe();
         return r.json().then(s => {
           if (!s) return;
-          if (UX.bootstrapApply(pendingSave, booted) === 'apply') {
+          if (UX.bootstrapApply(pendingSave, state.dirty, booted) === 'apply') {
             booted = applyScenario(s, true, storage);
           } else {
             setStoredIdentity(storage);

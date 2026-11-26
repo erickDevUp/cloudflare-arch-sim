@@ -78,8 +78,8 @@
       (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
   }
 
-  function bootstrapApply(pendingSave, booted) {
-    if (pendingSave || booted) return 'identity';
+  function bootstrapApply(pendingSave, dirty, booted) {
+    if (pendingSave || dirty || booted) return 'identity';
     return 'apply';
   }
 

@@ -2628,8 +2628,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
   }
 
-  function bootstrapApply(pendingSave, booted) {
-    if (pendingSave || booted) return 'identity';
+  function bootstrapApply(pendingSave, dirty, booted) {
+    if (pendingSave || dirty || booted) return 'identity';
     return 'apply';
   }
 
@@ -4282,7 +4282,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         subscribe();
         return r.json().then(s => {
           if (!s) return;
-          if (UX.bootstrapApply(pendingSave, booted) === 'apply') {
+          if (UX.bootstrapApply(pendingSave, state.dirty, booted) === 'apply') {
             booted = applyScenario(s, true, storage);
           } else {
             setStoredIdentity(storage);

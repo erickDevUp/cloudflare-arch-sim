@@ -95,9 +95,10 @@ test('sheet focusables include summaries even inside closed details', () => {
   assert.equal(ux.sheetFocusable(el('INPUT', { offsetParent: false })), false);
 });
 
-test('recovered bootstrap keeps a pending local edit instead of applying stored data', () => {
-  assert.equal(ux.bootstrapApply(false, false), 'apply');
-  assert.equal(ux.bootstrapApply(true, false), 'identity');
-  assert.equal(ux.bootstrapApply(false, true), 'identity');
-  assert.equal(ux.bootstrapApply(true, true), 'identity');
+test('recovered bootstrap keeps pending or dirty local edits instead of applying stored data', () => {
+  assert.equal(ux.bootstrapApply(false, false, false), 'apply');
+  assert.equal(ux.bootstrapApply(true, false, false), 'identity');
+  assert.equal(ux.bootstrapApply(false, true, false), 'identity');
+  assert.equal(ux.bootstrapApply(false, false, true), 'identity');
+  assert.equal(ux.bootstrapApply(true, true, true), 'identity');
 });
