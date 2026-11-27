@@ -79,14 +79,9 @@
       (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
   }
 
-  function bootstrapApply(pendingSave, dirty, booted) {
-    if (pendingSave || dirty || booted) return 'identity';
-    return 'apply';
-  }
-
   const api = {
     saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError,
-    sheetFocusable, bootstrapApply
+    sheetFocusable
   };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -2,6 +2,7 @@
   const TYPES = window.CATALOG.types;
   const GROUPS = window.CATALOG.groups;
   const QE = window.QUEUE_ENGINE;
+  const CORE = window.SIM_STATE_CORE;
   const UX = window.UX;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
@@ -1145,35 +1146,13 @@
   }
 
   function simState() {
-    // Units: time is simulated seconds, spent/rate are USD and USD/s,
-    // per-node lat is seconds, cost is USD/s, lambda is req/s, util/err are 0..1.
-    const nodes = Object.create(null);
-    state.nodes.forEach(n => {
-      const r = state.res[n.id] || {};
-      nodes[n.id] = {
-        type: n.type, lambda: r.lambda || 0, util: r.util || 0,
-        err: r.err || 0, lat: r.lat || 0, cost: r.cost || 0,
-        out: r.out || 0, capacity: r.capacity || 0,
-        backlog: state.backlog[n.id] || 0, drops: state.drops[n.id] || 0,
-        billedRequests: r.billedRequests || 0, doGbS: r.doGbS || 0,
-        objects: r.objects || 0, perObjectRate: r.perObjectRate || 0,
-        objectLimit: r.objectLimit || 0, overloaded: !!r.overloaded
-      };
-    });
     const usage = dimUsage();
     const monthly = PRICING.monthlyCost(state.plan, Object.assign({}, usage, {
       baseFee: state.baseFee, rateMonthly: PRICING.monthlyUsage(state.rate)
     }));
-    return {
-      time: state.time, spent: state.spent, rate: state.rate,
-      pathLat: state.pathLat, running: state.running, speed: state.speed, plan: state.plan,
-      baseFee: state.baseFee, budget: state.budget, requests: state.requests, requestCount: state.requests,
-      modelSpent: state.modelSpent, cpuRate: state.cpuRate,
-      scenarioRevision: state.scenarioRevision, scenarioHash: state.scenarioHash,
-      runId: state.runId, dirty: state.dirty, saving: state.saving, saveError: state.saveError,
-      chaos: Object.keys(state.chaos).filter(k => state.chaos[k] > state.time),
-      usage, monthly, modelSpend: modelBucket(), nodes
-    };
+    return CORE.simulationSnapshot(Object.assign({}, state, {
+      usage, monthly, modelSpend: modelBucket()
+    }), state.nodes, state);
   }
 
   function installScenario(s, doFit, warning, options) {
@@ -1212,10 +1191,7 @@
       state.drops = drops;
       if (settings.newRunId !== false) state.runId = nextRunId();
       if (settings.persisted) {
-        state.scenarioRevision = storedRevision;
-        state.scenarioHash = storedHash;
-        state.dirty = false;
-        state.saveError = null;
+        CORE.markSaved(state, { revision: storedRevision, hash: storedHash });
       } else {
         markDirty();
       }
@@ -1226,7 +1202,11 @@
       if (warning) toast(warning);
       return true;
     } catch (err) {
-      Object.assign(state, previousState);
+      const previousIdentity = CORE.identityState(previousState);
+      Object.keys(previousState).forEach(key => {
+        if (!Object.hasOwn(previousIdentity, key)) state[key] = previousState[key];
+      });
+      CORE.restoreIdentity(state, previousIdentity);
       drag = previousDrag;
       link = previousLink;
       seq = previousSeq;
@@ -1275,7 +1255,7 @@
       render();
     } catch (err) {
       node.p = previousParams;
-      Object.assign(state, previousIdentity);
+      CORE.restoreIdentity(state, previousIdentity);
       Object.assign(state, previousModel);
       render();
       throw err;
@@ -1340,28 +1320,23 @@
   }
 
   function setStoredIdentity(storage) {
-    const revision = storage && Number(storage.revision);
-    storedRevision = Number.isInteger(revision) ? revision : null;
-    storedHash = storage && typeof storage.hash === 'string' ? storage.hash : null;
-    storedEtag = storage && storage.etag || (storedHash ? '"' + storedHash + '"' : null);
+    const parsed = CORE.parseStoredIdentity(storage);
+    storedRevision = parsed.revision;
+    storedHash = parsed.hash;
+    storedEtag = parsed.etag;
   }
 
   function markDirty() {
-    state.dirty = true;
-    state.scenarioRevision = null;
-    state.scenarioHash = null;
-    state.saveError = null;
+    CORE.markDirty(state);
     if (!pendingSave) setSave({ type: 'unsaved' });
   }
 
   function saveFailure(error) {
-    state.dirty = true;
-    state.saveError = error;
-    return { error };
+    return CORE.saveFailure(state, error);
   }
 
   async function postScenario(scenario, body) {
-    state.saving = true;
+    CORE.setSaving(state, true);
     const ready = channelReady;
     try {
       const available = http ? await ready : false;
@@ -1391,12 +1366,8 @@
         return saveFailure({ code: 'SAVE_FAILED', message: 'Scenario channel returned an invalid save result' });
       }
       setStoredIdentity({ revision: payload.revision, hash: payload.hash, etag: response.headers.get('etag') });
-      if (JSON.stringify(currentScenario()) === body) {
+      if (CORE.sameScenario(currentScenario(), scenario)) {
         installScenario(payload.scenario, false, null, { resetRuntime: false, persisted: true, newRunId: false });
-        state.scenarioRevision = storedRevision;
-        state.scenarioHash = storedHash;
-        state.dirty = false;
-        state.saveError = null;
       }
       return {
         data: {
@@ -1409,7 +1380,7 @@
     } catch (err) {
       return saveFailure({ code: 'SAVE_FAILED', message: String((err && err.message) || err).split('\n')[0] });
     } finally {
-      state.saving = false;
+      CORE.setSaving(state, false);
     }
   }
 
@@ -1523,14 +1494,7 @@
     pricing: PRICING,
     getScenario: currentScenario,
     getSimulation: simState,
-    getIdentity: () => ({
-      scenarioRevision: state.scenarioRevision,
-      scenarioHash: state.scenarioHash,
-      runId: state.runId,
-      dirty: state.dirty,
-      saving: state.saving,
-      saveError: state.saveError
-    }),
+    getIdentity: () => CORE.identityState(state),
     getModel: () => ({ requestsPerUserPerMonth: REQ_PER_USER_PER_MONTH, engine: Object.assign({}, QE.MODEL) }),
     loadScenario: (s, options) => installScenario(s, true, null, options),
     setParams: setNodeParams,
@@ -1590,12 +1554,9 @@
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
         const storage = { revision: msg.revision, hash: msg.hash, etag: msg.hash ? '"' + msg.hash + '"' : null };
-        if (JSON.stringify(msg.scenario) === JSON.stringify(currentScenario())) {
+        if (CORE.sameScenario(msg.scenario, currentScenario())) {
           setStoredIdentity(storage);
-          state.scenarioRevision = storedRevision;
-          state.scenarioHash = storedHash;
-          state.dirty = false;
-          state.saveError = null;
+          CORE.markSaved(state, storage);
           if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           return;
         }
@@ -1642,7 +1603,7 @@
         subscribe();
         return r.json().then(s => {
           if (!s) return;
-          if (UX.bootstrapApply(pendingSave, state.dirty, booted) === 'apply') {
+          if (CORE.bootstrapAction(pendingSave, state.dirty, booted) === 'apply') {
             booted = applyScenario(s, true, storage);
           } else {
             setStoredIdentity(storage);

@@ -83,6 +83,7 @@ async function browser(initial) {
     location: { protocol: 'http:', hash: '' },
     navigator: {},
     innerWidth: 1400,
+    matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
     addEventListener() {},
     requestAnimationFrame() {},
     EventSource: class {
@@ -98,7 +99,7 @@ async function browser(initial) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  for (const file of ['pricing.js', 'catalog.js', 'scenario.js', 'engine.js', 'state-core.mjs', 'agent-api.js', 'app.js']) {
+  for (const file of ['pricing.js', 'catalog.js', 'scenario.js', 'engine.js', 'state-core.mjs', 'agent-api.js', 'ux.js', 'app.js']) {
     const source = fs.readFileSync(path.join(root, 'src', file), 'utf8');
     vm.runInContext(source, sandbox, { filename: file });
   }

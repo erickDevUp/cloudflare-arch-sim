@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const ux = require('../src/ux.js');
+const core = require('../src/state-core.cjs');
 
 globalThis.CATALOG = { types: { workers: { name: 'Workers' }, traffic: { name: 'Traffic' } } };
 
@@ -99,9 +100,37 @@ test('sheet focusables include summaries even inside closed details', () => {
 });
 
 test('recovered bootstrap keeps pending or dirty local edits instead of applying stored data', () => {
-  assert.equal(ux.bootstrapApply(false, false, false), 'apply');
-  assert.equal(ux.bootstrapApply(true, false, false), 'identity');
-  assert.equal(ux.bootstrapApply(false, true, false), 'identity');
-  assert.equal(ux.bootstrapApply(false, false, true), 'identity');
-  assert.equal(ux.bootstrapApply(true, true, true), 'identity');
+  assert.equal(core.bootstrapAction(false, false, false), 'apply');
+  assert.equal(core.bootstrapAction(true, false, false), 'identity');
+  assert.equal(core.bootstrapAction(false, true, false), 'identity');
+  assert.equal(core.bootstrapAction(false, false, true), 'identity');
+  assert.equal(core.bootstrapAction(true, true, true), 'identity');
+});
+
+test('state core centralizes saving and persisted identity transitions', () => {
+  const state = {
+    scenarioRevision: null, scenarioHash: null, dirty: true, saving: false,
+    saveError: { code: 'SAVE_FAILED', message: 'failed' }
+  };
+  core.setSaving(state, true);
+  assert.equal(state.saving, true);
+  assert.deepEqual(core.markSaved(state, { revision: '4', hash: 'hash-4' }), {
+    revision: 4, hash: 'hash-4', etag: '"hash-4"'
+  });
+  assert.equal(state.scenarioRevision, 4);
+  assert.equal(state.scenarioHash, 'hash-4');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveError, null);
+  core.setSaving(state, false);
+  assert.equal(state.saving, false);
+
+  const rollback = Object.assign({}, state, { runId: 'run-7', saving: true });
+  core.restoreIdentity(rollback, {
+    scenarioRevision: null, scenarioHash: null, dirty: true,
+    saveError: { code: 'SAVE_FAILED', message: 'failed' }
+  });
+  assert.equal(rollback.runId, 'run-7');
+  assert.equal(rollback.saving, true);
+  assert.equal(rollback.dirty, true);
+  assert.equal(rollback.scenarioRevision, null);
 });
