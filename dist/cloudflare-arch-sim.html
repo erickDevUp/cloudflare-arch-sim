@@ -2839,7 +2839,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   }
 
   function sheetFocusable(el) {
-    return !el.disabled && el.offsetParent !== null &&
+    return !el.disabled && el.tabIndex >= 0 && el.offsetParent !== null &&
       (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
   }
 
@@ -4412,7 +4412,9 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         if (CORE.sameScenario(msg.scenario, currentScenario())) {
           setStoredIdentity(storage);
           CORE.markSaved(state, storage);
-          if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
+          pendingSave = false;
+          clearTimeout(saveTimer);
+          setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           return;
         }
         const before = state.nodes.map(n => n.id).join('|');

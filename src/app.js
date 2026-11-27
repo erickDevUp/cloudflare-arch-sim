@@ -1557,7 +1557,9 @@
         if (CORE.sameScenario(msg.scenario, currentScenario())) {
           setStoredIdentity(storage);
           CORE.markSaved(state, storage);
-          if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
+          pendingSave = false;
+          clearTimeout(saveTimer);
+          setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           return;
         }
         const before = state.nodes.map(n => n.id).join('|');

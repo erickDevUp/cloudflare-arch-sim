@@ -75,7 +75,7 @@
   }
 
   function sheetFocusable(el) {
-    return !el.disabled && el.offsetParent !== null &&
+    return !el.disabled && el.tabIndex >= 0 && el.offsetParent !== null &&
       (el.tagName === 'SUMMARY' || !el.closest('details:not([open])'));
   }
 

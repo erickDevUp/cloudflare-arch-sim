@@ -85,9 +85,10 @@ test('banner errors are scoped and channel failures take priority', () => {
   assert.equal(ux.bannerError(errors), null);
 });
 
-test('sheet focusables include summaries even inside closed details', () => {
+test('sheet focusables respect tab order and include summaries even inside closed details', () => {
   const el = (tag, opts) => ({
     tagName: tag,
+    tabIndex: opts.tabIndex ?? 0,
     disabled: !!opts.disabled,
     offsetParent: opts.offsetParent === false ? null : {},
     closest: () => opts.closedDetails ? {} : null
@@ -96,6 +97,7 @@ test('sheet focusables include summaries even inside closed details', () => {
   assert.equal(ux.sheetFocusable(el('A', { closedDetails: true })), false);
   assert.equal(ux.sheetFocusable(el('A', {})), true);
   assert.equal(ux.sheetFocusable(el('BUTTON', { disabled: true })), false);
+  assert.equal(ux.sheetFocusable(el('BUTTON', { tabIndex: -1 })), false);
   assert.equal(ux.sheetFocusable(el('INPUT', { offsetParent: false })), false);
 });
 

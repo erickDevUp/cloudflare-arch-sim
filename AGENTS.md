@@ -28,7 +28,6 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 | `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, scenario, server, CLI, browser/headless APIs, MCP stdio, and UX helpers |
 | `docs/agent-operator.md` | Stable `window.SIM_API` v1 contract plus legacy HTTP/SSE operator behavior |
 | `docs/mcp.md` | MCP stdio configuration, tool/resource/prompt contract, examples, and v1 boundary |
-| `tests/` | Node built-in tests for engine, pricing, scenario, server, CLI, agent API, and UX helpers |
 | `docs/images/` | README screenshots |
 
 ## Entry points

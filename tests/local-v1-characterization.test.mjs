@@ -16,8 +16,12 @@ const flush = async () => {
 function element() {
   const classes = new Set();
   const attributes = new Map();
+  const listeners = new Map();
+  let html = '';
   return {
     style: {}, dataset: {}, children: [], value: '', hidden: false, clientWidth: 1200, clientHeight: 800,
+    get innerHTML() { return html; },
+    set innerHTML(value) { html = value; if (value === '') this.children.length = 0; },
     classList: {
       add(...names) { names.forEach(name => classes.add(name)); },
       remove(...names) { names.forEach(name => classes.delete(name)); },
@@ -29,7 +33,13 @@ function element() {
         return enabled;
       }
     },
-    addEventListener() {},
+    addEventListener(type, callback) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(callback);
+    },
+    dispatchEvent(event) {
+      (listeners.get(event.type) || []).forEach(callback => callback(event));
+    },
     appendChild(child) { this.children.push(child); return child; },
     remove() {},
     setAttribute(name, value) { attributes.set(name, String(value)); },
@@ -46,7 +56,10 @@ function element() {
 function response(scenario, revision, hash, status = 200) {
   const payload = status === 200
     ? { ok: true, revision, hash, eventId: 'scenario-' + revision, scenario: clone(scenario) }
-    : { code: 'STORAGE_CONFLICT', error: 'Scenario: storage changed since the loaded revision' };
+    : {
+      code: status === 409 ? 'STORAGE_CONFLICT' : 'SAVE_FAILED',
+      error: status === 409 ? 'Scenario: storage changed since the loaded revision' : 'Scenario save failed'
+    };
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -65,19 +78,42 @@ async function browser(initial) {
   const posts = [];
   const sources = [];
   const elements = new Map();
+  const nodeLayer = element();
+  const rateInput = element();
+  rateInput.tagName = 'INPUT';
+  rateInput.dataset = { f: 'rate' };
+  rateInput.min = '0';
+  rateInput.max = '1000000';
+  rateInput.value = '10';
+  const inspector = element();
+  inspector.querySelectorAll = selector => selector.indexOf('input[data-f]') >= 0 ? [rateInput] : [];
+  elements.set('#node-layer', nodeLayer);
+  elements.set('#inspect', inspector);
+  elements.set('#inspect input[data-f=rate]', rateInput);
   const document = {
     title: '',
     body: element(),
+    activeElement: null,
     querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, element());
       return elements.get(selector);
     },
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) {
+      return selector === '.node' ? nodeLayer.children.filter(el => el.className.indexOf('node') >= 0) : [];
+    },
     createElement: element,
     createElementNS: element,
     addEventListener() {},
     elementFromPoint() { return null; }
   };
+  const timers = new Map();
+  let timerId = 0;
+  const setTimeout = (callback, delay) => {
+    const id = ++timerId;
+    timers.set(id, { callback, delay });
+    return id;
+  };
+  const clearTimeout = id => timers.delete(id);
   const sandbox = {
     console, document, setTimeout, clearTimeout, TextEncoder, TextDecoder,
     location: { protocol: 'http:', hash: '' },
@@ -109,6 +145,20 @@ async function browser(initial) {
   return {
     window: sandbox,
     posts,
+    editRate(rate) {
+      const source = nodeLayer.children.find(el => el.dataset.id === 'source');
+      source.dispatchEvent({ type: 'keydown', key: 'Enter', preventDefault() {} });
+      rateInput.value = String(rate);
+      rateInput.dispatchEvent({ type: 'input' });
+    },
+    runTimers(delay = 400) {
+      for (const [id, timer] of Array.from(timers)) {
+        if (timer.delay <= delay) {
+          timers.delete(id);
+          timer.callback();
+        }
+      }
+    },
     emit(scenario, nextRevision, nextHash, clientId = 'another-client') {
       sources[0].onmessage({ data: JSON.stringify({
         clientId, scenario: clone(scenario), revision: nextRevision, hash: nextHash,
@@ -284,4 +334,54 @@ test('SSE same-scenario updates clear stale save status without resetting runtim
   assert.equal(after.requestCount, before.requestCount);
   assert.deepEqual(after.scenario, before.scenario);
   assert.equal(posts.length, 1);
+});
+
+test('failed autosave clears pending error and Retry when a peer saves the identical scenario', async () => {
+  const initial = baseline();
+  const first = await browser(initial);
+  const peer = await browser(initial);
+  const api = first.window.SIM_API;
+
+  first.editRate(20);
+  assert.equal(first.window.document.querySelector('#save-status').textContent, 'Saving scenario…');
+  first.runTimers();
+  await flush();
+  assert.equal(first.posts.length, 1);
+  first.posts[0].resolve(response(null, 1, 'hash-1', 500));
+  await flush();
+
+  const failed = api.getState().data;
+  assert.equal(failed.dirty, true);
+  assert.equal(failed.saveError.code, 'SAVE_FAILED');
+  assert.equal(first.window.document.querySelector('#save-status').dataset.phase, 'error');
+  assert.equal(first.window.document.querySelector('#channel-error').hidden, false);
+  assert.equal(first.window.document.querySelector('#error-retry').hidden, false);
+
+  api.run({ seconds: 5 });
+  const before = api.getState().data;
+  assert.equal(before.time, 5);
+  assert.equal(before.requestCount, 100);
+
+  assert.equal(peer.window.SIM_API.setParams('source', { rate: 20 }).ok, true);
+  const peerSave = peer.window.SIM_API.save();
+  await flush();
+  assert.equal(peer.posts.length, 1);
+  peer.posts[0].resolve(response(JSON.parse(peer.posts[0].body), 2, 'hash-2'));
+  const saved = await peerSave;
+  assert.equal(saved.ok, true);
+
+  first.emit(saved.data.scenario, 2, 'hash-2');
+  const after = api.getState().data;
+  assert.equal(after.dirty, false);
+  assert.equal(after.saveError, null);
+  assert.equal(after.scenarioRevision, 2);
+  assert.equal(after.scenarioHash, 'hash-2');
+  assert.equal(after.runId, before.runId);
+  assert.equal(after.time, before.time);
+  assert.equal(after.requestCount, before.requestCount);
+  assert.equal(first.window.document.querySelector('#save-status').textContent, 'All changes saved');
+  assert.equal(first.window.document.querySelector('#save-status').dataset.phase, 'saved');
+  assert.equal(first.window.document.querySelector('#channel-error').hidden, true);
+  assert.equal(first.window.document.querySelector('#error-retry').hidden, true);
+  assert.equal(first.posts.length, 1);
 });
