@@ -62,6 +62,20 @@
 
   /**
    * @param {StateIdentity} state
+   * @param {Partial<StateIdentity>} identity
+   */
+  function restoreIdentity(state, identity) {
+    const restored = identityState(Object.assign({}, state, identity));
+    state.scenarioRevision = restored.scenarioRevision;
+    state.scenarioHash = restored.scenarioHash;
+    state.runId = restored.runId;
+    state.dirty = restored.dirty;
+    state.saving = restored.saving;
+    state.saveError = restored.saveError;
+  }
+
+  /**
+   * @param {StateIdentity} state
    */
   function markDirty(state) {
     state.dirty = true;
@@ -72,12 +86,33 @@
 
   /**
    * @param {StateIdentity} state
+   * @param {boolean} saving
+   */
+  function setSaving(state, saving) {
+    state.saving = !!saving;
+  }
+
+  /**
+   * @param {StateIdentity} state
    * @param {{ code: string, message: string, details?: unknown }} error
    */
   function saveFailure(state, error) {
     state.dirty = true;
     state.saveError = error;
     return { error };
+  }
+
+  /**
+   * @param {StateIdentity} state
+   * @param {{ revision?: unknown, hash?: unknown, etag?: unknown } | null} storage
+   */
+  function markSaved(state, storage) {
+    const parsed = parseStoredIdentity(storage);
+    state.scenarioRevision = parsed.revision;
+    state.scenarioHash = parsed.hash;
+    state.dirty = false;
+    state.saveError = null;
+    return parsed;
   }
 
   /**
@@ -99,6 +134,17 @@
    */
   function sameScenario(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  /**
+   * @param {boolean} pendingSave
+   * @param {boolean} dirty
+   * @param {boolean} booted
+   * @returns {'apply' | 'identity'}
+   */
+  function bootstrapAction(pendingSave, dirty, booted) {
+    if (pendingSave || dirty || booted) return 'identity';
+    return 'apply';
   }
 
   /**
@@ -171,5 +217,8 @@
     };
   }
 
-  return { identityState, markDirty, saveFailure, parseStoredIdentity, sameScenario, simulationSnapshot, controlState };
+  return {
+    identityState, restoreIdentity, markDirty, setSaving, saveFailure, markSaved, parseStoredIdentity,
+    sameScenario, bootstrapAction, simulationSnapshot, controlState
+  };
 });

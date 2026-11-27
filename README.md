@@ -31,6 +31,14 @@ changes with `npm run typecheck`, `npm run lint`, `npm test`, `npm run check:dis
 `npm run pack:check`; use Orca's browser for UI checks. Keep work on a task branch and leave
 merging and npm publication to the maintainer.
 
+## Product UX
+
+- **Mobile:** Components and Costs & inspector open as bottom sheets over a full-width canvas. Closed panels are inert, and each sheet has a visible close control.
+- **Keyboard:** Tab to canvas nodes, press Enter or Space to select, and press Delete to remove. The inspector's **Connect to** control adds edges without dragging. Costs and Components are ARIA tabs with arrow-key navigation.
+- **Saving:** The header shows local-only, saving, saved, or error state. Failed writes and disconnected live updates keep a persistent alert with Retry when recovery is possible.
+- **Sharing:** **Copy link** uses the existing `#s=` encoder. Links over 8,000 characters fail visibly; use **Copy JSON** instead.
+- **Provenance:** Verified prices and limits are grouped separately from editable workload assumptions. Cloudflare totals and external model spend stay distinct, and monthly figures state the 730-hour estimate period.
+
 ## Engine model
 
 - **Flow follows the edges.** A source emits `rate` requests/second. Every other node passes its
@@ -64,10 +72,11 @@ merging and npm publication to the maintainer.
 - **Chaos uses real time.** The 429, DO eviction, D1 write storm, cache miss, store 402 and
   webhook buttons set expiry with `performance.now()` in **real seconds** (8–12 s depending on
   the button), independently of the simulation-speed multiplier.
-- **Verified vs assumption.** The inspector labels a node `verified in docs` only when
-  `src/catalog.js` carries a `verified` note and a source link. Every other number says
-  `assumption — edit it`; those fields are editable and keep the simulator honest about what is
-  a hard limit and what is a guess.
+- **Verified vs assumption.** The inspector groups documented prices and limits under
+  **Verified prices & limits** when `src/catalog.js` carries a `verified` note and source link.
+  Documented default values show **Verified default · editable**; workload values show
+  **Editable assumptions**. Components without verified notes say **Editable assumptions**, so a
+  node-level source never implies that every field is verified.
 
 ## Cost model
 
@@ -128,8 +137,8 @@ cross-checks every catalog price against `PRICING.dims`.
 
 ![Custom plan: base fee, monthly budget bar, and model token spend in its own row](docs/images/cost-panel.png)
 
-*The Custom plan with a $10 base fee and a $5,000 budget. The model row shows a separately
-computed token bill; it never enters the Cloudflare total above it.*
+*The Custom plan with a $10 base fee and a $5,000 budget. The external model row stays separate
+from the Cloudflare total and remains `unset` until all token fields are complete.*
 
 ## Install and run
 
@@ -149,7 +158,7 @@ node build.mjs           # -> dist/cloudflare-arch-sim.html (single offline file
 npm run mcp                          # local MCP stdio server; stdout is protocol-only
 node serve.mjs --port 8788            # page + shared scenario channel on 127.0.0.1:8788
 node build.mjs --scenario scenario.json   # offline build with scenario.json embedded
-node --test                            # engine, pricing, model, scenario, server, CLI, APIs, and MCP
+node --test                            # engine, pricing, model, scenario, server, CLI, APIs, MCP, and UX
 ```
 
 `node serve.mjs --port 8788` serves the page at `http://127.0.0.1:8788/`, the live `scenario.json`
@@ -225,8 +234,8 @@ s.nodes.find(n => n.type === 'traffic').p.rate = 25;
 window.__SIM__.load(s);
 window.__SIM__.getState().nodes;   // live util / err / lat / cost per node
 
-// Build a shareable #s= link by hand (there is no Copy link button yet):
-const hash = '#s=' + window.SCENARIO.encode(s); // null if over 8000 chars
+// Copy link builds the same shareable #s= URL; the encoder returns null over 8000 chars:
+const hash = '#s=' + window.SCENARIO.encode(s);
 ```
 
 From a terminal, round-trip the stored file rather than posting a partial object — omitted known
@@ -243,9 +252,11 @@ curl -s -X POST http://127.0.0.1:8788/scenario \
 **Writes and updates:** human edits (a real drag, a new edge, a parameter edit, add/delete) POST
 to `/scenario` debounced by 400 ms; a click that does not move a node publishes nothing. A
 successful atomic write broadcasts the scenario over `/events` with a `clientId`, so other tabs
-converge without echoing the writer's own change. `POST /scenario` requires
-`content-type: application/json` and a `nodes` array; invalid content gets a 400/415, a failing
-write gets a 500, and broadcasting happens only after the write succeeds.
+converge without echoing the writer's own change. The header reports saving and saved states;
+non-400 failures, network rejections, and EventSource disconnects keep a persistent alert with a
+Retry action when recovery is possible. `POST /scenario` requires `content-type: application/json`
+and a `nodes` array; invalid content gets a 400/415, a failing write gets a 500, and broadcasting
+happens only after the write succeeds.
 
 **Lossless round-trip:** every write merges stored unknown data back in. An omitted opaque node,
 an unknown field or param, and an edge attached to a preserved node all come back; removing a
@@ -276,29 +287,30 @@ port can rewrite the file — there is no login or token. Keep it on loopback.
 | `src/agent-api.js` | Versioned API, pure validation/result helpers, provenance, and structured errors |
 | `src/headless-service.js` | Deterministic in-memory host shared by the MCP adapter and `SIM_API` semantics |
 | `packages/mcp/mcp-server.mjs` | MCP stdio tools, resources, prompt, schemas, and `cloudflare-arch-sim-mcp` workspace bin |
+| `src/ux.js` | Pure UX state, tab navigation, field provenance, and keyboard connect helpers |
 | `serve.mjs` | Local page, JSON endpoint, SSE broadcast, atomic writes and Host/Origin checks |
 | `cli.mjs` | npm `bin`: flag parsing and delegation to `serve.mjs`, or `--path` to print the bundled HTML |
 | `build.mjs` | Inlines CSS/JS/icons into `dist/cloudflare-arch-sim.html`; optional `--scenario` snapshot |
 | `scenario.json` | Live source of truth when served by `serve.mjs` |
-| `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, model, scenario, server, CLI, browser/headless APIs, and MCP stdio |
+| `tests/`, `packages/mcp/test/` | Node built-in tests for engine, pricing, model, scenario, server, CLI, browser/headless APIs, MCP stdio, and UX helpers |
 | `docs/images/` | Screenshots used in this README; `dist/` is generated, not hand-edited |
 
 ## Verification and known gaps
 
 `npm test` covers pricing math, catalog/price parity, P0 audit fixtures, queue and Durable Object
 physics, model billing, schema validation, merge rules, the HTTP channel, CLI validation,
-browser/headless API behavior, MCP discovery, and dependency isolation. `npm run typecheck`
-checks the shared state/API/MCP JavaScript, and `npm run lint` checks authored JavaScript for
-undefined, unused, and unreachable code. `npm run check:dist` verifies the tracked bundle against
-a fresh temporary build. Each package's `pack:check` script
-lists only its runtime files; `prepublishOnly` runs the tests and rebuilds the root bundle before
-publication. Prices are the values in `PRICING.dims` with `asOf: 2026-11-24`; adding a component
-or a price means updating `src/catalog.js` and `src/pricing.js` together.
+browser/headless API behavior, UX helpers, MCP discovery, and dependency isolation.
+`npm run typecheck` checks the shared state/API/MCP JavaScript, and `npm run lint` checks authored
+JavaScript for undefined, unused, and unreachable code. `npm run check:dist` verifies the tracked
+bundle against a fresh temporary build. Each package's `pack:check` script lists only its runtime
+files; `prepublishOnly` runs the tests and rebuilds the root bundle before publication. Prices are
+the values in `PRICING.dims` with `asOf: 2026-11-24`; adding a component or a price means updating
+`src/catalog.js` and `src/pricing.js` together.
 
 - The static HTML has no persistence of its own: reloading restarts from the embedded scenario
   (or the built-in template). Only `serve.mjs` provides the file-backed, SSE-driven loop; a plain
   static server gets one `/scenario` probe and no subscriptions.
-- There is no `Copy link` button; `window.SCENARIO.encode(export())` builds a `#s=` link by hand.
+- `Copy link` is limited to 8,000 encoded characters; larger scenarios require `Copy JSON`.
 - Fan-out is calls, not weighted routing: edge `weight` is stored and exported but ignored by
   physics. Cycles are skipped by the topological pass, so nodes in a cycle get zero traffic.
 - Vectorize dimensions, D1 writes/storage, KV writes/storage and R2 infrequent-access retrieval

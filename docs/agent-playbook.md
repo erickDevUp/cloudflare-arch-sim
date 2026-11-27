@@ -128,8 +128,8 @@ npm run check:dist
 
 ### UI
 
-1. Change [src/index.html](../src/index.html), [src/styles.css](../src/styles.css), or [src/app.js](../src/app.js) while keeping English copy.
-2. Build and start the server, then inspect it in Orca's browser:
+1. Change [src/index.html](../src/index.html), [src/styles.css](../src/styles.css), [src/app.js](../src/app.js), or [src/ux.js](../src/ux.js) while keeping English copy.
+2. Run `npm test -- tests/ux.test.mjs`, build, and start the server, then inspect it in Orca's browser:
 
 ```sh
 npm run build
@@ -140,7 +140,7 @@ orca console --page <browserPageId> --limit 50 --json
 orca tab close --page <browserPageId> --json
 ```
 
-3. Replace `<browserPageId>` with the returned id. Exercise the changed control, take a snapshot after async updates, and confirm the console has no new errors.
+3. Replace `<browserPageId>` with the returned id. Exercise the changed control, take a snapshot after async updates, and confirm the console has no new errors. For responsive or accessibility work, also check 390 px mobile sheets, inert closed panels, keyboard node selection/delete, ARIA tab arrow keys, and visible focus.
 4. Close the browser tab and stop the server. Do not substitute a generic browser tool.
 
 ### MCP

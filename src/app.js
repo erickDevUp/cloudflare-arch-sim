@@ -3,6 +3,7 @@
   const GROUPS = window.CATALOG.groups;
   const QE = window.QUEUE_ENGINE;
   const CORE = window.SIM_STATE_CORE;
+  const UX = window.UX;
   const NS = 'http://www.w3.org/2000/svg';
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -262,6 +263,8 @@
 
   function renderNodes() {
     const layer = $('#node-layer');
+    const focused = document.activeElement && document.activeElement.closest('.node');
+    const focusId = focused ? focused.dataset.id : null;
     layer.innerHTML = '';
     state.nodes.forEach(n => {
       const def = typeOf(n);
@@ -276,6 +279,9 @@
       const el = document.createElement('div');
       el.className = 'node' + (state.sel === n.id ? ' sel' : '') + (slashed ? ' hit' : '') + (bad ? ' sat' : '');
       el.dataset.id = n.id;
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', nname(n) + '. ' + badge(n, r) + '. Press Enter to select, Delete to remove.');
       el.style.left = n.x + 'px';
       el.style.top = n.y + 'px';
       const color = groupColor(n.type);
@@ -290,8 +296,19 @@
         '<span class="port" data-port="1"></span>';
       layer.appendChild(el);
     });
-    $$('.node').forEach(el => { el.addEventListener('pointerdown', onNodeDown); });
+    $$('.node').forEach(el => {
+      el.addEventListener('pointerdown', onNodeDown);
+      el.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        select(el.dataset.id, true);
+      });
+    });
     $$('.port').forEach(p => { p.addEventListener('pointerdown', onPortDown); });
+    if (focusId) {
+      const next = Array.from(layer.children).find(el => el.dataset.id === focusId);
+      if (next) next.focus({ preventScroll: true });
+    }
   }
 
   function badge(n, r) {
@@ -362,7 +379,7 @@
   function renderInspector() {
     const box = $('#inspect');
     if (!state.sel) {
-      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Add from the palette. Drag the dot on a node to connect. Drag the canvas to pan.</div>';
+      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Keyboard: Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use Connect to in the inspector to add an edge without dragging.</div>';
       return;
     }
     const n = nodeById(state.sel);
@@ -391,6 +408,13 @@
       storedGb: 'SQLite stored GB (total)',
       classAUnits: 'Class A units / request',
       storageGb: 'Stored GB',
+      priceClassA: '$ per million Class A units',
+      priceStorage: '$ per GB-month',
+      pricePerThousand: '$ per 1,000 transforms',
+      priceStored: '$ per 100,000 stored images',
+      priceDelivered: '$ per 100,000 delivered images',
+      storagePrice: '$ per 1,000 stored minutes',
+      deliveryPricePerThousand: '$ per 1,000 delivered minutes',
       uniqueTransforms: 'Unique transforms / month',
       imagesStored: 'Images stored / month',
       imagesDelivered: 'Images delivered / month',
@@ -406,22 +430,34 @@
     const RANGES = window.CATALOG.ranges || {};
     const ENUMS = window.CATALOG.enums || {};
     let html = '<div class="ins-head"><span class="dot" style="background:' + groupColor(n.type) + '"></span><b>' + esc(n.alias || def.name) + '</b></div>';
-    html += '<div class="ins-sub">' + (def.verified ? '<span class="ok">verified in docs</span>' : '<span class="asm">assumption &mdash; edit it</span>') + '</div>';
+    if (def.verified) {
+      html += '<div class="provenance verified"><b>Verified prices &amp; limits</b>' + def.verified + '</div>';
+    } else {
+      html += '<div class="provenance assumption"><b>Editable assumptions</b>No verified price or limit is provided for this component. Workload and price fields below are editable assumptions.</div>';
+    }
+    html += '<div class="field-group-title">Editable assumptions</div>';
     fields.forEach(f => {
       const L = labels[f] || f;
+      const provenance = UX.fieldProvenance(def, f);
+      const head = '<div class="field-head"><span>' + L + '</span><span class="prov-badge ' + provenance.kind + '">' + provenance.label + '</span></div>';
       if (ENUMS[f]) {
-        html += '<label class="field"><span>' + L + '</span><select data-f="' + f + '">' +
+        html += '<label class="field">' + head + '<select data-f="' + f + '">' +
           ENUMS[f].map(v => '<option value="' + v + '"' + (n.p[f] === v ? ' selected' : '') + '>' + v + '</option>').join('') +
           '</select></label>';
         return;
       }
       const R = RANGES[f] || [0, 1e6, 1];
-      html += '<label class="field"><span>' + L + '</span><input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
+      html += '<label class="field">' + head + '<input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
-    if (def.verified) html += '<p class="note ok-note">' + def.verified + '</p>';
-    if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">source</a>';
+    if (def.doc) html += '<a class="src" target="_blank" rel="noopener" href="' + def.doc + '">Source</a>';
+    const targets = UX.connectTargets(state.nodes, n.id);
+    if (targets.length) {
+      html += '<div class="connect"><label class="field"><span>Connect to</span><select id="connect-target">' +
+        targets.map(t => '<option value="' + esc(t.id) + '">' + esc(t.label) + '</option>').join('') +
+        '</select></label><button id="connect-node">Connect</button></div>';
+    }
     html += '<button class="del" id="delnode">Delete node</button>';
     box.innerHTML = html;
     $$('select[data-f]', box).forEach(sel => {
@@ -436,11 +472,7 @@
         const f = inp.dataset.f;
         const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
         if (inp.value.trim() === '') {
-          if (nullable) {
-            n.p[f] = null;
-            compute(); renderNodes(); renderCost(); renderInspectorStats();
-            pushScenario();
-          }
+          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); pushScenario(); }
           return;
         }
         const raw = parseFloat(inp.value);
@@ -452,13 +484,18 @@
       });
       inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
     });
-    $('#delnode').addEventListener('click', () => {
-      state.nodes = state.nodes.filter(x => x.id !== n.id);
-      state.edges = state.edges.filter(e => e.from !== n.id && e.to !== n.id);
-      state.sel = null;
-      compute(); render();
-      pushScenario();
-    });
+    $('#delnode').addEventListener('click', () => deleteSelected());
+    if ($('#connect-node')) {
+      $('#connect-node').addEventListener('click', () => {
+        const to = $('#connect-target').value;
+        if (addEdge(n.id, to)) {
+          compute(); renderNodes(); renderCost(); renderInspectorStats(); pushScenario();
+          toast('Connected to ' + nname(nodeById(to)));
+        } else {
+          toast('Those components are already connected');
+        }
+      });
+    }
   }
 
   function fmt(v) { return v < 1000 ? Math.round(v) + 'ms' : (v / 1000).toFixed(1) + 's'; }
@@ -508,14 +545,16 @@
     if (plan === 'free') {
       if (!res.exceeded.length) return '<div class="plan-line">within free limits</div>';
       return res.exceeded.map(l => {
-        const lim = l.period === 'per request' ? l.limit + ' ms/req' : human(l.limit) + '/mo';
-        const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/mo';
+        const lim = l.period === 'per request' ? l.limit + ' ms/req'
+          : l.period === 'per day' ? human(l.daily) + '/day' : human(l.limit) + '/month';
+        const used = l.period === 'per request' ? (Math.round(l.used * 10) / 10) + ' ms/req' : human(l.used) + '/month';
         return '<div class="plan-line over"><span>Free limit: ' + l.label + ' (' + lim + ')</span><b>' + used + '</b></div>';
       }).join('');
     }
     return res.lines.map(l =>
       '<div class="plan-line' + (l.cost > 0 ? ' over' : '') + '"><span>' + l.label + ' ' +
-      human(l.used) + ' / ' + human(l.included) + '</span><b>' + (l.cost > 0 ? '+' + money(l.cost) : '$0') + '</b></div>'
+      human(l.used) + ' / ' + (l.included > 0 ? human(l.included) + ' per month' : 'no monthly allowance') +
+      '</span><b>' + (l.cost > 0 ? '+' + money(l.cost) : '$0') + '</b></div>'
     ).join('');
   }
 
@@ -536,11 +575,11 @@
     const n = Math.floor(first.limit / perReq / REQ_PER_USER_PER_MONTH);
     if (!(n > 0)) return '';
     const plan = state.plan === 'paid' ? 'Paid $5' : 'Free';
-    const tip = 'Estimación basada en ' + REQ_PER_USER_PER_MONTH +
-      ' requests por usuario al mes. Primer límite: ' + first.label +
-      ' (' + human(first.limit) + '/mo).';
-    return '~' + n.toLocaleString() + ' usuarios en ' + plan +
-      ' antes del primer límite <span class="info" title="' + esc(tip) + '">&#9432;</span>';
+    const tip = 'Estimate based on ' + REQ_PER_USER_PER_MONTH +
+      ' requests per user per month. First limit: ' + first.label +
+      ' (' + human(first.limit) + '/month).';
+    return '~' + n.toLocaleString() + ' users on ' + plan +
+      ' before the first limit <span class="info" title="' + esc(tip) + '">&#9432;</span>';
   }
 
   function renderCost() {
@@ -571,10 +610,10 @@
     const overBudget = state.plan === 'custom' && res.total > state.budget;
     const over = overMoney || overFree || overBudget;
     const chip = $('#over-chip');
-    chip.textContent = overMoney ? '+ ' + money(res.overage) + ' extra'
-      : overFree ? 'Fuera de los límites Free'
-      : overBudget ? '+ ' + money(res.total - state.budget) + ' sobre presupuesto'
-      : 'Dentro del plan';
+    chip.textContent = overMoney ? '+ ' + money(res.overage) + ' overage'
+      : overFree ? 'Outside Free limits'
+      : overBudget ? '+ ' + money(res.total - state.budget) + ' over budget'
+      : 'Within plan';
     chip.className = 'chip' + (over ? ' over' : '');
 
     // Included bar shows what the plan covers; the red Extra bar exists only
@@ -595,10 +634,15 @@
       used = peak.used;
       limit = peak.limit;
       pct = peak.ratio * 100;
-      if (overFree) extra = { label: '+' + pctText((peak.ratio - 1) * 100) + '% sobre el límite', pct: 100 };
+      if (overFree) extra = { label: '+' + pctText((peak.ratio - 1) * 100) + '% over limit', pct: 100 };
     }
+    $('#incl-label-text').textContent = state.plan === 'paid' ? 'Plan base / month'
+      : state.plan === 'custom' ? 'Budget / month'
+      : peak && peak.period === 'per day' ? 'Highest daily limit'
+      : peak && peak.period === 'per request' ? 'Per-request limit'
+      : 'Highest monthly limit';
     $('#incl-label').textContent = used == null ? '\u2014'
-      : state.plan === 'free' && peak.period === 'per day' ? human(used) + ' / ' + human(limit) + '/mo'
+      : state.plan === 'free' && peak.period === 'per day' ? human(used) + ' / month vs ' + human(limit) + ' / day'
       : state.plan === 'free' && peak.period === 'per request' ? (Math.round(used * 10) / 10) + ' / ' + limit + ' ms/req'
       : money(used) + ' / ' + money(limit);
     const bar = $('#budget-bar');
@@ -614,6 +658,9 @@
     $('#capacity').innerHTML = capacity;
     $('#capacity').hidden = !capacity;
     $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
+    $('#cost-provenance').innerHTML = res.unverified.length
+      ? '<b>Some prices are unverified</b><span>Unverified dimensions are excluded from the total. Workload rates and monthly totals are estimates.</span>'
+      : '<b>Verified prices &amp; allowances</b><span>Workload rates and monthly totals are estimates.</span>';
     $('#custom-fields').hidden = state.plan !== 'custom';
 
     const ms = modelBucket();
@@ -650,6 +697,7 @@
     ev.stopPropagation();
     const el = ev.target.closest('.node');
     const n = nodeById(el.dataset.id);
+    el.focus({ preventScroll: true });
     select(n.id);
     drag = { id: n.id, sx: ev.clientX, sy: ev.clientY, ox: n.x, oy: n.y };
   }
@@ -711,11 +759,31 @@
     if (changed) pushScenario();
   }
 
-  function select(id) {
+  function select(id, revealInspector) {
     state.sel = id;
     renderNodes();
     renderInspector();
     setTab('components');
+    if (revealInspector && mobile.matches) openMobileSheet('right', true);
+  }
+
+  function deleteSelected() {
+    if (!state.sel) return;
+    const index = state.nodes.findIndex(n => n.id === state.sel);
+    const next = state.nodes[index + 1] || state.nodes[index - 1];
+    state.nodes = state.nodes.filter(n => n.id !== state.sel);
+    state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
+    state.sel = null;
+    compute(); render();
+    pushScenario();
+    requestAnimationFrame(() => {
+      if (mobile.matches && openSheet === 'right') {
+        $('#close-inspector').focus({ preventScroll: true });
+        return;
+      }
+      const el = next && Array.from($('#node-layer').children).find(node => node.dataset.id === next.id);
+      (el || $('#canvas')).focus({ preventScroll: true });
+    });
   }
 
   function fit() {
@@ -894,7 +962,7 @@
   $('#budget').addEventListener('change', e => setBillingInputs({ budget: Math.max(1, parseFloat(e.target.value) || 1) }));
   $('#plan').addEventListener('change', e => setPlan(e.target.value));
   $('#basefee').addEventListener('change', e => setBillingInputs({ baseFee: Math.max(0, parseFloat(e.target.value) || 0) }));
-  $('#k-asof').textContent = 'prices as of ' + PRICING.asOf;
+  $('#k-asof').textContent = 'Prices verified as of ' + PRICING.asOf;
   $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
     '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
     k.charAt(0).toUpperCase() + k.slice(1) + '</a>'
@@ -902,6 +970,7 @@
 
   $('#canvas').addEventListener('pointerdown', ev => {
     if (ev.target.closest('.node')) return;
+    $('#canvas').focus({ preventScroll: true });
     pan = { sx: ev.clientX, sy: ev.clientY, px: state.px, py: state.py };
     state.sel = null; renderNodes(); renderInspector();
   });
@@ -911,16 +980,38 @@
     render();
   }, { passive: false });
 
+  let refocusing = false;
   document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && openSheet) {
+      ev.preventDefault();
+      closeMobileSheet();
+      return;
+    }
+    if (ev.key === 'Tab' && openSheet) {
+      const target = UX.trapFocus(document.activeElement, ev.shiftKey, sheetFocusables());
+      if (target) {
+        ev.preventDefault();
+        refocusing = true;
+        target.focus({ preventScroll: true });
+        refocusing = false;
+      }
+    }
     if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
-    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
     if (!state.sel) return;
     ev.preventDefault();
-    state.nodes = state.nodes.filter(x => x.id !== state.sel);
-    state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
-    state.sel = null;
-    compute(); render();
-    pushScenario();
+    deleteSelected();
+  });
+  document.addEventListener('focusin', ev => {
+    if (!openSheet || refocusing) return;
+    const focusable = sheetFocusables();
+    if (focusable.indexOf(ev.target) >= 0) return;
+    const target = UX.trapFocus(ev.target, false, focusable);
+    if (target) {
+      refocusing = true;
+      target.focus({ preventScroll: true });
+      refocusing = false;
+    }
   });
 
   let rz = null;
@@ -929,17 +1020,88 @@
   if (window.ResizeObserver) new ResizeObserver(refit).observe($('#canvas'));
 
   const app = document.querySelector('.app');
-  const toggle = (btn, cls) => {
+  const mobile = window.matchMedia('(max-width: 700px)');
+  let openSheet = null;
+
+  function setPanelClosed(panel, closed) {
+    panel.inert = closed;
+    panel.setAttribute('aria-hidden', String(closed));
+  }
+
+  function syncPanels() {
+    const isMobile = mobile.matches;
+    app.classList.toggle('mobile', isMobile);
+    if (!isMobile) {
+      app.classList.remove('palette-open', 'right-open');
+      openSheet = null;
+    }
+    const paletteClosed = isMobile ? !app.classList.contains('palette-open') : app.classList.contains('no-pal');
+    const inspectorClosed = isMobile ? !app.classList.contains('right-open') : app.classList.contains('no-insp');
+    const active = document.activeElement;
+    const activePanel = active && (active.closest('.palette') ? 'palette' : active.closest('.right') ? 'right' : null);
+    if ((activePanel === 'palette' && paletteClosed) || (activePanel === 'right' && inspectorClosed)) active.blur();
+    setPanelClosed($('#palette'), paletteClosed);
+    setPanelClosed($('#right-panel'), inspectorClosed);
+    $('#tog-pal').setAttribute('aria-expanded', String(!paletteClosed));
+    $('#tog-insp').setAttribute('aria-expanded', String(!inspectorClosed));
+    $('#tog-pal').classList.toggle('on', !paletteClosed);
+    $('#tog-insp').classList.toggle('on', !inspectorClosed);
+    $('#sheet-scrim').hidden = !(isMobile && openSheet);
+    $('#close-palette').hidden = !isMobile;
+    $('#close-inspector').hidden = !isMobile;
+  }
+
+  function sheetFocusables() {
+    const panel = openSheet === 'palette' ? $('#palette') : $('#right-panel');
+    const focusable = $$('button:not([hidden]),input:not([hidden]),select:not([hidden]),a[href],summary', panel)
+      .filter(UX.sheetFocusable);
+    if (!$('#error-retry').hidden) focusable.unshift($('#error-retry'));
+    return focusable;
+  }
+
+  function openMobileSheet(name, focusPanel) {
+    if (!mobile.matches) return;
+    app.classList.toggle('palette-open', name === 'palette');
+    app.classList.toggle('right-open', name === 'right');
+    openSheet = name;
+    syncPanels();
+    if (focusPanel) requestAnimationFrame(() => {
+      if (openSheet !== name) return;
+      (name === 'palette' ? $('#search') : $('#close-inspector')).focus({ preventScroll: true });
+    });
+  }
+
+  function closeMobileSheet() {
+    const previous = openSheet;
+    app.classList.remove('palette-open', 'right-open');
+    openSheet = null;
+    syncPanels();
+    if (previous) (previous === 'palette' ? $('#tog-pal') : $('#tog-insp')).focus();
+  }
+
+  const togglePanel = cls => {
+    if (mobile.matches) {
+      const name = cls === 'no-pal' ? 'palette' : 'right';
+      if (openSheet === name) closeMobileSheet();
+      else openMobileSheet(name, true);
+      return;
+    }
     app.classList.toggle(cls);
-    btn.classList.toggle('on', app.classList.contains(cls));
+    syncPanels();
     refit();
   };
-  $('#tog-pal').addEventListener('click', () => toggle($('#tog-pal'), 'no-pal'));
-  $('#tog-insp').addEventListener('click', () => toggle($('#tog-insp'), 'no-insp'));
-  if (window.innerWidth < 780) { app.classList.add('no-insp'); $('#tog-insp').classList.remove('on'); }
+  $('#tog-pal').addEventListener('click', () => togglePanel('no-pal'));
+  $('#tog-insp').addEventListener('click', () => togglePanel('no-insp'));
+  $('#close-palette').addEventListener('click', closeMobileSheet);
+  $('#close-inspector').addEventListener('click', closeMobileSheet);
+  $('#sheet-scrim').addEventListener('click', closeMobileSheet);
+  if (mobile.addEventListener) mobile.addEventListener('change', syncPanels);
+  else mobile.addListener(syncPanels);
+  syncPanels();
 
   const tabCost = $('#tab-cost'), tabComponents = $('#tab-components');
-  function setTab(name) {
+  const tabNames = ['cost', 'components'];
+  function setTab(name, moveFocus) {
     const cost = name === 'cost';
     $('#cost').hidden = !cost;
     $('#inspect').hidden = cost;
@@ -947,9 +1109,20 @@
     tabComponents.classList.toggle('on', !cost);
     tabCost.setAttribute('aria-selected', String(cost));
     tabComponents.setAttribute('aria-selected', String(!cost));
+    tabCost.tabIndex = cost ? 0 : -1;
+    tabComponents.tabIndex = cost ? -1 : 0;
+    if (moveFocus) (cost ? tabCost : tabComponents).focus();
   }
   tabCost.addEventListener('click', () => setTab('cost'));
   tabComponents.addEventListener('click', () => setTab('components'));
+  $('.cost-tabs').addEventListener('keydown', ev => {
+    const current = tabCost.getAttribute('aria-selected') === 'true' ? 'cost' : 'components';
+    const next = UX.nextTab(current, ev.key, tabNames);
+    if (next !== current) {
+      ev.preventDefault();
+      setTab(next, true);
+    }
+  });
   setTab('cost');
 
   // Scenario channel: scenario.json is the source of truth for humans and agents.
@@ -1018,10 +1191,7 @@
       state.drops = drops;
       if (settings.newRunId !== false) state.runId = nextRunId();
       if (settings.persisted) {
-        state.scenarioRevision = storedRevision;
-        state.scenarioHash = storedHash;
-        state.dirty = false;
-        state.saveError = null;
+        CORE.markSaved(state, { revision: storedRevision, hash: storedHash });
       } else {
         markDirty();
       }
@@ -1032,7 +1202,11 @@
       if (warning) toast(warning);
       return true;
     } catch (err) {
-      Object.assign(state, previousState);
+      const previousIdentity = CORE.identityState(previousState);
+      Object.keys(previousState).forEach(key => {
+        if (!Object.hasOwn(previousIdentity, key)) state[key] = previousState[key];
+      });
+      CORE.restoreIdentity(state, previousIdentity);
       drag = previousDrag;
       link = previousLink;
       seq = previousSeq;
@@ -1081,7 +1255,7 @@
       render();
     } catch (err) {
       node.p = previousParams;
-      Object.assign(state, previousIdentity);
+      CORE.restoreIdentity(state, previousIdentity);
       Object.assign(state, previousModel);
       render();
       throw err;
@@ -1093,13 +1267,57 @@
   const clientId = Math.random().toString(36).slice(2);
   let saveTimer = null;
   let channel = null;
+  let subscribe = null;
+  let channelMode = http ? 'checking' : 'local';
+  let pendingSave = false;
   let storedRevision = null;
   let storedHash = null;
   let storedEtag = null;
   let saveQueue = Promise.resolve();
-  let resolveChannelReady;
-  const channelReady = new Promise(resolve => { resolveChannelReady = resolve; });
-  if (!http) resolveChannelReady(false);
+  let channelReady;
+  const newChannelReady = () => {
+    let resolve;
+    channelReady = new Promise(r => { resolve = r; });
+    channelReady.resolve = resolve;
+    return channelReady;
+  };
+  newChannelReady();
+  if (!http) channelReady.resolve(false);
+  const bannerErrors = {};
+  let saveState = UX.saveStatus({ type: 'local' });
+
+  function renderBannerError() {
+    const error = UX.bannerError(bannerErrors);
+    $('#channel-error-text').textContent = error ? error.message : '';
+    $('#error-retry').hidden = !(error && error.retry);
+    $('#channel-error').hidden = !error;
+  }
+
+  function showError(message, retry, scope) {
+    bannerErrors[scope || 'save'] = { message, retry: retry || null };
+    renderBannerError();
+  }
+
+  function clearError(scope) {
+    delete bannerErrors[scope];
+    renderBannerError();
+  }
+
+  function renderSaveState() {
+    const el = $('#save-status');
+    el.textContent = saveState.message;
+    el.dataset.phase = saveState.phase;
+  }
+
+  function setSave(event, retry, scope) {
+    saveState = UX.saveStatus(event);
+    if (saveState.phase === 'error') {
+      showError(saveState.message, saveState.retryable ? retry : null, scope || 'save');
+    } else if (bannerErrors.save) {
+      clearError('save');
+    }
+    renderSaveState();
+  }
 
   function setStoredIdentity(storage) {
     const parsed = CORE.parseStoredIdentity(storage);
@@ -1110,6 +1328,7 @@
 
   function markDirty() {
     CORE.markDirty(state);
+    if (!pendingSave) setSave({ type: 'unsaved' });
   }
 
   function saveFailure(error) {
@@ -1117,10 +1336,11 @@
   }
 
   async function postScenario(scenario, body) {
-    state.saving = true;
+    CORE.setSaving(state, true);
+    const ready = channelReady;
     try {
-      const available = http ? await channelReady : false;
-      if (!available || !channel) {
+      const available = http ? await ready : false;
+      if (!available) {
         return saveFailure({ code: 'CHANNEL_UNAVAILABLE', message: 'Scenario channel is unavailable' });
       }
       const headers = { 'content-type': 'application/json', 'x-client-id': clientId };
@@ -1146,12 +1366,8 @@
         return saveFailure({ code: 'SAVE_FAILED', message: 'Scenario channel returned an invalid save result' });
       }
       setStoredIdentity({ revision: payload.revision, hash: payload.hash, etag: response.headers.get('etag') });
-      if (JSON.stringify(currentScenario()) === body) {
+      if (CORE.sameScenario(currentScenario(), scenario)) {
         installScenario(payload.scenario, false, null, { resetRuntime: false, persisted: true, newRunId: false });
-        state.scenarioRevision = storedRevision;
-        state.scenarioHash = storedHash;
-        state.dirty = false;
-        state.saveError = null;
       }
       return {
         data: {
@@ -1164,7 +1380,7 @@
     } catch (err) {
       return saveFailure({ code: 'SAVE_FAILED', message: String((err && err.message) || err).split('\n')[0] });
     } finally {
-      state.saving = false;
+      CORE.setSaving(state, false);
     }
   }
 
@@ -1178,17 +1394,46 @@
 
   function pushScenario() {
     markDirty();
-    if (!http || !channel) return;
+    if (!http || channelMode === 'local') {
+      pendingSave = false;
+      if (channelMode === 'local') setSave({ type: 'local' });
+      return;
+    }
+    pendingSave = true;
     clearTimeout(saveTimer);
+    if (channelMode !== 'live') return;
+    setSave({ type: 'saving' });
     saveTimer = setTimeout(() => {
       saveScenario().then(result => {
-        if (result.error) toast(result.error.message);
+        if (result.error) {
+          const status = result.error.details && result.error.details.status;
+          const retry = () => { clearTimeout(saveTimer); saveScenario().then(r => applySaveResult(r)); };
+          if (status === 400) setSave({ type: 'rejected', message: result.error.message });
+          else if (result.error.code === 'CHANNEL_UNAVAILABLE') setSave({ type: 'network' }, retry);
+          else setSave({ type: 'http', status: status || 500 }, retry);
+        } else {
+          pendingSave = false;
+          setSave({ type: state.dirty ? 'unsaved' : 'saved' });
+          if (!channel) subscribe();
+        }
       });
     }, 400);
   }
 
-  function copyJson() {
-    const text = JSON.stringify(currentScenario(), null, 2);
+  function applySaveResult(result) {
+    if (result.error) {
+      const status = result.error.details && result.error.details.status;
+      const retry = () => { clearTimeout(saveTimer); saveScenario().then(r => applySaveResult(r)); };
+      if (status === 400) setSave({ type: 'rejected', message: result.error.message });
+      else if (result.error.code === 'CHANNEL_UNAVAILABLE') setSave({ type: 'network' }, retry);
+      else setSave({ type: 'http', status: status || 500 }, retry);
+      return;
+    }
+    pendingSave = false;
+    setSave({ type: state.dirty ? 'unsaved' : 'saved' });
+    if (!channel) subscribe();
+  }
+  function copyText(text, successMessage) {
     const fallback = () => {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -1198,16 +1443,44 @@
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       ta.remove();
-      toast(ok ? 'Scenario JSON copied' : 'Copy failed');
+      if (ok) {
+        clearError('copy');
+        toast(successMessage);
+      } else {
+        showError('Copy failed. Select and copy the text manually.', null, 'copy');
+      }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => toast('Scenario JSON copied'), fallback);
+      navigator.clipboard.writeText(text).then(() => {
+        clearError('copy');
+        toast(successMessage);
+      }, fallback);
     } else {
       fallback();
     }
   }
 
+  function copyJson() {
+    copyText(JSON.stringify(currentScenario(), null, 2), 'Scenario JSON copied');
+  }
+
+  function copyLink() {
+    const encoded = window.SCENARIO.encode(currentScenario());
+    if (!encoded) {
+      showError('Link is too large (8,000-character limit). Use Copy JSON instead.', null, 'copy');
+      toast('Link is too large. Use Copy JSON instead.');
+      return;
+    }
+    copyText(location.href.split('#')[0] + '#s=' + encoded, 'Scenario link copied');
+  }
+
   $('#copy-json').addEventListener('click', copyJson);
+  $('#copy-link').addEventListener('click', copyLink);
+  $('#error-retry').addEventListener('click', () => {
+    const error = UX.bannerError(bannerErrors);
+    if (error && error.retry) error.retry();
+  });
+  renderSaveState();
 
   window.__SIM__ = {
     load: raw => applyScenario(raw, true),
@@ -1237,7 +1510,10 @@
     setSpeed,
     saveScenario: scenario => {
       clearTimeout(saveTimer);
-      return saveScenario(scenario);
+      return saveScenario(scenario).then(result => {
+        if (!result.error) applySaveResult(result);
+        return result;
+      });
     },
     getChannelStatus: () => ({
       available: !!channel,
@@ -1263,61 +1539,88 @@
   });
 
   if (http) {
-    const subscribe = () => {
+    subscribe = () => {
       if (channel) return;
-      channel = new EventSource('/events');
-      resolveChannelReady(true);
-      channel.onmessage = ev => {
+      const source = new EventSource('/events');
+      channel = source;
+      channelReady.resolve(true);
+      source.onopen = () => {
+        if (channel !== source) return;
+        clearError('channel');
+        if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
+      };
+      source.onmessage = ev => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (!msg || !msg.scenario || msg.clientId === clientId) return;
         const storage = { revision: msg.revision, hash: msg.hash, etag: msg.hash ? '"' + msg.hash + '"' : null };
         if (CORE.sameScenario(msg.scenario, currentScenario())) {
           setStoredIdentity(storage);
-          state.scenarioRevision = storedRevision;
-          state.scenarioHash = storedHash;
-          state.dirty = false;
-          state.saveError = null;
+          CORE.markSaved(state, storage);
+          pendingSave = false;
+          clearTimeout(saveTimer);
+          setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           return;
         }
         const before = state.nodes.map(n => n.id).join('|');
         if (applyScenario(msg.scenario, false, storage)) {
           booted = true;
           if (state.nodes.map(n => n.id).join('|') !== before) fit();
+          if (!pendingSave) setSave({ type: state.dirty ? 'unsaved' : 'saved' });
           toast('Scenario updated from the server');
         }
       };
+      source.onerror = () => {
+        source.close();
+        if (channel === source) channel = null;
+        setSave({ type: 'disconnected' }, () => subscribe(), 'channel');
+      };
     };
-    // One probe: /scenario is both the bootstrap source and the signal that
-    // serve.mjs exists. A plain static server answers 404/HTML, so the page
-    // never subscribes or publishes to it.
-    fetch('/scenario')
-      .then(r => {
+    const bootstrap = () => {
+      const ready = newChannelReady();
+      channelMode = 'checking';
+      clearError('channel');
+      setSave({ type: 'checking' });
+      return fetch('/scenario').then(r => {
         const type = r.headers.get('content-type') || '';
-        const json = type.indexOf('json') >= 0;
-        if (json) subscribe();
-        if (r.ok) {
-          const storage = {
-            revision: r.headers.get('x-scenario-revision'),
-            hash: r.headers.get('x-scenario-hash'),
-            etag: r.headers.get('etag')
-          };
-          return r.json().then(s => {
-            if (!s) return;
-            if (!booted) booted = applyScenario(s, true, storage);
-            else setStoredIdentity(storage);
-          });
+        if (type.indexOf('json') < 0) {
+          channelMode = 'local';
+          pendingSave = false;
+          ready.resolve(false);
+          setSave({ type: 'local' });
+          return null;
         }
-        if (json) {
-          return r.json().then(
-            j => { toast(j.error || 'Scenario unavailable (HTTP ' + r.status + ')'); throw 0; },
-            () => { throw 0; }
-          );
+        if (!r.ok) {
+          channelMode = 'error';
+          ready.resolve(false);
+          setSave({ type: 'unavailable', status: r.status }, bootstrap, 'channel');
+          return null;
         }
-        throw 0;
-      })
-      .catch(() => {})
-      .finally(() => resolveChannelReady(!!channel));
+        const storage = {
+          revision: r.headers.get('x-scenario-revision'),
+          hash: r.headers.get('x-scenario-hash'),
+          etag: r.headers.get('etag')
+        };
+        channelMode = 'live';
+        subscribe();
+        return r.json().then(s => {
+          if (!s) return;
+          if (CORE.bootstrapAction(pendingSave, state.dirty, booted) === 'apply') {
+            booted = applyScenario(s, true, storage);
+          } else {
+            setStoredIdentity(storage);
+            booted = true;
+          }
+        });
+      }).then(() => {
+        if (channelMode === 'live' && pendingSave) pushScenario();
+      }).catch(() => {
+        channelMode = 'error';
+        ready.resolve(false);
+        setSave({ type: 'network' }, bootstrap, 'channel');
+      });
+    };
+    bootstrap();
   }
 
   window.addEventListener('hashchange', () => {

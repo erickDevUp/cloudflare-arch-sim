@@ -28,6 +28,7 @@ html = html.replace('<script src="scenario.js"></script>', () => `<script>\n${re
 html = html.replace('<script src="engine.js"></script>', () => `<script>\n${read('engine.js')}\n</script>`);
 html = html.replace('<script src="state-core.mjs"></script>', () => `<script>\n${stateCore}\n</script>`);
 html = html.replace('<script src="agent-api.js"></script>', () => `<script>\n${read('agent-api.js')}\n</script>`);
+html = html.replace('<script src="ux.js"></script>', () => `<script>\n${read('ux.js')}\n</script>`);
 
 const flag = process.argv.indexOf('--scenario');
 const scenarioFile = flag >= 0 ? process.argv[flag + 1] : null;
