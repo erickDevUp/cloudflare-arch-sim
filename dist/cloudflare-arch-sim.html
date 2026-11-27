@@ -71,12 +71,15 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 .canvas:focus-visible{outline-offset:-3px}
 .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .edge-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
-.edge{fill:none;stroke:#262633;stroke-width:1.6;transition:stroke .25s}
+.edge{fill:none;stroke:#262633;stroke-width:1.6;transition:stroke .25s;pointer-events:stroke;cursor:pointer}
 .bead{fill:#3ef2c0;stroke:rgba(62,242,192,.22);stroke-width:3;transition:fill .2s,stroke .2s}
 .bead.hot{fill:#ff3b5c;stroke:rgba(255,59,92,.26)}
 .edge.hot{stroke:#ef4444;stroke-width:2}
 .edge.temp{stroke:#6d5cff;stroke-dasharray:5 4}
 .edge.idle{stroke:#17171d;opacity:.55}
+.edge.sel,.edge:focus-visible{stroke:#8b7bff;stroke-width:2.4}
+.edge-label{fill:#8f8f9e;font:9px/1 ui-monospace,monospace;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.edge-label.sel{fill:#c8c0ff}
 
 .node-layer{position:absolute;left:0;top:0}
 .node{position:absolute;width:74px;user-select:none;cursor:grab}
@@ -337,7 +340,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
       <div class="canvas-wrap">
       <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
       <div class="canvas" id="canvas" tabindex="-1" role="group" aria-label="Architecture canvas" aria-describedby="canvas-help">
-        <p id="canvas-help" class="sr-only">Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use the inspector Connect to control to add an edge without dragging.</p>
+        <p id="canvas-help" class="sr-only">Tab to a node or connection, press Enter or Space to select it, and press Delete to remove it. Use the inspector Connect to control to add an edge without dragging.</p>
         <div class="world" id="world">
           <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
           <div class="node-layer" id="node-layer"></div>
@@ -1082,10 +1085,11 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         dropped++;
         return;
       }
-      const e = { from: re.from, to: re.to };
+      const e = { from: re.from, to: re.to, weight: 100 };
       if (re.weight !== undefined) {
         if (!fin(re.weight)) { issues.push('invalid weight on edges[' + i + ']'); dropped++; }
         else if (re.weight < 0) { issues.push('weight on edges[' + i + '] is negative, using 0'); dropped++; e.weight = 0; }
+        else if (re.weight > 100) { issues.push('weight on edges[' + i + '] is above 100, using 100'); dropped++; e.weight = 100; }
         else e.weight = re.weight;
       }
       Object.keys(re).forEach(k => {
@@ -1440,7 +1444,9 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
     edges.forEach(e => {
       if (!out[e.from] || !inc[e.to]) return;
-      out[e.from].push(e.to);
+      const weight = e.weight == null ? 100 : e.weight;
+      if (!(weight > 0)) return;
+      out[e.from].push(e);
       inc[e.to].push(e.from);
     });
     const indeg = {};
@@ -1450,7 +1456,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     while (q.length) {
       const id = q.shift();
       order.push(id);
-      out[id].forEach(to => { indeg[to]--; if (indeg[to] === 0) q.push(to); });
+      out[id].forEach(e => { indeg[e.to]--; if (indeg[e.to] === 0) q.push(e.to); });
     }
     const byId = new Map(nodes.map(n => [n.id, n]));
     const lambda = {}, outLambda = {}, lat = {}, arrive = {};
@@ -1509,9 +1515,11 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         r.drops = drops[id] || 0;
         res[id] = r;
       }
-      out[id].forEach(to => {
-        lambda[to] += outLambda[id];
-        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
+      out[id].forEach(e => {
+        const flow = outLambda[id] * ((e.weight == null ? 100 : e.weight) / 100);
+        if (flow <= 0) return;
+        lambda[e.to] += flow;
+        arrive[e.to] = Math.max(arrive[e.to], arrive[id] + lat[id]);
       });
     });
     let cpuRate = 0, rate = 0;
@@ -2252,6 +2260,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     const outgoing = new Map(scenario.nodes.map(node => [node.id, []]));
     (scenario.edges || []).forEach(edge => {
       if (!nodes.has(edge.from) || !nodes.has(edge.to)) return;
+      if (edge.weight !== undefined && edge.weight <= 0) return;
       indegree.set(edge.to, indegree.get(edge.to) + 1);
       outgoing.get(edge.from).push(edge.to);
     });
@@ -2938,7 +2947,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   function nextRunId() { return 'run-' + String(++runSeq).padStart(6, '0'); }
 
   const state = {
-    nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
+    nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, selEdge: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
     running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
     time: 0, spent: 0, requests: 0, modelSpent: 0, chaos: {}, errors: 0,
     res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {},
@@ -2960,12 +2969,15 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   function addEdge(from, to) {
     if (from === to) return null;
     if (state.edges.some(e => e.from === from && e.to === to)) return null;
-    const e = { from, to };
+    const e = { from, to, weight: 100 };
     state.edges.push(e);
     return e;
   }
 
   function nodeById(id) { return state.nodes.find(n => n.id === id); }
+  function edgeWeight(e) { return e.weight == null ? 100 : e.weight; }
+  function edgeSelected(e) { return !!state.selEdge && state.selEdge.from === e.from && state.selEdge.to === e.to; }
+  function selectedEdge() { return state.edges.find(edgeSelected) || null; }
 
   function eff(n, clock) {
     const current = clock || state;
@@ -3124,8 +3136,24 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
       const x1 = a.x + 74, y1 = a.y + 37, x2 = b.x, y2 = b.y + 37;
       const d = 'M' + x1 + ',' + y1 + ' C' + (x1 + 46) + ',' + y1 + ' ' + (x2 - 46) + ',' + y2 + ' ' + x2 + ',' + y2;
       const path = document.createElementNS(NS, 'path');
+      const selected = edgeSelected(e);
       path.setAttribute('d', d);
-      path.setAttribute('class', 'edge');
+      path.setAttribute('class', 'edge' + (selected ? ' sel' : ''));
+      path.setAttribute('data-from', e.from);
+      path.setAttribute('data-to', e.to);
+      path.setAttribute('tabindex', '0');
+      path.setAttribute('role', 'button');
+      path.setAttribute('aria-label', 'Connection from ' + nname(a) + ' to ' + nname(b) + ', ' + edgeWeight(e) + ' percent. Press Enter to select, Delete to remove.');
+      path.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        selectEdge(e, true);
+      });
+      path.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        selectEdge(e, true);
+      });
       g.appendChild(path);
       const len = path.getTotalLength();
       const pool = Math.min(64, Math.max(8, Math.ceil(len / 4) + 2));
@@ -3138,20 +3166,25 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         g.appendChild(c);
         dots.push({ el: c });
       }
-      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), from: e.from, to: e.to });
+      const label = document.createElementNS(NS, 'text');
+      const mid = path.getPointAtLength(len / 2);
+      label.setAttribute('x', mid.x);
+      label.setAttribute('y', mid.y - 8);
+      label.setAttribute('class', 'edge-label' + (selected ? ' sel' : ''));
+      label.textContent = edgeWeight(e) + '%';
+      g.appendChild(label);
+      state.edgeEls.push({ path, dots, label, len, pts: samplePath(path, len), from: e.from, to: e.to, weight: edgeWeight(e) });
     });
   }
 
   function animateEdges(ts) {
     const t = ts / 1000;
     (state.edgeEls || []).forEach(e => {
-      // ponytail: the from-node rate stands in for the edge's own share;
-      // per-edge weights (roadmap) will replace it with the edge share.
       const fr = state.res[e.from] || {};
-      const flow = fr.out || 0;
+      const flow = (fr.out || 0) * (e.weight / 100);
       const r = state.res[e.to] || {};
       const hot = flow > 0 && ((r.util || 0) >= 0.9 || (r.err || 0) > 0);
-      const cls = 'edge' + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
+      const cls = 'edge' + (edgeSelected(e) ? ' sel' : '') + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
       if (e.path.getAttribute('class') !== cls) e.path.setAttribute('class', cls);
       if (!state.running || flow <= 0 || e.len <= 0) {
         e.dots.forEach(d => { if (d.el.style.opacity !== '0') d.el.style.opacity = 0; });
@@ -3287,15 +3320,54 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 
   function renderInspectorStats() {
     const el = $('#ins-stats');
-    if (!el || !state.sel) return;
+    if (!el) return;
+    if (state.selEdge) {
+      const edge = selectedEdge();
+      if (!edge) return;
+      const flow = ((state.res[edge.from] || {}).out || 0) * (edgeWeight(edge) / 100);
+      el.innerHTML = '<div><span>share</span><b>' + edgeWeight(edge) + '%</b></div>' +
+        '<div><span>traffic</span><b>' + flow.toFixed(1) + '/s</b></div>';
+      return;
+    }
+    if (!state.sel) return;
     const n = nodeById(state.sel);
     el.innerHTML = statsHtml(state.res[state.sel] || {}, n);
   }
 
   function renderInspector() {
     const box = $('#inspect');
+    if (state.selEdge) {
+      const edge = selectedEdge();
+      if (!edge) { state.selEdge = null; renderInspector(); return; }
+      const from = nodeById(edge.from), to = nodeById(edge.to);
+      box.innerHTML = '<div class="ins-head"><span class="dot" style="background:#7c5cff"></span><b>' + esc(nname(from)) + ' &rarr; ' + esc(nname(to)) + '</b></div>' +
+        '<div class="field-group-title">Connection</div>' +
+        '<label class="field"><span>Share %</span><input id="edge-weight" type="text" inputmode="decimal" data-f="weight" min="0" max="100" step="0.1" value="' + edgeWeight(edge) + '" aria-describedby="edge-weight-hint"><span id="edge-weight-hint" class="field-hint" role="status" hidden></span></label>' +
+        '<div class="ins-stats" id="ins-stats"></div>' +
+        '<button class="del" id="deledge">Delete connection</button>';
+      renderInspectorStats();
+      const inp = $$('input[data-f=weight]', box)[0];
+      if (inp) {
+        inp.addEventListener('input', () => {
+          const raw = UX.parseDecimalInput(inp.value, 0, 100);
+          if (raw == null) {
+            setInputHint(inp, inputRangeHint(inp));
+            return;
+          }
+          setInputHint(inp, '');
+          edge.weight = raw;
+          compute(); renderNodes(); renderCost(); buildEdges(); renderInspectorStats();
+          pushScenario();
+        });
+        inp.addEventListener('change', () => {
+          if (inp.getAttribute('aria-invalid') !== 'true') inp.value = edgeWeight(edge);
+        });
+      }
+      $('#deledge').addEventListener('click', () => deleteSelected());
+      return;
+    }
     if (!state.sel) {
-      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Keyboard: Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use Connect to in the inspector to add an edge without dragging.</div>';
+      box.innerHTML = '<div class="empty">Select a node or connection to edit it.<br><br>Keyboard: Tab to a node or connection, press Enter or Space to select it, and press Delete to remove it. Use Connect to in the inspector to add an edge without dragging.</div>';
       return;
     }
     const n = nodeById(state.sel);
@@ -3670,13 +3742,34 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
 
   function select(id, revealInspector) {
     state.sel = id;
+    state.selEdge = null;
     renderNodes();
     renderInspector();
     setTab('components');
     if (revealInspector && mobile.matches) openMobileSheet('right', true);
   }
 
+  function selectEdge(edge, revealInspector) {
+    state.sel = null;
+    state.selEdge = { from: edge.from, to: edge.to };
+    renderNodes();
+    buildEdges();
+    renderInspector();
+    setTab('components');
+    if (revealInspector && mobile.matches) openMobileSheet('right', true);
+    const current = state.edgeEls.find(e => e.from === edge.from && e.to === edge.to);
+    if (current) current.path.focus({ preventScroll: true });
+  }
+
   function deleteSelected() {
+    if (state.selEdge) {
+      state.edges = state.edges.filter(e => !edgeSelected(e));
+      state.selEdge = null;
+      compute(); render();
+      pushScenario();
+      requestAnimationFrame(() => $('#canvas').focus({ preventScroll: true }));
+      return;
+    }
     if (!state.sel) return;
     const index = state.nodes.findIndex(n => n.id === state.sel);
     const next = state.nodes[index + 1] || state.nodes[index - 1];
@@ -3738,6 +3831,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     addEdge(sync.id, q.id);
     addEdge(q.id, ext.id);
     state.sel = model.id;
+    state.selEdge = null;
     compute();
     render();
     fit();
@@ -3905,7 +3999,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     if (ev.target.closest('.node')) return;
     $('#canvas').focus({ preventScroll: true });
     pan = { sx: ev.clientX, sy: ev.clientY, px: state.px, py: state.py };
-    state.sel = null; renderNodes(); renderInspector();
+    state.sel = null; state.selEdge = null; renderNodes(); renderInspector();
   });
   $('#canvas').addEventListener('wheel', ev => {
     ev.preventDefault();
@@ -3931,7 +4025,7 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     }
     if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
-    if (!state.sel) return;
+    if (!state.sel && !state.selEdge) return;
     ev.preventDefault();
     deleteSelected();
   });
@@ -4106,13 +4200,14 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     const previousState = Object.assign({}, state);
     const previousDrag = drag, previousLink = link, previousSeq = seq;
     try {
-      const keep = state.sel;
+      const keep = state.sel, keepEdge = state.selEdge;
       state.name = s.name;
       state.nodes = known;
       state.opaque = s.nodes.filter(n => !hasType(n));
       state.rootExtra = rootExtra;
       state.edges = s.edges;
       state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
+      state.selEdge = !state.sel && keepEdge && s.edges.some(e => e.from === keepEdge.from && e.to === keepEdge.to) ? keepEdge : null;
       drag = null;
       link = null;
       seq = window.SCENARIO.nextNodeSeq(s.nodes);

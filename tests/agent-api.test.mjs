@@ -835,6 +835,13 @@ test('getState warns about cycles and unsupported boot data', () => {
   const codes = state.warnings.map(item => item.code);
   assert.ok(codes.includes('CYCLE_DETECTED'));
   assert.ok(codes.includes('UNSUPPORTED_CONTENT'));
+
+  const zeroShare = API.createAgentApi(makeHost({
+    version: 1,
+    nodes: [{ id: 'a', type: 'traffic' }, { id: 'b', type: 'workers' }],
+    edges: [{ from: 'a', to: 'b', weight: 100 }, { from: 'b', to: 'a', weight: 0 }]
+  })).getState().data;
+  assert.ok(!zeroShare.warnings.some(item => item.code === 'CYCLE_DETECTED'));
 });
 
 test('exportScenario is canonical, isolated, and can include assessment and provenance', () => {

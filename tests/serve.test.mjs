@@ -184,7 +184,7 @@ test('GET serves the stored bytes and POST keeps unknown nodes and fields', asyn
     assert.deepEqual(written.nodes.map(n => n.type), ['traffic', 'quantum_lb']);
     assert.equal(written.nodes[0].shade, 'neon');
     assert.equal(written.preview, true);
-    assert.deepEqual(written.edges, [{ from: 'a', to: 'q' }]);
+    assert.deepEqual(written.edges, [{ from: 'a', to: 'q', weight: 100 }]);
     assert.deepEqual(fs.readdirSync(dir).filter(f => f.endsWith('.tmp')), []);
     assert.equal((await fetch(base + '/scenario')).status, 200);
   } finally {
@@ -273,7 +273,7 @@ test('a POST that omits stored unknown data cannot delete it', async () => {
     assert.equal(out.preview, true);
     assert.equal(out.nodes.find(n => n.id === 'a').shade, 'neon');
     assert.equal(out.nodes.some(n => n.id === 'q' && n.type === 'quantum_lb'), true);
-    assert.deepEqual(out.edges.find(e => e.to === 'q'), { from: 'a', to: 'q', label: 'sync' });
+    assert.deepEqual(out.edges.find(e => e.to === 'q'), { from: 'a', to: 'q', weight: 100, label: 'sync' });
 
     const get = await fetch(base + '/scenario');
     assert.equal(get.status, 200);
@@ -324,7 +324,7 @@ test('POST with a known node reusing a stored opaque id preserves its extras', a
     assert.equal(q.p.hint, 0.4);
     assert.equal(out.preview, true);
     assert.equal(out.nodes.some(n => n.id === 's' && n.type === 'shade'), true);
-    assert.deepEqual(out.edges.find(e => e.from === 'q' && e.to === 's'), { from: 'q', to: 's', label: 'link' });
+    assert.deepEqual(out.edges.find(e => e.from === 'q' && e.to === 's'), { from: 'q', to: 's', weight: 100, label: 'link' });
   } finally {
     stop(server, dir);
   }
@@ -360,7 +360,7 @@ test('POST with a partial opaque node already in the file is completed from stor
     assert.equal(q.x, 22);
     assert.equal(q.y, 33);
     assert.equal(q.p.replicas, 3);
-    assert.deepEqual(out.edges, [{ from: 'a', to: 'q' }]);
+    assert.deepEqual(out.edges, [{ from: 'a', to: 'q', weight: 100 }]);
   } finally {
     stop(server, dir);
   }

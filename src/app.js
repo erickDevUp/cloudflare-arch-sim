@@ -41,7 +41,7 @@
   function nextRunId() { return 'run-' + String(++runSeq).padStart(6, '0'); }
 
   const state = {
-    nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
+    nodes: [], opaque: [], rootExtra: {}, edges: [], sel: null, selEdge: null, zoom: 1, px: 40, py: 40, name: 'Untitled scenario',
     running: false, speed: 60, budget: 5000, plan: 'paid', baseFee: 0, edgeEls: [], cpuRate: 0,
     time: 0, spent: 0, requests: 0, modelSpent: 0, chaos: {}, errors: 0,
     res: {}, rate: 0, pathLat: 0, backlog: {}, drops: {},
@@ -63,12 +63,15 @@
   function addEdge(from, to) {
     if (from === to) return null;
     if (state.edges.some(e => e.from === from && e.to === to)) return null;
-    const e = { from, to };
+    const e = { from, to, weight: 100 };
     state.edges.push(e);
     return e;
   }
 
   function nodeById(id) { return state.nodes.find(n => n.id === id); }
+  function edgeWeight(e) { return e.weight == null ? 100 : e.weight; }
+  function edgeSelected(e) { return !!state.selEdge && state.selEdge.from === e.from && state.selEdge.to === e.to; }
+  function selectedEdge() { return state.edges.find(edgeSelected) || null; }
 
   function eff(n, clock) {
     const current = clock || state;
@@ -227,8 +230,24 @@
       const x1 = a.x + 74, y1 = a.y + 37, x2 = b.x, y2 = b.y + 37;
       const d = 'M' + x1 + ',' + y1 + ' C' + (x1 + 46) + ',' + y1 + ' ' + (x2 - 46) + ',' + y2 + ' ' + x2 + ',' + y2;
       const path = document.createElementNS(NS, 'path');
+      const selected = edgeSelected(e);
       path.setAttribute('d', d);
-      path.setAttribute('class', 'edge');
+      path.setAttribute('class', 'edge' + (selected ? ' sel' : ''));
+      path.setAttribute('data-from', e.from);
+      path.setAttribute('data-to', e.to);
+      path.setAttribute('tabindex', '0');
+      path.setAttribute('role', 'button');
+      path.setAttribute('aria-label', 'Connection from ' + nname(a) + ' to ' + nname(b) + ', ' + edgeWeight(e) + ' percent. Press Enter to select, Delete to remove.');
+      path.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        selectEdge(e, true);
+      });
+      path.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        selectEdge(e, true);
+      });
       g.appendChild(path);
       const len = path.getTotalLength();
       const pool = Math.min(64, Math.max(8, Math.ceil(len / 4) + 2));
@@ -241,20 +260,25 @@
         g.appendChild(c);
         dots.push({ el: c });
       }
-      state.edgeEls.push({ path, dots, len, pts: samplePath(path, len), from: e.from, to: e.to });
+      const label = document.createElementNS(NS, 'text');
+      const mid = path.getPointAtLength(len / 2);
+      label.setAttribute('x', mid.x);
+      label.setAttribute('y', mid.y - 8);
+      label.setAttribute('class', 'edge-label' + (selected ? ' sel' : ''));
+      label.textContent = edgeWeight(e) + '%';
+      g.appendChild(label);
+      state.edgeEls.push({ path, dots, label, len, pts: samplePath(path, len), from: e.from, to: e.to, weight: edgeWeight(e) });
     });
   }
 
   function animateEdges(ts) {
     const t = ts / 1000;
     (state.edgeEls || []).forEach(e => {
-      // ponytail: the from-node rate stands in for the edge's own share;
-      // per-edge weights (roadmap) will replace it with the edge share.
       const fr = state.res[e.from] || {};
-      const flow = fr.out || 0;
+      const flow = (fr.out || 0) * (e.weight / 100);
       const r = state.res[e.to] || {};
       const hot = flow > 0 && ((r.util || 0) >= 0.9 || (r.err || 0) > 0);
-      const cls = 'edge' + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
+      const cls = 'edge' + (edgeSelected(e) ? ' sel' : '') + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
       if (e.path.getAttribute('class') !== cls) e.path.setAttribute('class', cls);
       if (!state.running || flow <= 0 || e.len <= 0) {
         e.dots.forEach(d => { if (d.el.style.opacity !== '0') d.el.style.opacity = 0; });
@@ -390,15 +414,54 @@
 
   function renderInspectorStats() {
     const el = $('#ins-stats');
-    if (!el || !state.sel) return;
+    if (!el) return;
+    if (state.selEdge) {
+      const edge = selectedEdge();
+      if (!edge) return;
+      const flow = ((state.res[edge.from] || {}).out || 0) * (edgeWeight(edge) / 100);
+      el.innerHTML = '<div><span>share</span><b>' + edgeWeight(edge) + '%</b></div>' +
+        '<div><span>traffic</span><b>' + flow.toFixed(1) + '/s</b></div>';
+      return;
+    }
+    if (!state.sel) return;
     const n = nodeById(state.sel);
     el.innerHTML = statsHtml(state.res[state.sel] || {}, n);
   }
 
   function renderInspector() {
     const box = $('#inspect');
+    if (state.selEdge) {
+      const edge = selectedEdge();
+      if (!edge) { state.selEdge = null; renderInspector(); return; }
+      const from = nodeById(edge.from), to = nodeById(edge.to);
+      box.innerHTML = '<div class="ins-head"><span class="dot" style="background:#7c5cff"></span><b>' + esc(nname(from)) + ' &rarr; ' + esc(nname(to)) + '</b></div>' +
+        '<div class="field-group-title">Connection</div>' +
+        '<label class="field"><span>Share %</span><input id="edge-weight" type="text" inputmode="decimal" data-f="weight" min="0" max="100" step="0.1" value="' + edgeWeight(edge) + '" aria-describedby="edge-weight-hint"><span id="edge-weight-hint" class="field-hint" role="status" hidden></span></label>' +
+        '<div class="ins-stats" id="ins-stats"></div>' +
+        '<button class="del" id="deledge">Delete connection</button>';
+      renderInspectorStats();
+      const inp = $$('input[data-f=weight]', box)[0];
+      if (inp) {
+        inp.addEventListener('input', () => {
+          const raw = UX.parseDecimalInput(inp.value, 0, 100);
+          if (raw == null) {
+            setInputHint(inp, inputRangeHint(inp));
+            return;
+          }
+          setInputHint(inp, '');
+          edge.weight = raw;
+          compute(); renderNodes(); renderCost(); buildEdges(); renderInspectorStats();
+          pushScenario();
+        });
+        inp.addEventListener('change', () => {
+          if (inp.getAttribute('aria-invalid') !== 'true') inp.value = edgeWeight(edge);
+        });
+      }
+      $('#deledge').addEventListener('click', () => deleteSelected());
+      return;
+    }
     if (!state.sel) {
-      box.innerHTML = '<div class="empty">Select a node to edit it.<br><br>Keyboard: Tab to a node, press Enter or Space to select it, and press Delete to remove it. Use Connect to in the inspector to add an edge without dragging.</div>';
+      box.innerHTML = '<div class="empty">Select a node or connection to edit it.<br><br>Keyboard: Tab to a node or connection, press Enter or Space to select it, and press Delete to remove it. Use Connect to in the inspector to add an edge without dragging.</div>';
       return;
     }
     const n = nodeById(state.sel);
@@ -773,13 +836,34 @@
 
   function select(id, revealInspector) {
     state.sel = id;
+    state.selEdge = null;
     renderNodes();
     renderInspector();
     setTab('components');
     if (revealInspector && mobile.matches) openMobileSheet('right', true);
   }
 
+  function selectEdge(edge, revealInspector) {
+    state.sel = null;
+    state.selEdge = { from: edge.from, to: edge.to };
+    renderNodes();
+    buildEdges();
+    renderInspector();
+    setTab('components');
+    if (revealInspector && mobile.matches) openMobileSheet('right', true);
+    const current = state.edgeEls.find(e => e.from === edge.from && e.to === edge.to);
+    if (current) current.path.focus({ preventScroll: true });
+  }
+
   function deleteSelected() {
+    if (state.selEdge) {
+      state.edges = state.edges.filter(e => !edgeSelected(e));
+      state.selEdge = null;
+      compute(); render();
+      pushScenario();
+      requestAnimationFrame(() => $('#canvas').focus({ preventScroll: true }));
+      return;
+    }
     if (!state.sel) return;
     const index = state.nodes.findIndex(n => n.id === state.sel);
     const next = state.nodes[index + 1] || state.nodes[index - 1];
@@ -841,6 +925,7 @@
     addEdge(sync.id, q.id);
     addEdge(q.id, ext.id);
     state.sel = model.id;
+    state.selEdge = null;
     compute();
     render();
     fit();
@@ -1008,7 +1093,7 @@
     if (ev.target.closest('.node')) return;
     $('#canvas').focus({ preventScroll: true });
     pan = { sx: ev.clientX, sy: ev.clientY, px: state.px, py: state.py };
-    state.sel = null; renderNodes(); renderInspector();
+    state.sel = null; state.selEdge = null; renderNodes(); renderInspector();
   });
   $('#canvas').addEventListener('wheel', ev => {
     ev.preventDefault();
@@ -1034,7 +1119,7 @@
     }
     if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
-    if (!state.sel) return;
+    if (!state.sel && !state.selEdge) return;
     ev.preventDefault();
     deleteSelected();
   });
@@ -1209,13 +1294,14 @@
     const previousState = Object.assign({}, state);
     const previousDrag = drag, previousLink = link, previousSeq = seq;
     try {
-      const keep = state.sel;
+      const keep = state.sel, keepEdge = state.selEdge;
       state.name = s.name;
       state.nodes = known;
       state.opaque = s.nodes.filter(n => !hasType(n));
       state.rootExtra = rootExtra;
       state.edges = s.edges;
       state.sel = keep && state.nodes.some(n => n.id === keep) ? keep : null;
+      state.selEdge = !state.sel && keepEdge && s.edges.some(e => e.from === keepEdge.from && e.to === keepEdge.to) ? keepEdge : null;
       drag = null;
       link = null;
       seq = window.SCENARIO.nextNodeSeq(s.nodes);

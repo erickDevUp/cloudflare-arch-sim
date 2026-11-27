@@ -163,7 +163,7 @@ Top-level units identify simulated seconds, USD, USD/s, requests, and USD/month.
 | `billedRequests`, `doGbS` | Durable Object-only billed requests/s and monthly GB-s. |
 | `objects`, `perObjectRate`, `objectLimit`, `overloaded` | Durable Object-only sharding and limit state. |
 
-Irrelevant per-node fields are omitted, not filled with misleading zeroes. Flow follows graph edges with full fan-out; edge `weight` does not affect physics. Ordinary nodes use M/M/c with Erlang-C, caches forward only misses, and only Queue nodes throttle into backlog. See [src/app.js](../src/app.js), [src/engine.js](../src/engine.js), and [src/pricing.js](../src/pricing.js).
+Irrelevant per-node fields are omitted, not filled with misleading zeroes. Flow follows graph edges using each edge's 0–100% `weight`; missing weights normalize to 100, multiple 100% edges fan out, and zero-share edges carry no traffic. Ordinary nodes use M/M/c with Erlang-C, caches forward only misses, and only Queue nodes throttle into backlog. See [src/app.js](../src/app.js), [src/engine.js](../src/engine.js), and [src/pricing.js](../src/pricing.js).
 
 ### Assumptions and provenance
 

@@ -42,7 +42,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 
 ## Simulator invariants
 
-- Flow follows graph edges. Each node sends its full output rate to every outgoing edge; edge `weight` is stored but does not affect physics.
+- Flow follows graph edges. Each node applies its outgoing edge's `weight` as a 0–100% share; missing weights normalize to 100, multiple 100% edges fan out, and zero-share edges carry no traffic.
 - Ordinary nodes use M/M/c with Erlang-C: `mu = 1000 / latency`, `util = lambda / (mu * concurrency)`, and saturation pins wait at 30 seconds.
 - A cache forwards only `1 - hit` of its input downstream.
 - Only Queue nodes throttle output to service capacity. Excess traffic becomes backlog, advanced by simulated time; FIFO retention expiry becomes drops/s.
@@ -109,7 +109,7 @@ Read [docs/agent-playbook.md](docs/agent-playbook.md) for executable workflows a
 ### Physics
 
 1. Keep pure queue helpers in `src/engine.js`; change orchestration in `src/app.js` only when required.
-2. Preserve M/M/c, cache forwarding, full fan-out, simulated-time backlog, and retention semantics.
+2. Preserve M/M/c, cache forwarding, weighted fan-out, simulated-time backlog, and retention semantics.
 3. Extend `tests/engine.test.mjs` with the smallest regression case.
 4. Run `npm test`, `npm run build`, and `npm run check:dist`.
 

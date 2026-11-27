@@ -225,10 +225,11 @@
         dropped++;
         return;
       }
-      const e = { from: re.from, to: re.to };
+      const e = { from: re.from, to: re.to, weight: 100 };
       if (re.weight !== undefined) {
         if (!fin(re.weight)) { issues.push('invalid weight on edges[' + i + ']'); dropped++; }
         else if (re.weight < 0) { issues.push('weight on edges[' + i + '] is negative, using 0'); dropped++; e.weight = 0; }
+        else if (re.weight > 100) { issues.push('weight on edges[' + i + '] is above 100, using 100'); dropped++; e.weight = 100; }
         else e.weight = re.weight;
       }
       Object.keys(re).forEach(k => {
