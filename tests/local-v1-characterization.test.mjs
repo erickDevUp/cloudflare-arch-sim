@@ -19,7 +19,7 @@ function element() {
   const listeners = new Map();
   let html = '';
   return {
-    style: {}, dataset: {}, children: [], value: '', hidden: false, clientWidth: 1200, clientHeight: 800,
+    style: {}, dataset: {}, children: [], value: '', textContent: '', hidden: false, clientWidth: 1200, clientHeight: 800,
     get innerHTML() { return html; },
     set innerHTML(value) { html = value; if (value === '') this.children.length = 0; },
     classList: {
@@ -37,9 +37,11 @@ function element() {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(callback);
     },
+    focus() {},
     dispatchEvent(event) {
       (listeners.get(event.type) || []).forEach(callback => callback(event));
     },
+    clearListeners() { listeners.clear(); },
     appendChild(child) { this.children.push(child); return child; },
     remove() {},
     setAttribute(name, value) { attributes.set(name, String(value)); },
@@ -85,11 +87,22 @@ async function browser(initial) {
   rateInput.min = '0';
   rateInput.max = '1000000';
   rateInput.value = '10';
+  const shareInput = element();
+  shareInput.tagName = 'INPUT';
+  shareInput.dataset = { f: 'weight' };
+  shareInput.min = '0';
+  shareInput.max = '100';
+  shareInput.value = '100';
+  shareInput.setAttribute('aria-describedby', 'edge-weight-hint');
   const inspector = element();
-  inspector.querySelectorAll = selector => selector.indexOf('input[data-f]') >= 0 ? [rateInput] : [];
+  inspector.querySelectorAll = selector => {
+    if (selector === 'input[data-f=weight]') return [shareInput];
+    return selector.indexOf('input[data-f]') >= 0 ? [rateInput] : [];
+  };
   elements.set('#node-layer', nodeLayer);
   elements.set('#inspect', inspector);
   elements.set('#inspect input[data-f=rate]', rateInput);
+  elements.set('#inspect input[data-f=weight]', shareInput);
   const document = {
     title: '',
     body: element(),
@@ -124,7 +137,7 @@ async function browser(initial) {
     innerWidth: 1400,
     matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
     addEventListener() {},
-    requestAnimationFrame() {},
+    requestAnimationFrame(callback) { sandbox.__frame = callback; },
     EventSource: class {
       constructor() { sources.push(this); }
       close() {}
@@ -145,9 +158,13 @@ async function browser(initial) {
   await flush();
   assert.equal(sources.length, 1);
   assert.equal(sandbox.__SIM__.export().name, initial.name);
+  const edgeLayer = document.querySelector('#edge-layer');
   return {
     window: sandbox,
     posts,
+    edgeLayer,
+    shareInput,
+    inspector,
     editRate(rate) {
       const source = nodeLayer.children.find(el => el.dataset.id === 'source');
       source.dispatchEvent({ type: 'keydown', key: 'Enter', preventDefault() {} });
@@ -417,4 +434,85 @@ test('failed autosave clears pending error and Retry when a peer saves the ident
   assert.equal(first.window.document.querySelector('#channel-error').hidden, true);
   assert.equal(first.window.document.querySelector('#error-retry').hidden, true);
   assert.equal(first.posts.length, 1);
+});
+
+function edgePath(edgeLayer, from, to) {
+  return edgeLayer.children.find(el => el.getAttribute('data-from') === from && el.getAttribute('data-to') === to);
+}
+
+function visibleBeads(edgeLayer, from, to) {
+  const paths = edgeLayer.children.filter(el => el.getAttribute('data-from'));
+  const index = paths.findIndex(el => el.getAttribute('data-from') === from && el.getAttribute('data-to') === to);
+  const start = edgeLayer.children.indexOf(paths[index]);
+  const end = index + 1 < paths.length ? edgeLayer.children.indexOf(paths[index + 1]) : edgeLayer.children.length;
+  return edgeLayer.children.slice(start + 1, end)
+    .filter(el => el.getAttribute('class') === 'bead' && Number(el.style.opacity) > 0).length;
+}
+
+function splitScenario() {
+  return {
+    version: 1,
+    name: 'Edge shares',
+    nodes: [
+      { id: 'source', type: 'traffic', x: 20, y: 20, p: { rate: 10 } },
+      { id: 'main', type: 'workers', x: 220, y: 20 },
+      { id: 'secondary', type: 'workers', x: 220, y: 180 },
+      { id: 'off', type: 'workers', x: 220, y: 340 }
+    ],
+    edges: [
+      { from: 'source', to: 'main', weight: 90 },
+      { from: 'source', to: 'secondary', weight: 10 },
+      { from: 'source', to: 'off', weight: 0 }
+    ]
+  };
+}
+
+test('DOM normalizes missing shares and defaults new connections to 100%', async () => {
+  const raw = splitScenario();
+  raw.edges = [{ from: 'source', to: 'main' }, { from: 'source', to: 'secondary' }];
+  const { window, edgeLayer } = await browser(raw);
+  assert.deepEqual(clone(window.__SIM__.export().edges.map(e => e.weight)), [100, 100]);
+  assert.deepEqual(window.SIM_API.getState().data.nodes.main.lambda, 10);
+  assert.equal(window.SIM_API.getState().data.nodes.secondary.lambda, 10);
+  assert.deepEqual(edgeLayer.children.filter(el => el.getAttribute('class') === 'edge-label').map(el => el.textContent), ['100%', '100%']);
+
+  const connect = window.document.querySelector('#connect-node');
+  connect.clearListeners();
+  const source = window.document.querySelector('#node-layer').children.find(el => el.dataset.id === 'source');
+  source.dispatchEvent({ type: 'keydown', key: 'Enter', preventDefault() {} });
+  window.document.querySelector('#connect-target').value = 'off';
+  connect.dispatchEvent({ type: 'click' });
+  assert.deepEqual(clone(window.__SIM__.export().edges.map(e => e.weight)), [100, 100, 100]);
+  assert.equal(window.SIM_API.getState().data.nodes.off.lambda, 10);
+});
+
+test('DOM edge inspector edits shares and animates 90/10 while zero stays idle', async () => {
+  const { window, edgeLayer, shareInput, inspector } = await browser(splitScenario());
+  const state = window.SIM_API.getState().data;
+  assert.equal(state.nodes.main.lambda, 9);
+  assert.equal(state.nodes.secondary.lambda, 1);
+  assert.equal(state.nodes.off.lambda, 0);
+  assert.deepEqual(edgeLayer.children.filter(el => el.getAttribute('class') === 'edge-label').map(el => el.textContent), ['90%', '10%', '0%']);
+
+  edgePath(edgeLayer, 'source', 'main').dispatchEvent({ type: 'pointerdown', preventDefault() {}, stopPropagation() {} });
+  assert.match(inspector.innerHTML, /Share %/);
+  shareInput.value = '101';
+  shareInput.dispatchEvent({ type: 'input' });
+  assert.equal(window.__SIM__.export().edges[0].weight, 90);
+  assert.equal(window.document.querySelector('#edge-weight-hint').textContent, 'Enter 0–100.');
+
+  shareInput.value = '90,0';
+  shareInput.dispatchEvent({ type: 'input' });
+  assert.equal(window.__SIM__.export().edges[0].weight, 90);
+  window.SIM_API.start();
+  window.__frame(1000);
+  assert.ok(visibleBeads(edgeLayer, 'source', 'main') > visibleBeads(edgeLayer, 'source', 'secondary'));
+  assert.ok(visibleBeads(edgeLayer, 'source', 'secondary') > 0);
+  assert.equal(visibleBeads(edgeLayer, 'source', 'off'), 0);
+
+  shareInput.value = '0';
+  shareInput.dispatchEvent({ type: 'input' });
+  window.__frame(2000);
+  assert.equal(window.SIM_API.getState().data.nodes.main.lambda, 0);
+  assert.equal(visibleBeads(edgeLayer, 'source', 'main'), 0);
 });

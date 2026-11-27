@@ -14,7 +14,7 @@ Load this skill for repository changes or for using the simulator to design/eval
 ## Hard Rules
 
 - Treat `src/pricing.js` as the pricing source of truth and `scenario.json` as the default scenario source of truth.
-- Preserve M/M/c, full fan-out, cache forwarding, simulated-time queue backlog, retention drops, and separate Cloudflare/model spend.
+- Preserve M/M/c, weighted fan-out, cache forwarding, simulated-time queue backlog, retention drops, and separate Cloudflare/model spend.
 - Never hand-edit `dist/`; rebuild it and keep it fresh.
 - Preserve unknown scenario data and lossless merge behavior.
 - Keep UI copy in English, Cloudflare totals distinct from external/model spend, and verified prices/limits distinct from editable assumptions.

@@ -75,3 +75,50 @@ test('Erlang wait stays continuous across the 400-server cap', () => {
   assert.ok(Math.abs(above - at) < 0.0001);
   assert.ok(above < at && at < below);
 });
+
+function flowModel(edges) {
+  const nodes = [
+    { id: 'source', type: 'traffic' },
+    { id: 'main', type: 'workers' },
+    { id: 'secondary', type: 'workers' },
+    { id: 'off', type: 'workers' }
+  ];
+  const types = { traffic: { source: true }, workers: {} };
+  const params = {
+    source: { rate: 10 },
+    main: { latency: 100, concurrency: 100 },
+    secondary: { latency: 100, concurrency: 100 },
+    off: { latency: 100, concurrency: 100 }
+  };
+  return QE.compute(nodes, edges, types, params, {}, {}, 730);
+}
+
+test('an edge without a weight carries the full source rate', () => {
+  const model = flowModel([{ from: 'source', to: 'main' }]);
+  assert.equal(model.res.main.lambda, 10);
+});
+
+test('90/10 edge shares split 10/s into 9/s and 1/s', () => {
+  const model = flowModel([
+    { from: 'source', to: 'main', weight: 90 },
+    { from: 'source', to: 'secondary', weight: 10 }
+  ]);
+  assert.equal(model.res.main.lambda, 9);
+  assert.equal(model.res.secondary.lambda, 1);
+  assert.equal(model.pathLat, 0.1);
+});
+
+test('a zero-share edge carries no traffic or critical-path latency', () => {
+  const model = flowModel([{ from: 'source', to: 'off', weight: 0 }]);
+  assert.equal(model.res.off.lambda, 0);
+  assert.equal(model.pathLat, 0);
+});
+
+test('multiple 100% edges fan out the full source rate', () => {
+  const model = flowModel([
+    { from: 'source', to: 'main', weight: 100 },
+    { from: 'source', to: 'secondary', weight: 100 }
+  ]);
+  assert.equal(model.res.main.lambda, 10);
+  assert.equal(model.res.secondary.lambda, 10);
+});

@@ -161,7 +161,9 @@
     nodes.forEach(n => { inc[n.id] = []; out[n.id] = []; });
     edges.forEach(e => {
       if (!out[e.from] || !inc[e.to]) return;
-      out[e.from].push(e.to);
+      const weight = e.weight == null ? 100 : e.weight;
+      if (!(weight > 0)) return;
+      out[e.from].push(e);
       inc[e.to].push(e.from);
     });
     const indeg = {};
@@ -171,7 +173,7 @@
     while (q.length) {
       const id = q.shift();
       order.push(id);
-      out[id].forEach(to => { indeg[to]--; if (indeg[to] === 0) q.push(to); });
+      out[id].forEach(e => { indeg[e.to]--; if (indeg[e.to] === 0) q.push(e.to); });
     }
     const byId = new Map(nodes.map(n => [n.id, n]));
     const lambda = {}, outLambda = {}, lat = {}, arrive = {};
@@ -230,9 +232,11 @@
         r.drops = drops[id] || 0;
         res[id] = r;
       }
-      out[id].forEach(to => {
-        lambda[to] += outLambda[id];
-        if (outLambda[id] > 0) arrive[to] = Math.max(arrive[to], arrive[id] + lat[id]);
+      out[id].forEach(e => {
+        const flow = outLambda[id] * ((e.weight == null ? 100 : e.weight) / 100);
+        if (flow <= 0) return;
+        lambda[e.to] += flow;
+        arrive[e.to] = Math.max(arrive[e.to], arrive[id] + lat[id]);
       });
     });
     let cpuRate = 0, rate = 0;

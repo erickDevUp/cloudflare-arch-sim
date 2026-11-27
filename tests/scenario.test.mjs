@@ -24,10 +24,10 @@ test('validates and fills catalog defaults', () => {
   assert.equal(s.nodes[0].p.rate, 5);
   assert.equal(s.nodes[0].p.concurrency, 1); // traffic default
   assert.equal(s.nodes[1].p.latency, 6); // workers default
-  assert.deepEqual(s.edges, [{ from: 'a', to: 'b' }]);
+  assert.deepEqual(s.edges, [{ from: 'a', to: 'b', weight: 100 }]);
 });
 
-test('keeps an optional edge weight', () => {
+test('keeps an explicit edge weight', () => {
   const raw = minimal();
   raw.edges[0].weight = 0.25;
   const { scenario: s, error } = scenario.validate(raw, catalog);
@@ -202,13 +202,47 @@ test('generated ids never collide with given ids, before or after', () => {
   assert.deepEqual(b.scenario.nodes.map(n => n.id), ['n2', 'n3']);
 });
 
-test('negative edge weight is clamped and reported', () => {
+test('edge weights clamp to 0..100 and are reported', () => {
   const raw = minimal();
   raw.edges[0].weight = -5;
+  const low = scenario.validate(raw, catalog);
+  assert.equal(low.scenario.edges[0].weight, 0);
+  assert.equal(low.dropped, 1);
+  assert.match(low.error, /weight on edges\[0\] is negative, using 0/);
+
+  raw.edges[0].weight = 101;
+  const high = scenario.validate(raw, catalog);
+  assert.equal(high.scenario.edges[0].weight, 100);
+  assert.equal(high.dropped, 1);
+  assert.match(high.error, /weight on edges\[0\] is above 100, using 100/);
+});
+
+test('missing weights normalize to 100 on every edge', () => {
+  const raw = minimal();
+  raw.nodes.push({ id: 'c', type: 'workers', x: 380, y: 20 });
+  raw.edges.push({ from: 'a', to: 'c' });
   const { scenario: s, error, dropped } = scenario.validate(raw, catalog);
-  assert.equal(s.edges[0].weight, 0);
-  assert.equal(dropped, 1);
-  assert.match(error, /weight on edges\[0\] is negative, using 0/);
+  assert.equal(error, null);
+  assert.equal(dropped, 0);
+  assert.deepEqual(s.edges, [
+    { from: 'a', to: 'b', weight: 100 },
+    { from: 'a', to: 'c', weight: 100 }
+  ]);
+});
+
+test('90/10 and zero edge shares validate and round-trip', () => {
+  const raw = minimal();
+  raw.nodes.push({ id: 'c', type: 'workers', x: 380, y: 20 });
+  raw.edges = [
+    { from: 'a', to: 'b', weight: 90 },
+    { from: 'a', to: 'c', weight: 10 },
+    { from: 'b', to: 'c', weight: 0 }
+  ];
+  const { scenario: s, error, dropped } = scenario.validate(raw, catalog);
+  assert.equal(error, null);
+  assert.equal(dropped, 0);
+  assert.deepEqual(s.edges.map(e => e.weight), [90, 10, 0]);
+  assert.deepEqual(scenario.decode(scenario.encode(s)), s);
 });
 
 test('merge re-adds stored unknown data but keeps known removals possible', () => {
@@ -239,7 +273,7 @@ test('merge re-adds stored unknown data but keeps known removals possible', () =
   assert.equal(merged.preview, true); // unknown root field survives
   assert.equal(merged.nodes.some(n => n.id === 'q'), true); // opaque node survives
   assert.equal(merged.nodes.some(n => n.id === 'gone'), false); // known removal stays possible
-  assert.deepEqual(merged.edges.find(e => e.to === 'q'), { from: 'a', to: 'q', label: 'sync' });
+  assert.deepEqual(merged.edges.find(e => e.to === 'q'), { from: 'a', to: 'q', weight: 100, label: 'sync' });
 });
 
 test('merge preserves a stored opaque node\'s extras when a known node reuses its id', () => {
@@ -270,7 +304,7 @@ test('merge preserves a stored opaque node\'s extras when a known node reuses it
   assert.equal(q.p.replicas, 3);
   assert.equal(q.p.hint, 0.4);
   assert.equal(merged.nodes.some(n => n.id === 's' && n.type === 'shade'), true);
-  assert.deepEqual(merged.edges.find(e => e.from === 'q' && e.to === 's'), { from: 'q', to: 's', label: 'link' });
+  assert.deepEqual(merged.edges.find(e => e.from === 'q' && e.to === 's'), { from: 'q', to: 's', weight: 100, label: 'link' });
 });
 
 test('merge completes a partial opaque node from the stored copy', () => {

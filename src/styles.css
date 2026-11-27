@@ -63,12 +63,15 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 .canvas:focus-visible{outline-offset:-3px}
 .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .edge-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
-.edge{fill:none;stroke:#262633;stroke-width:1.6;transition:stroke .25s}
+.edge{fill:none;stroke:#262633;stroke-width:1.6;transition:stroke .25s;pointer-events:stroke;cursor:pointer}
 .bead{fill:#3ef2c0;stroke:rgba(62,242,192,.22);stroke-width:3;transition:fill .2s,stroke .2s}
 .bead.hot{fill:#ff3b5c;stroke:rgba(255,59,92,.26)}
 .edge.hot{stroke:#ef4444;stroke-width:2}
 .edge.temp{stroke:#6d5cff;stroke-dasharray:5 4}
 .edge.idle{stroke:#17171d;opacity:.55}
+.edge.sel,.edge:focus-visible{stroke:#8b7bff;stroke-width:2.4}
+.edge-label{fill:#8f8f9e;font:9px/1 ui-monospace,monospace;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.edge-label.sel{fill:#c8c0ff}
 
 .node-layer{position:absolute;left:0;top:0}
 .node{position:absolute;width:74px;user-select:none;cursor:grab}

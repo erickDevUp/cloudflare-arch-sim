@@ -441,6 +441,7 @@
     const outgoing = new Map(scenario.nodes.map(node => [node.id, []]));
     (scenario.edges || []).forEach(edge => {
       if (!nodes.has(edge.from) || !nodes.has(edge.to)) return;
+      if (edge.weight !== undefined && edge.weight <= 0) return;
       indegree.set(edge.to, indegree.get(edge.to) + 1);
       outgoing.get(edge.from).push(edge.to);
     });

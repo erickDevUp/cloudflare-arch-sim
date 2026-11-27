@@ -34,17 +34,17 @@ merging and npm publication to the maintainer.
 ## Product UX
 
 - **Mobile:** Components and Costs & inspector open as bottom sheets over a full-width canvas. Closed panels are inert, and each sheet has a visible close control.
-- **Keyboard:** Tab to canvas nodes, press Enter or Space to select, and press Delete to remove. The inspector's **Connect to** control adds edges without dragging. Costs and Components are ARIA tabs with arrow-key navigation.
+- **Keyboard:** Tab to canvas nodes or connections, press Enter or Space to select, and press Delete to remove. The inspector's **Connect to** control adds edges without dragging; selecting a connection exposes its **Share %** field. Costs and Components are ARIA tabs with arrow-key navigation.
 - **Saving:** The header shows local-only, saving, saved, or error state. Failed writes and disconnected live updates keep a persistent alert with Retry when recovery is possible.
 - **Sharing:** **Copy link** uses the existing `#s=` encoder. Links over 8,000 characters fail visibly; use **Copy JSON** instead.
 - **Provenance:** Verified prices and limits are grouped separately from editable workload assumptions. Cloudflare totals and external model spend stay distinct, and monthly figures state the 730-hour estimate period.
 
 ## Engine model
 
-- **Flow follows the edges.** A source emits `rate` requests/second. Every other node passes its
-  **full output rate to every outgoing edge** — one node calling three services sends `lambda` to
-  each of them. This is calls, not a weighted split. Edge `weight` is validated, stored and
-  exported, but **does not affect the physics yet** (roadmap).
+- **Flow follows the edges.** A source emits `rate` requests/second. Each outgoing edge applies its
+  validated 0–100% `weight` to the sender's output rate; missing weights normalize to 100, so a
+  90/10 split sends 90% and 10% while multiple 100% edges fan out the full rate. Zero-share edges
+  remain visible and editable but carry no traffic.
 - **Queueing is M/M/c with Erlang-C.** Service time is the node's `latency` in ms
   (`mu = 1000 / latency`), `c` is `concurrency`, and `util = lambda / (mu * c)`. Erlang-C gives
   the wait; `util >= 1` pins the node at a 30 s wait and paints it red. The series uses the same
@@ -66,9 +66,9 @@ merging and npm publication to the maintainer.
   chaos pins the external node at `err = 1`. The canvas raises `HOT PATH BOTTLENECK`,
   `ERROR BUDGET BURN`, `DATA LOSS RISK` and `SPOF` alerts. The reported critical path is the
   longest chain of node latencies from any source.
-- **Beads are decoration.** An edge animates `min(50, sender output rate)` beads per second; the
-  cap of 50 is **visual only**. Utilization, latency and cost always use the real rate, and a
-  source at 0 req/s keeps its edge idle even when the node downstream is hot.
+- **Beads are decoration.** An edge animates up to 50 beads per second using its weighted share of
+  the sender output rate and labels the share on the canvas. The cap is **visual only**;
+  utilization, latency and cost always use the real rate, and a zero-share edge stays idle.
 - **Chaos uses real time.** The 429, DO eviction, D1 write storm, cache miss, store 402 and
   webhook buttons set expiry with `performance.now()` in **real seconds** (8–12 s depending on
   the button), independently of the simulation-speed multiplier.
