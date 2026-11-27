@@ -61,10 +61,13 @@
       <div class="stage-bar">
       <div class="toolbar">
         <button id="start" class="primary">Start simulation</button>
-        <div class="speeds">
-          <input id="speed" type="number" min="1" max="7200" step="1" value="60"
-                 aria-label="Simulation speed" title="Simulated seconds per real second">
-          <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+        <div class="speed-field">
+          <div class="speeds">
+            <input id="speed" type="text" inputmode="decimal" min="1" max="7200" step="1" value="60"
+                   aria-label="Simulation speed" aria-describedby="speed-hint" title="Simulated seconds per real second">
+            <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+          </div>
+          <span id="speed-hint" class="field-hint" role="status" hidden></span>
         </div>
       </div>
 
@@ -143,8 +146,8 @@
         </details>
         <div id="custom-fields" class="custom-fields" hidden>
           <div class="cost-head">Custom plan settings</div>
-          <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
-          <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
+          <label class="field"><span>Base fee ($/mo)</span><input type="text" inputmode="decimal" id="basefee" min="0" step="1" value="0" aria-describedby="basefee-hint"><span id="basefee-hint" class="field-hint" role="status" hidden></span></label>
+          <label class="field"><span>Monthly budget ($)</span><input type="text" inputmode="decimal" id="budget" min="1" step="500" value="5000" aria-describedby="budget-hint"><span id="budget-hint" class="field-hint" role="status" hidden></span></label>
         </div>
       </div>
       <div id="inspect" class="inspect" role="tabpanel" aria-labelledby="tab-components" hidden></div>

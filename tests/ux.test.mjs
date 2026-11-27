@@ -35,6 +35,37 @@ test('tabs wrap with arrow keys and support Home and End', () => {
   assert.equal(ux.nextTab('cost', 'Escape', tabs), 'cost');
 });
 
+test('decimal input parser accepts comma and dot decimals and rejects invalid or out-of-range values', () => {
+  assert.equal(ux.parseDecimalInput(' 0,5 ', 0, 1), 0.5);
+  assert.equal(ux.parseDecimalInput('0.5', 0, 1), 0.5);
+  assert.equal(ux.parseDecimalInput('0', 0, 1), 0);
+  assert.equal(ux.parseDecimalInput('1', 0, 1), 1);
+  assert.equal(ux.parseDecimalInput('not a number', 0, 1), null);
+  assert.equal(ux.parseDecimalInput('12px', 0, 20), null);
+  assert.equal(ux.parseDecimalInput('1,2.3', 0, 20), null);
+  assert.equal(ux.parseDecimalInput('', 0, 1), null);
+  assert.equal(ux.parseDecimalInput('   ', 0, 1), null);
+  assert.equal(ux.parseDecimalInput('-0.1', 0, 1), null);
+  assert.equal(ux.parseDecimalInput('1.1', 0, 1), null);
+});
+
+test('user capacity splits current users into included and extra rows', () => {
+  const result = {
+    plan: 'paid', base: 5,
+    lines: [{ label: 'Workers requests', used: 5000, included: 10000 }]
+  };
+  assert.equal(ux.userCapacity(result, { workersRequests: 0 }, 100), null);
+  assert.deepEqual(ux.userCapacity(result, { workersRequests: 5000 }, 100), {
+    base: 50, extra: 0, total: 50, label: 'Workers requests', limit: 10000
+  });
+  assert.deepEqual(ux.userCapacity({
+    plan: 'paid', base: 5,
+    lines: [{ label: 'Workers requests', used: 15000, included: 10000 }]
+  }, { workersRequests: 15000 }, 100), {
+    base: 100, extra: 50, total: 150, label: 'Workers requests', limit: 10000
+  });
+});
+
 test('verified node notes do not mark workload fields as verified', () => {
   const def = { verified: 'Verified prices and limits.' };
   assert.deepEqual(ux.fieldProvenance(def, 'price'), {

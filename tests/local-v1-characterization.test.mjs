@@ -98,6 +98,9 @@ async function browser(initial) {
       if (!elements.has(selector)) elements.set(selector, element());
       return elements.get(selector);
     },
+    getElementById(id) {
+      return this.querySelector('#' + id);
+    },
     querySelectorAll(selector) {
       return selector === '.node' ? nodeLayer.children.filter(el => el.className.indexOf('node') >= 0) : [];
     },
@@ -249,6 +252,36 @@ test('SIM_API v1 preserves its method surface, envelopes, error codes, and reque
     'requestCount', 'modelSpent', 'cpuRate', 'scenarioRevision', 'scenarioHash', 'runId', 'dirty',
     'saving', 'saveError', 'chaos', 'usage', 'monthly', 'modelSpend', 'nodes'
   ]);
+});
+
+test('speed input preserves the previous speed and shows invalid and empty hints', async () => {
+  const { window } = await browser(baseline());
+  const speed = window.document.querySelector('#speed');
+  const hint = window.document.querySelector('#speed-hint');
+  speed.setAttribute('aria-describedby', 'speed-hint');
+  const edit = value => {
+    speed.value = value;
+    speed.dispatchEvent({ type: 'input', target: speed });
+  };
+
+  edit('invalid');
+  assert.equal(window.__SIM__.getState().speed, 60);
+  assert.equal(hint.textContent, 'Enter a whole number from 1 to 7200.');
+  assert.equal(hint.hidden, false);
+  assert.equal(speed.getAttribute('aria-invalid'), 'true');
+
+  edit('');
+  assert.equal(window.__SIM__.getState().speed, 60);
+  assert.equal(hint.textContent, 'Enter a whole number from 1 to 7200.');
+  assert.equal(hint.hidden, false);
+  assert.equal(speed.getAttribute('aria-invalid'), 'true');
+
+  edit('120');
+  assert.equal(window.__SIM__.getState().speed, 120);
+  assert.equal(String(speed.value), '120');
+  assert.equal(hint.textContent, '');
+  assert.equal(hint.hidden, true);
+  assert.equal(speed.getAttribute('aria-invalid'), 'false');
 });
 
 test('browser SIM_API preserves dirty/save transitions when a newer edit arrives during save', async () => {
