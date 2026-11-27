@@ -20,10 +20,12 @@
   }
 
   function setInputHint(inp, message) {
-    const hint = inp.parentElement ? inp.parentElement.querySelector('.field-hint') : null;
-    if (!hint) return;
-    hint.textContent = message;
-    hint.hidden = !message;
+    const hintId = inp.getAttribute('aria-describedby');
+    const hint = hintId ? document.getElementById(hintId) : null;
+    if (hint) {
+      hint.textContent = message;
+      hint.hidden = !message;
+    }
     inp.setAttribute('aria-invalid', message ? 'true' : 'false');
   }
 
