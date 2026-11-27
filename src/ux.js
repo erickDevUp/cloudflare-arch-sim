@@ -55,6 +55,40 @@
     return { kind: 'assumption', label: 'Editable assumption' };
   }
 
+  /**
+   * @param {string | number} value
+   * @param {number} min
+   * @param {number} [max]
+   * @returns {number | null}
+   */
+  function parseDecimalInput(value, min, max = Infinity) {
+    const text = String(value).trim();
+    if (!text || (text.includes(',') && text.includes('.'))) return null;
+    const normalized = text.replace(',', '.');
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(normalized)) return null;
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) return null;
+    return parsed;
+  }
+
+  function userCapacity(res, usage, requestsPerUserPerMonth) {
+    if (!res || res.plan === 'custom' || !usage || !(usage.workersRequests > 0) ||
+        !(requestsPerUserPerMonth > 0) || !Array.isArray(res.lines)) return null;
+    const first = res.lines.filter(l => l.period !== 'per request' && l.used > 0)
+      .reduce((a, l) => {
+        const limit = l.limit != null ? l.limit : l.included;
+        const ratio = limit > 0 ? l.used / limit : 0;
+        return !a || ratio > a.ratio ? { label: l.label, limit, used: l.used, ratio } : a;
+      }, null);
+    if (!first || !(first.limit > 0)) return null;
+    const perReq = first.used / usage.workersRequests;
+    const total = Math.floor(usage.workersRequests / requestsPerUserPerMonth);
+    if (!(perReq > 0) || !(total > 0)) return null;
+    const includedUsers = Math.floor(first.limit / perReq / requestsPerUserPerMonth);
+    const base = Math.min(total, includedUsers);
+    return { base, extra: total - base, total, label: first.label, limit: first.limit };
+  }
+
   function connectTargets(nodes, fromId) {
     return nodes.filter(n => n.id !== fromId).map(n => ({
       id: n.id,
@@ -80,8 +114,8 @@
   }
 
   const api = {
-    saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError,
-    sheetFocusable
+    saveStatus, nextTab, fieldProvenance, parseDecimalInput, userCapacity,
+    connectTargets, trapFocus, bannerError, sheetFocusable
   };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

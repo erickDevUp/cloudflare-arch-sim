@@ -124,6 +124,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 .speeds input{width:56px;background:#0d0d12;border:1px solid #24242f;border-radius:6px;color:#e8e8ec;
   padding:4px 6px;font:11px ui-monospace,monospace;text-align:right}
 .speeds input:focus{outline:none;border-color:#4b3fb0}
+.speeds input[aria-invalid="true"]{border-color:#7f1d2b}
 .speeds .sp-eq{font:10px/1 ui-monospace,monospace;color:#8c8c9c;white-space:nowrap;padding-right:2px}
 
 .chaos{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
@@ -170,6 +171,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 .bar-head{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;color:#8a8a99}
 .bar-head b{color:#e8e8ec;font:600 10.5px/1.3 ui-monospace,monospace}
 .capacity{margin-top:11px;font-size:10.5px;color:#9d9daa;line-height:1.4}
+.capacity-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.capacity-row b{color:#e8e8ec;font:600 10.5px/1.3 ui-monospace,monospace;white-space:nowrap}
 .capacity .info{cursor:help;color:#7b8cff;margin-left:2px}
 .breakdown{margin-top:12px;border-top:1px solid #1f1f29;padding-top:8px}
 .breakdown summary{cursor:pointer;font-size:10.5px;color:#8a8a99;list-style:none}
@@ -228,6 +231,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
 .field input,.field select{width:100%;background:#101016;border:1px solid #20202a;border-radius:7px;
   color:#e8e8ec;padding:5px 8px;font:11.5px ui-monospace,monospace}
 .field input:focus,.field select:focus{outline:none;border-color:#4b3fb0}
+.field-hint{display:block;margin-top:3px;font-size:9.5px;line-height:1.3;color:#ff8fa0}
+.field input[aria-invalid="true"]{border-color:#7f1d2b}
 .ins-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
 .ins-stats div{background:#101016;border:1px solid #1c1c25;border-radius:8px;padding:6px 8px}
 .ins-stats span{display:block;font-size:9.5px;color:#8a8a99;text-transform:uppercase;letter-spacing:.04em}
@@ -344,10 +349,13 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
       <div class="stage-bar">
       <div class="toolbar">
         <button id="start" class="primary">Start simulation</button>
-        <div class="speeds">
-          <input id="speed" type="number" min="1" max="7200" step="1" value="60"
-                 aria-label="Simulation speed" title="Simulated seconds per real second">
-          <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+        <div class="speed-field">
+          <div class="speeds">
+            <input id="speed" type="text" inputmode="decimal" min="1" max="7200" step="1" value="60"
+                   aria-label="Simulation speed" aria-describedby="speed-hint" title="Simulated seconds per real second">
+            <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+          </div>
+          <span id="speed-hint" class="field-hint" role="status" hidden></span>
         </div>
       </div>
 
@@ -426,8 +434,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,s
         </details>
         <div id="custom-fields" class="custom-fields" hidden>
           <div class="cost-head">Custom plan settings</div>
-          <label class="field"><span>Base fee ($/mo)</span><input type="number" id="basefee" min="0" step="1" value="0"></label>
-          <label class="field"><span>Monthly budget ($)</span><input type="number" id="budget" min="1" step="500" value="5000"></label>
+          <label class="field"><span>Base fee ($/mo)</span><input type="text" inputmode="decimal" id="basefee" min="0" step="1" value="0" aria-describedby="basefee-hint"><span id="basefee-hint" class="field-hint" role="status" hidden></span></label>
+          <label class="field"><span>Monthly budget ($)</span><input type="text" inputmode="decimal" id="budget" min="1" step="500" value="5000" aria-describedby="budget-hint"><span id="budget-hint" class="field-hint" role="status" hidden></span></label>
         </div>
       </div>
       <div id="inspect" class="inspect" role="tabpanel" aria-labelledby="tab-components" hidden></div>
@@ -2819,6 +2827,40 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     return { kind: 'assumption', label: 'Editable assumption' };
   }
 
+  /**
+   * @param {string | number} value
+   * @param {number} min
+   * @param {number} [max]
+   * @returns {number | null}
+   */
+  function parseDecimalInput(value, min, max = Infinity) {
+    const text = String(value).trim();
+    if (!text || (text.includes(',') && text.includes('.'))) return null;
+    const normalized = text.replace(',', '.');
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(normalized)) return null;
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) return null;
+    return parsed;
+  }
+
+  function userCapacity(res, usage, requestsPerUserPerMonth) {
+    if (!res || res.plan === 'custom' || !usage || !(usage.workersRequests > 0) ||
+        !(requestsPerUserPerMonth > 0) || !Array.isArray(res.lines)) return null;
+    const first = res.lines.filter(l => l.period !== 'per request' && l.used > 0)
+      .reduce((a, l) => {
+        const limit = l.limit != null ? l.limit : l.included;
+        const ratio = limit > 0 ? l.used / limit : 0;
+        return !a || ratio > a.ratio ? { label: l.label, limit, used: l.used, ratio } : a;
+      }, null);
+    if (!first || !(first.limit > 0)) return null;
+    const perReq = first.used / usage.workersRequests;
+    const total = Math.floor(usage.workersRequests / requestsPerUserPerMonth);
+    if (!(perReq > 0) || !(total > 0)) return null;
+    const includedUsers = Math.floor(first.limit / perReq / requestsPerUserPerMonth);
+    const base = Math.min(total, includedUsers);
+    return { base, extra: total - base, total, label: first.label, limit: first.limit };
+  }
+
   function connectTargets(nodes, fromId) {
     return nodes.filter(n => n.id !== fromId).map(n => ({
       id: n.id,
@@ -2844,8 +2886,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   }
 
   const api = {
-    saveStatus, nextTab, fieldProvenance, connectTargets, trapFocus, bannerError,
-    sheetFocusable
+    saveStatus, nextTab, fieldProvenance, parseDecimalInput, userCapacity,
+    connectTargets, trapFocus, bannerError, sheetFocusable
   };
   root.UX = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -2865,6 +2907,23 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = v => String(v).replace(/[&<>"']/g, c => ESC[c]);
   const cloneJson = value => JSON.parse(JSON.stringify(value));
+
+  function inputRangeHint(inp) {
+    const min = inp.min === '' ? null : Number(inp.min);
+    const max = inp.max === '' ? null : Number(inp.max);
+    if (min != null && max != null) return 'Enter ' + min + '–' + max + '.';
+    if (min != null) return 'Enter ' + min + ' or more.';
+    return 'Enter a valid number.';
+  }
+
+  function setInputHint(inp, message) {
+    const hint = inp.parentElement ? inp.parentElement.querySelector('.field-hint') : null;
+    if (!hint) return;
+    hint.textContent = message;
+    hint.hidden = !message;
+    inp.setAttribute('aria-invalid', message ? 'true' : 'false');
+  }
+
   const NODE_KEYS = ['id', 'type', 'x', 'y', 'alias', 'p'];
   const EDGE_KEYS = ['from', 'to', 'weight'];
   // ponytail: the engine models rates, not people. One visible assumption turns
@@ -3302,7 +3361,8 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
         return;
       }
       const R = RANGES[f] || [0, 1e6, 1];
-      html += '<label class="field">' + head + '<input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
+      const hintId = 'field-hint-' + f;
+      html += '<label class="field">' + head + '<input type="text" inputmode="decimal" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '" aria-describedby="' + hintId + '"><span id="' + hintId + '" class="field-hint" role="status" hidden></span></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
@@ -3325,19 +3385,22 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
         const f = inp.dataset.f;
-        const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
-        if (inp.value.trim() === '') {
-          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); pushScenario(); }
+        const max = inp.max === '' ? Infinity : Number(inp.max);
+        const raw = UX.parseDecimalInput(inp.value, Number(inp.min), max);
+        if (raw == null) {
+          setInputHint(inp, inputRangeHint(inp));
           return;
         }
-        const raw = parseFloat(inp.value);
-        if (isNaN(raw)) return;
-        const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
-        n.p[f] = Math.min(hi, Math.max(lo, raw));
+        setInputHint(inp, '');
+        n.p[f] = raw;
         compute(); renderNodes(); renderCost(); renderInspectorStats();
         pushScenario();
       });
-      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
+      inp.addEventListener('change', () => {
+        if (inp.getAttribute('aria-invalid') !== 'true') {
+          inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f];
+        }
+      });
     });
     $('#delnode').addEventListener('click', () => deleteSelected());
     if ($('#connect-node')) {
@@ -3413,28 +3476,17 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     ).join('');
   }
 
-  // An estimate, not a measured user count: convert the first monthly limit
-  // the current traffic would hit into requests, then apply the assumption.
-  // No traffic or no monthly limit means no number at all.
   function capacityHtml(res, usage) {
-    if (state.plan === 'custom' || !(usage.workersRequests > 0)) return '';
-    const first = res.lines.filter(l => l.period !== 'per request' && l.used > 0)
-      .reduce((a, l) => {
-        const limit = l.limit != null ? l.limit : l.included;
-        const ratio = limit > 0 ? l.used / limit : 0;
-        return !a || ratio > a.ratio ? { label: l.label, limit, used: l.used, ratio } : a;
-      }, null);
-    if (!first || !(first.limit > 0)) return '';
-    const perReq = first.used / usage.workersRequests;
-    if (!(perReq > 0)) return '';
-    const n = Math.floor(first.limit / perReq / REQ_PER_USER_PER_MONTH);
-    if (!(n > 0)) return '';
-    const plan = state.plan === 'paid' ? 'Paid $5' : 'Free';
+    const capacity = UX.userCapacity(res, usage, REQ_PER_USER_PER_MONTH);
+    if (!capacity) return '';
     const tip = 'Estimate based on ' + REQ_PER_USER_PER_MONTH +
-      ' requests per user per month. First limit: ' + first.label +
-      ' (' + human(first.limit) + '/month).';
-    return '~' + n.toLocaleString() + ' users on ' + plan +
-      ' before the first limit <span class="info" title="' + esc(tip) + '">&#9432;</span>';
+      ' requests per user per month. First limit: ' + capacity.label +
+      ' (' + human(capacity.limit) + '/month).';
+    const row = (label, value) => '<div class="capacity-row"><span>' + label +
+      '</span><b>' + value.toLocaleString() + ' users</b></div>';
+    return row('Plan base $' + res.base, capacity.base) +
+      row('Extra', capacity.extra) +
+      row('Total <span class="info" title="' + esc(tip) + '">&#9432;</span>', capacity.total);
   }
 
   function renderCost() {
@@ -3803,9 +3855,15 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
     return '1s = ' + (Math.round(v / 360) / 10) + 'h';
   }
   function setSpeed(value) {
-    const v = parseInt(value, 10);
-    if (!isNaN(v)) state.speed = Math.max(1, Math.min(7200, v));
-    $('#speed').value = state.speed;
+    const inp = $('#speed');
+    const v = UX.parseDecimalInput(value, 1, 7200);
+    if (v == null || !Number.isInteger(v)) {
+      setInputHint(inp, 'Enter a whole number from 1 to 7200.');
+      return;
+    }
+    state.speed = v;
+    setInputHint(inp, '');
+    inp.value = state.speed;
     $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
   }
   $('#speed').addEventListener('input', e => setSpeed(e.target.value));
@@ -3814,9 +3872,27 @@ window.ICONS = {"activity":"<svg class=\"lucide lucide-activity\" xmlns=\"http:/
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
-  $('#budget').addEventListener('change', e => setBillingInputs({ budget: Math.max(1, parseFloat(e.target.value) || 1) }));
+  $('#budget').addEventListener('change', () => {
+    const inp = $('#budget');
+    const budget = UX.parseDecimalInput(inp.value, 1);
+    if (budget == null) {
+      setInputHint(inp, inputRangeHint(inp));
+      return;
+    }
+    setInputHint(inp, '');
+    setBillingInputs({ budget });
+  });
   $('#plan').addEventListener('change', e => setPlan(e.target.value));
-  $('#basefee').addEventListener('change', e => setBillingInputs({ baseFee: Math.max(0, parseFloat(e.target.value) || 0) }));
+  $('#basefee').addEventListener('change', () => {
+    const inp = $('#basefee');
+    const baseFee = UX.parseDecimalInput(inp.value, 0);
+    if (baseFee == null) {
+      setInputHint(inp, inputRangeHint(inp));
+      return;
+    }
+    setInputHint(inp, '');
+    setBillingInputs({ baseFee });
+  });
   $('#k-asof').textContent = 'Prices verified as of ' + PRICING.asOf;
   $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
     '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +

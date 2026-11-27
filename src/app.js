@@ -10,6 +10,23 @@
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = v => String(v).replace(/[&<>"']/g, c => ESC[c]);
   const cloneJson = value => JSON.parse(JSON.stringify(value));
+
+  function inputRangeHint(inp) {
+    const min = inp.min === '' ? null : Number(inp.min);
+    const max = inp.max === '' ? null : Number(inp.max);
+    if (min != null && max != null) return 'Enter ' + min + '–' + max + '.';
+    if (min != null) return 'Enter ' + min + ' or more.';
+    return 'Enter a valid number.';
+  }
+
+  function setInputHint(inp, message) {
+    const hint = inp.parentElement ? inp.parentElement.querySelector('.field-hint') : null;
+    if (!hint) return;
+    hint.textContent = message;
+    hint.hidden = !message;
+    inp.setAttribute('aria-invalid', message ? 'true' : 'false');
+  }
+
   const NODE_KEYS = ['id', 'type', 'x', 'y', 'alias', 'p'];
   const EDGE_KEYS = ['from', 'to', 'weight'];
   // ponytail: the engine models rates, not people. One visible assumption turns
@@ -447,7 +464,8 @@
         return;
       }
       const R = RANGES[f] || [0, 1e6, 1];
-      html += '<label class="field">' + head + '<input type="number" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '"></label>';
+      const hintId = 'field-hint-' + f;
+      html += '<label class="field">' + head + '<input type="text" inputmode="decimal" data-f="' + f + '" min="' + R[0] + '" max="' + R[1] + '" step="' + R[2] + '" value="' + (n.p[f] == null ? '' : n.p[f]) + '" aria-describedby="' + hintId + '"><span id="' + hintId + '" class="field-hint" role="status" hidden></span></label>';
     });
     html += '<div class="ins-stats" id="ins-stats">' + statsHtml(r, n) + '</div>';
     if (def.note) html += '<p class="note">' + def.note + '</p>';
@@ -470,19 +488,22 @@
     $$('input[data-f]', box).forEach(inp => {
       inp.addEventListener('input', () => {
         const f = inp.dataset.f;
-        const nullable = f === 'inPrice' || f === 'outPrice' || f === 'inTokens' || f === 'outTokens';
-        if (inp.value.trim() === '') {
-          if (nullable) { n.p[f] = null; compute(); renderNodes(); renderCost(); renderInspectorStats(); pushScenario(); }
+        const max = inp.max === '' ? Infinity : Number(inp.max);
+        const raw = UX.parseDecimalInput(inp.value, Number(inp.min), max);
+        if (raw == null) {
+          setInputHint(inp, inputRangeHint(inp));
           return;
         }
-        const raw = parseFloat(inp.value);
-        if (isNaN(raw)) return;
-        const lo = parseFloat(inp.min), hi = parseFloat(inp.max);
-        n.p[f] = Math.min(hi, Math.max(lo, raw));
+        setInputHint(inp, '');
+        n.p[f] = raw;
         compute(); renderNodes(); renderCost(); renderInspectorStats();
         pushScenario();
       });
-      inp.addEventListener('change', () => { inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f]; });
+      inp.addEventListener('change', () => {
+        if (inp.getAttribute('aria-invalid') !== 'true') {
+          inp.value = n.p[inp.dataset.f] == null ? '' : n.p[inp.dataset.f];
+        }
+      });
     });
     $('#delnode').addEventListener('click', () => deleteSelected());
     if ($('#connect-node')) {
@@ -558,28 +579,17 @@
     ).join('');
   }
 
-  // An estimate, not a measured user count: convert the first monthly limit
-  // the current traffic would hit into requests, then apply the assumption.
-  // No traffic or no monthly limit means no number at all.
   function capacityHtml(res, usage) {
-    if (state.plan === 'custom' || !(usage.workersRequests > 0)) return '';
-    const first = res.lines.filter(l => l.period !== 'per request' && l.used > 0)
-      .reduce((a, l) => {
-        const limit = l.limit != null ? l.limit : l.included;
-        const ratio = limit > 0 ? l.used / limit : 0;
-        return !a || ratio > a.ratio ? { label: l.label, limit, used: l.used, ratio } : a;
-      }, null);
-    if (!first || !(first.limit > 0)) return '';
-    const perReq = first.used / usage.workersRequests;
-    if (!(perReq > 0)) return '';
-    const n = Math.floor(first.limit / perReq / REQ_PER_USER_PER_MONTH);
-    if (!(n > 0)) return '';
-    const plan = state.plan === 'paid' ? 'Paid $5' : 'Free';
+    const capacity = UX.userCapacity(res, usage, REQ_PER_USER_PER_MONTH);
+    if (!capacity) return '';
     const tip = 'Estimate based on ' + REQ_PER_USER_PER_MONTH +
-      ' requests per user per month. First limit: ' + first.label +
-      ' (' + human(first.limit) + '/month).';
-    return '~' + n.toLocaleString() + ' users on ' + plan +
-      ' before the first limit <span class="info" title="' + esc(tip) + '">&#9432;</span>';
+      ' requests per user per month. First limit: ' + capacity.label +
+      ' (' + human(capacity.limit) + '/month).';
+    const row = (label, value) => '<div class="capacity-row"><span>' + label +
+      '</span><b>' + value.toLocaleString() + ' users</b></div>';
+    return row('Plan base $' + res.base, capacity.base) +
+      row('Extra', capacity.extra) +
+      row('Total <span class="info" title="' + esc(tip) + '">&#9432;</span>', capacity.total);
   }
 
   function renderCost() {
@@ -948,9 +958,15 @@
     return '1s = ' + (Math.round(v / 360) / 10) + 'h';
   }
   function setSpeed(value) {
-    const v = parseInt(value, 10);
-    if (!isNaN(v)) state.speed = Math.max(1, Math.min(7200, v));
-    $('#speed').value = state.speed;
+    const inp = $('#speed');
+    const v = UX.parseDecimalInput(value, 1, 7200);
+    if (v == null || !Number.isInteger(v)) {
+      setInputHint(inp, 'Enter a whole number from 1 to 7200.');
+      return;
+    }
+    state.speed = v;
+    setInputHint(inp, '');
+    inp.value = state.speed;
     $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
   }
   $('#speed').addEventListener('input', e => setSpeed(e.target.value));
@@ -959,9 +975,27 @@
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
-  $('#budget').addEventListener('change', e => setBillingInputs({ budget: Math.max(1, parseFloat(e.target.value) || 1) }));
+  $('#budget').addEventListener('change', () => {
+    const inp = $('#budget');
+    const budget = UX.parseDecimalInput(inp.value, 1);
+    if (budget == null) {
+      setInputHint(inp, inputRangeHint(inp));
+      return;
+    }
+    setInputHint(inp, '');
+    setBillingInputs({ budget });
+  });
   $('#plan').addEventListener('change', e => setPlan(e.target.value));
-  $('#basefee').addEventListener('change', e => setBillingInputs({ baseFee: Math.max(0, parseFloat(e.target.value) || 0) }));
+  $('#basefee').addEventListener('change', () => {
+    const inp = $('#basefee');
+    const baseFee = UX.parseDecimalInput(inp.value, 0);
+    if (baseFee == null) {
+      setInputHint(inp, inputRangeHint(inp));
+      return;
+    }
+    setInputHint(inp, '');
+    setBillingInputs({ baseFee });
+  });
   $('#k-asof').textContent = 'Prices verified as of ' + PRICING.asOf;
   $('#k-src').innerHTML = Object.keys(PRICING.sources).map(k =>
     '<a class="src" target="_blank" rel="noopener" href="' + PRICING.sources[k] + '">' +
