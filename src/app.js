@@ -1,6 +1,13 @@
 (function () {
   const TYPES = window.CATALOG.types;
-  const GROUPS = window.CATALOG.groups;
+  const PALETTE_GROUPS = [
+    { id: 'edge', label: 'Tráfico y borde' },
+    { id: 'compute', label: 'Compute' },
+    { id: 'data', label: 'Datos' },
+    { id: 'ai', label: 'IA' },
+    { id: 'external', label: 'Externos' }
+  ];
+  const collapsedGroups = new Set(PALETTE_GROUPS.slice(1).map(g => g.id));
   const QE = window.QUEUE_ENGINE;
   const CORE = window.SIM_STATE_CORE;
   const UX = window.UX;
@@ -48,10 +55,15 @@
     runId: nextRunId(), scenarioRevision: null, scenarioHash: null, dirty: false, saving: false, saveError: null
   };
   let seq = 1;
+  let guideStep = 0;
+  let guideFocus = false;
+  let guideBaseline = null;
   const uid = () => 'n' + seq++;
 
   function typeOf(n) { return TYPES[n.type]; }
-  function groupColor(t) { return (GROUPS.find(g => g.id === TYPES[t].group) || {}).color || '#888'; }
+  function groupColor(t) {
+    return { edge: '#b65a31', compute: '#4f7c43', data: '#536f91', ai: '#78559a', external: '#57745a' }[TYPES[t].group] || '#6f6961';
+  }
 
   function addNode(type, x, y) {
     const def = TYPES[type];
@@ -137,19 +149,40 @@
     const wrap = $('#palette-list');
     wrap.innerHTML = '';
     let shown = 0;
-    GROUPS.forEach(g => {
-      const items = Object.keys(TYPES).filter(k => TYPES[k].group === g.id && TYPES[k].name.toLowerCase().includes(q));
+    const total = Object.keys(TYPES).length;
+    PALETTE_GROUPS.forEach((g, index) => {
+      const all = Object.keys(TYPES).filter(k => TYPES[k].group === g.id);
+      const items = all.filter(k => TYPES[k].name.toLowerCase().includes(q));
       if (!items.length) return;
       shown += items.length;
+      const present = all.filter(k => state.nodes.some(n => n.type === k)).length;
+      const selectedNode = state.sel && nodeById(state.sel);
+      if (selectedNode && selectedNode.type && TYPES[selectedNode.type].group === g.id) collapsedGroups.delete(g.id);
+      const collapsed = !q && collapsedGroups.has(g.id);
       const sec = document.createElement('div');
       sec.className = 'pal-group';
-      sec.innerHTML = '<div class="pal-title">' + g.label + '</div>';
+      const title = document.createElement('button');
+      title.className = 'pal-title';
+      title.type = 'button';
+      title.setAttribute('aria-expanded', String(!collapsed));
+      title.innerHTML = '<span class="pal-number">' + String(index + 1).padStart(2, '0') + '</span><span>' + g.label + '</span><span class="pal-count">' + present + '/' + all.length + '</span><span class="pal-chevron">' + (collapsed ? '▸' : '▾') + '</span>';
+      title.addEventListener('click', () => {
+        if (collapsedGroups.has(g.id)) collapsedGroups.delete(g.id);
+        else collapsedGroups.add(g.id);
+        renderPalette();
+      });
+      sec.appendChild(title);
+      const progress = document.createElement('div');
+      progress.className = 'pal-progress';
+      progress.innerHTML = '<i style="width:' + (all.length ? present / all.length * 100 : 0) + '%"></i>';
+      sec.appendChild(progress);
       const grid = document.createElement('div');
       grid.className = 'pal-grid';
+      grid.hidden = collapsed;
       items.forEach(k => {
         const def = TYPES[k];
         const el = document.createElement('button');
-        el.className = 'pal-item';
+        el.className = 'pal-item' + (state.sel && nodeById(state.sel) && nodeById(state.sel).type === k ? ' sel' : '');
         el.title = def.note || def.name;
         el.innerHTML = '<span class="pal-ico" style="color:' + groupColor(k) + '">' + svg(k) + '</span><span>' + def.name + '</span>';
         el.addEventListener('pointerdown', ev => {
@@ -169,6 +202,9 @@
       wrap.appendChild(sec);
     });
     if (!shown) wrap.innerHTML = '<div class="pal-empty">No components match.</div>';
+    const used = Object.keys(TYPES).filter(k => state.nodes.some(n => n.type === k)).length;
+    $('#palette-total').textContent = shown === total ? total + ' elementos' : shown + ' / ' + total + ' elementos';
+    $('#palette-progress').textContent = 'PROGRESO ' + used + ' / ' + total;
   }
 
   function svg(type) {
@@ -187,6 +223,7 @@
     renderInspector();
     renderCost();
     renderAlerts();
+    renderGuide();
   }
 
   function renderName() {
@@ -195,7 +232,72 @@
     const tagline = 'model of real Cloudflare behaviour \u2014 not a load test';
     const text = state.name && state.name !== 'Untitled scenario' ? state.name : tagline;
     if (el.textContent !== text) el.textContent = text;
+    const title = $('#lesson-title');
+    if (title && title.textContent !== state.name) title.textContent = state.name;
     if (document.title.indexOf(text) !== 0) document.title = text + ' \u2014 Cloudflare architecture simulator';
+  }
+
+  function guideView() {
+    return {
+      nodes: state.nodes.map(n => ({ type: n.type, p: eff(n).p, r: state.res[n.id] || {} })),
+      sourceRate: sourceRate(),
+      pathLat: state.pathLat,
+      time: state.time,
+      requests: state.requests,
+      spent: state.spent,
+      modelSpent: state.modelSpent,
+      modelSet: modelBucket().set
+    };
+  }
+
+  function captureGuideBaseline() {
+    guideBaseline = { time: state.time, requests: state.requests, spent: state.spent, modelSpent: state.modelSpent };
+  }
+
+  function renderGuide() {
+    const view = guideView();
+    const content = UX.guideContent(guideStep, view);
+    if (!guideBaseline) captureGuideBaseline();
+    $('#guide-step').textContent = 'PASO ' + content.step + ' / ' + content.total;
+    $('#guide-status').textContent = content.status;
+    $('#guide-status').className = 'status-chip ' + (content.problem ? 'problem' : 'ok');
+    $('#guide-title').textContent = content.title;
+    $('#guide-case').textContent = content.caseText;
+    $('#guide-tip').textContent = content.tip;
+    const changes = UX.guideChanges(guideBaseline, view);
+    $('#guide-changes').innerHTML = changes.reset
+      ? '<div class="change-row"><span>Runtime restablecido</span><b>0s · 0 req</b></div>'
+      : '<div class="change-row"><span>Tiempo simulado</span><b>+' + Math.round(changes.seconds) + 's</b></div>' +
+        '<div class="change-row"><span>Peticiones</span><b>+' + Math.round(changes.requests).toLocaleString() + '</b></div>' +
+        '<div class="change-row"><span>Cloudflare</span><b>+$' + changes.cloudflare.toFixed(2) + '</b></div>' +
+        '<div class="change-row"><span>Modelo externo</span><b>+$' + changes.model.toFixed(2) + '</b></div>';
+    $('#guide-checklist').innerHTML = content.checklist.map(item =>
+      '<li data-checked="' + item.checked + '">' + item.label + '</li>'
+    ).join('');
+    $('#guide-prev').disabled = guideStep === 0;
+    $('#guide-next').disabled = guideStep === content.total - 1;
+    $('#guide-next').textContent = guideStep === content.total - 1
+      ? '« Repasar: ' + UX.guideContent(guideStep - 1, view).label
+      : '« Siguiente: ' + UX.guideContent(guideStep + 1, view).label;
+    $('#timeline-current').textContent = 'Paso ' + content.step + ' de ' + content.total;
+    $$('[data-guide-step]').forEach(button => {
+      const index = Number(button.dataset.guideStep);
+      button.classList.toggle('on', index === guideStep);
+      button.classList.toggle('done', index < guideStep);
+      if (index === guideStep) button.setAttribute('aria-current', 'step');
+      else button.removeAttribute('aria-current');
+    });
+    $('#stage').classList.toggle('phase-focus', guideFocus);
+  }
+
+  function setGuideStep(index, emphasize) {
+    const next = Math.max(0, Math.min(6, Number(index) || 0));
+    if (next !== guideStep || !guideBaseline) captureGuideBaseline();
+    guideStep = next;
+    guideFocus = !!emphasize;
+    setNav(guideFocus ? 'lifecycle' : 'simulator');
+    renderNodes();
+    renderGuide();
   }
 
   function samplePath(path, len) {
@@ -231,8 +333,10 @@
       const d = 'M' + x1 + ',' + y1 + ' C' + (x1 + 46) + ',' + y1 + ' ' + (x2 - 46) + ',' + y2 + ' ' + x2 + ',' + y2;
       const path = document.createElementNS(NS, 'path');
       const selected = edgeSelected(e);
+      const phase = UX.phaseForType(b.type);
       path.setAttribute('d', d);
-      path.setAttribute('class', 'edge' + (selected ? ' sel' : ''));
+      path.setAttribute('class', 'edge' + (selected ? ' sel' : '') + (guideFocus && phase === guideStep ? ' phase-active' : ''));
+      path.dataset.phase = String(phase);
       path.setAttribute('data-from', e.from);
       path.setAttribute('data-to', e.to);
       path.setAttribute('tabindex', '0');
@@ -265,9 +369,10 @@
       label.setAttribute('x', mid.x);
       label.setAttribute('y', mid.y - 8);
       label.setAttribute('class', 'edge-label' + (selected ? ' sel' : ''));
+      label.dataset.phase = String(phase);
       label.textContent = edgeWeight(e) + '%';
       g.appendChild(label);
-      state.edgeEls.push({ path, dots, label, len, pts: samplePath(path, len), from: e.from, to: e.to, weight: edgeWeight(e) });
+      state.edgeEls.push({ path, dots, label, len, pts: samplePath(path, len), from: e.from, to: e.to, weight: edgeWeight(e), phase });
     });
   }
 
@@ -278,7 +383,7 @@
       const flow = (fr.out || 0) * (e.weight / 100);
       const r = state.res[e.to] || {};
       const hot = flow > 0 && ((r.util || 0) >= 0.9 || (r.err || 0) > 0);
-      const cls = 'edge' + (edgeSelected(e) ? ' sel' : '') + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '');
+      const cls = 'edge' + (edgeSelected(e) ? ' sel' : '') + (hot ? ' hot' : '') + (flow <= 0 ? ' idle' : '') + (guideFocus && e.phase === guideStep ? ' phase-active' : '');
       if (e.path.getAttribute('class') !== cls) e.path.setAttribute('class', cls);
       if (!state.running || flow <= 0 || e.len <= 0) {
         e.dots.forEach(d => { if (d.el.style.opacity !== '0') d.el.style.opacity = 0; });
@@ -319,24 +424,35 @@
       const cls = bad ? 'hot' : util > 0.9 ? 'hot' : util > 0.7 ? 'warm' : '';
       const barCls = (r.err || 0) > 0 ? 'over' : util >= 1 ? 'over' : util > 0.9 ? 'hot' : util > 0.7 ? 'warm' : '';
       const bcls = (r.err || 0) > 0 ? 'bad' : util >= 1 ? 'bad' : util > 0.7 ? 'warn' : '';
-      const el = document.createElement('div');
-      el.className = 'node' + (state.sel === n.id ? ' sel' : '') + (slashed ? ' hit' : '') + (bad ? ' sat' : '');
+      const el = document.createElementNS(NS, 'g');
+      const phase = UX.phaseForType(n.type);
+      const nodeClass = 'node' + (state.sel === n.id ? ' sel' : '') + (slashed ? ' hit' : '') + (bad ? ' sat' : '') + (guideFocus && phase === guideStep ? ' phase-active' : '');
+      el.setAttribute('class', nodeClass);
       el.dataset.id = n.id;
+      el.dataset.group = def.group;
+      el.dataset.phase = String(phase);
       el.tabIndex = 0;
       el.setAttribute('role', 'button');
       el.setAttribute('aria-label', nname(n) + '. ' + badge(n, r) + '. Press Enter to select, Delete to remove.');
-      el.style.left = n.x + 'px';
-      el.style.top = n.y + 'px';
-      const color = groupColor(n.type);
+      el.setAttribute('transform', 'translate(' + n.x + ' ' + n.y + ')');
+      const icon = svg(n.type);
+      const iconInner = icon.slice(icon.indexOf('>') + 1, icon.lastIndexOf('</svg>'));
       el.innerHTML =
-        '<div class="nbox ' + cls + '" style="--c:' + color + '">' +
-          '<span class="nicon">' + svg(n.type) + '</span>' +
-          (def.source ? '<span class="nrate">' + Math.round(r.lambda) + '/s</span>' : '') +
-          '<span class="nbar"><i class="' + barCls + '" style="width:' + Math.min(100, pct) + '%"></i></span>' +
-        '</div>' +
-        '<div class="nlabel">' + esc(n.alias || def.name) + '</div>' +
-        '<div class="nbadge ' + bcls + '">' + badge(n, r) + '</div>' +
-        '<span class="port" data-port="1"></span>';
+        '<rect class="node-hit" x="-8" y="-8" width="90" height="112"/>' +
+        '<g class="nbox ' + cls + '" style="--c:' + groupColor(n.type) + '">' +
+          '<g class="token-visual">' +
+            '<polygon class="token-face token-top" points="37,4 70,22 37,40 4,22"/>' +
+            '<polygon class="token-face token-left" points="4,22 37,40 37,72 4,54"/>' +
+            '<polygon class="token-face token-right" points="37,40 70,22 70,54 37,72"/>' +
+            '<svg class="nicon" x="23" y="23" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + iconInner + '</svg>' +
+            (def.source ? '<text class="nrate" x="61" y="16">' + Math.round(r.lambda) + '/s</text>' : '') +
+            '<rect class="nbar" x="20" y="61" width="34" height="3" rx="1.5"/>' +
+            '<rect class="nbar-fill ' + barCls + '" x="20" y="61" width="' + Math.min(34, Math.max(0, pct / 100 * 34)) + '" height="3" rx="1.5"/>' +
+          '</g>' +
+        '</g>' +
+        '<text class="nlabel" x="37" y="88">' + esc(n.alias || def.name) + '</text>' +
+        '<text class="nbadge ' + bcls + '" x="37" y="101">' + badge(n, r) + '</text>' +
+        '<circle class="port" cx="74" cy="37" r="6" data-port="1"/>';
       layer.appendChild(el);
     });
     $$('.node').forEach(el => {
@@ -664,6 +780,8 @@
     $('#k-spent').textContent = '$' + state.spent.toFixed(2);
     $('#k-time').textContent = hours < 1 ? Math.round(state.time) + 's' : hours.toFixed(2) + 'h';
     $('#k-lat').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
+    $('#m-rate').textContent = sourceRate().toFixed(1) + ' req/s';
+    $('#m-latency').textContent = state.pathLat ? fmt(state.pathLat * 1000) : '\u2014';
     $('#k-cpu').textContent = Math.round(state.cpuRate || 0) + ' ms/s';
     const anyErr = state.nodes.some(n => (state.res[n.id] || {}).err > 0);
     const status = anyErr ? 'ERR' : state.pathLat >= 30 ? 'saturated' : state.pathLat > 3 ? 'slow' : 'ok';
@@ -677,6 +795,7 @@
     }));
     $('#k-total').textContent = money(res.total) + '/mo';
     $('#k-proj').textContent = money(res.total) + '/mo';
+    $('#m-cloudflare').textContent = money(res.total) + '/mo';
 
     // One headline, one chip: every figure comes from the monthlyCost result
     // above, never from a second pricing path.
@@ -730,8 +849,10 @@
     }
 
     const capacity = capacityHtml(res, usage);
+    const capacityData = UX.userCapacity(res, usage, REQ_PER_USER_PER_MONTH);
     $('#capacity').innerHTML = capacity;
     $('#capacity').hidden = !capacity;
+    $('#m-users').textContent = capacityData ? capacityData.total.toLocaleString() : '\u2014';
     $('#plan-lines').innerHTML = planLinesHtml(res, state.plan);
     $('#cost-provenance').innerHTML = res.unverified.length
       ? '<b>Some prices are unverified</b><span>Unverified dimensions are excluded from the total. Workload rates and monthly totals are estimates.</span>'
@@ -742,7 +863,9 @@
     const mdl = $('#k-model');
     mdl.textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
     mdl.className = ms.set ? 'v good' : '';
+    $('#m-model').textContent = ms.set ? money(ms.total) + '/mo' : 'unset';
     $('#k-reqs').textContent = Math.round(state.requests).toLocaleString();
+    $('#m-requests').textContent = human(state.requests);
     $('#k-perreq').textContent = state.requests > 0 ? perReq(state.spent / state.requests) : '\u2014';
     $('#k-modelreq').textContent = !ms.set ? 'unset' : state.requests > 0 ? perReq(state.modelSpent / state.requests) : '\u2014';
   }
@@ -837,7 +960,9 @@
   function select(id, revealInspector) {
     state.sel = id;
     state.selEdge = null;
-    renderNodes();
+    const node = nodeById(id);
+    setGuideStep(node ? UX.phaseForType(node.type) : guideStep, false);
+    renderPalette();
     renderInspector();
     setTab('components');
     if (revealInspector && mobile.matches) openMobileSheet('right', true);
@@ -846,7 +971,9 @@
   function selectEdge(edge, revealInspector) {
     state.sel = null;
     state.selEdge = { from: edge.from, to: edge.to };
-    renderNodes();
+    const target = nodeById(edge.to);
+    setGuideStep(target ? UX.phaseForType(target.type) : guideStep, false);
+    renderPalette();
     buildEdges();
     renderInspector();
     setTab('components');
@@ -859,7 +986,7 @@
     if (state.selEdge) {
       state.edges = state.edges.filter(e => !edgeSelected(e));
       state.selEdge = null;
-      compute(); render();
+      compute(); render(); renderPalette();
       pushScenario();
       requestAnimationFrame(() => $('#canvas').focus({ preventScroll: true }));
       return;
@@ -870,7 +997,7 @@
     state.nodes = state.nodes.filter(n => n.id !== state.sel);
     state.edges = state.edges.filter(e => e.from !== state.sel && e.to !== state.sel);
     state.sel = null;
-    compute(); render();
+    compute(); render(); renderPalette();
     pushScenario();
     requestAnimationFrame(() => {
       if (mobile.matches && openSheet === 'right') {
@@ -991,7 +1118,7 @@
       acc += dtReal;
       if (acc >= 0.22) {
         acc = 0;
-        renderCost(); renderNodes(); renderAlerts(); renderInspectorStats();
+        renderCost(); renderNodes(); renderAlerts(); renderInspectorStats(); renderGuide();
       }
     }
     animateEdges(ts);
@@ -1003,7 +1130,8 @@
 
   $('#search').addEventListener('input', renderPalette);
   function syncRunControl() {
-    $('#start').textContent = state.running ? 'Pause simulation' : 'Start simulation';
+    $('#start').textContent = state.running ? 'Pausa' : 'Iniciar';
+    $('#start').setAttribute('aria-label', state.running ? 'Pause simulation' : 'Start simulation');
     $('#start').classList.toggle('on', state.running);
   }
 
@@ -1015,7 +1143,7 @@
 
   function clearRuntime() {
     state.time = 0; state.spent = 0; state.requests = 0; state.modelSpent = 0; state.chaos = {};
-    state.backlog = {}; state.drops = {}; lastReal = 0; acc = 0;
+    state.backlog = {}; state.drops = {}; lastReal = 0; acc = 0; guideBaseline = null;
   }
 
   function resetSim() {
@@ -1034,11 +1162,13 @@
   function runSimulation(seconds) {
     setRunning(false);
     advanceSimulation(seconds);
-    renderCost(); renderNodes(); renderAlerts(); renderInspectorStats();
+    renderCost(); renderNodes(); renderAlerts(); renderInspectorStats(); renderGuide();
   }
 
   $('#start').addEventListener('click', () => setRunning(!state.running));
   $('#reset').addEventListener('click', resetSim);
+  $('#repeat').addEventListener('click', resetSim);
+  $('#reset-top').addEventListener('click', resetSim);
   function speedEq(v) {
     if (v < 60) return '1s = ' + v + 's';
     if (v < 3600) return '1s = ' + (Math.round(v / 6) / 10) + 'm';
@@ -1059,6 +1189,57 @@
   $('#speed').addEventListener('input', e => setSpeed(e.target.value));
   $('#speed-eq').innerHTML = '\u00d7 \u00b7 ' + speedEq(state.speed);
   $$('.chaos-btn').forEach(b => b.addEventListener('click', () => chaos(b.dataset.c)));
+
+  function setNav(name) {
+    ['simulator', 'lifecycle', 'costs'].forEach(key => {
+      const button = $('#nav-' + key);
+      button.classList.toggle('on', key === name);
+      button.setAttribute('aria-pressed', String(key === name));
+    });
+  }
+
+  $$('[data-guide-step]').forEach(button => button.addEventListener('click', () => setGuideStep(Number(button.dataset.guideStep), true)));
+  $('#guide-prev').addEventListener('click', () => setGuideStep(guideStep - 1, true));
+  $('#guide-next').addEventListener('click', () => setGuideStep(guideStep + 1, true));
+  $('#nav-simulator').addEventListener('click', () => {
+    guideFocus = false;
+    setNav('simulator');
+    renderNodes();
+    renderGuide();
+  });
+  $('#nav-lifecycle').addEventListener('click', () => setGuideStep(guideStep, true));
+  $('#nav-costs').addEventListener('click', () => {
+    app.classList.remove('no-insp');
+    syncPanels();
+    setTab('cost');
+    setNav('costs');
+    if (mobile.matches) openMobileSheet('right', true);
+  });
+  $('#global-search').addEventListener('click', () => {
+    if (mobile.matches) openMobileSheet('palette', true);
+    else {
+      app.classList.remove('no-pal');
+      syncPanels();
+      $('#search').focus();
+    }
+  });
+  $('#help').addEventListener('click', () => {
+    const popover = $('#help-popover');
+    popover.hidden = !popover.hidden;
+    $('#help').setAttribute('aria-expanded', String(!popover.hidden));
+  });
+  $('#theme-toggle').addEventListener('click', () => {
+    const dark = app.dataset.theme !== 'dark';
+    app.dataset.theme = dark ? 'dark' : 'paper';
+    $('#theme-toggle').setAttribute('aria-pressed', String(dark));
+    $('#theme-toggle').setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+  });
+  document.addEventListener('click', ev => {
+    if (!$('#help-popover').hidden && !ev.target.closest('.top-tools')) {
+      $('#help-popover').hidden = true;
+      $('#help').setAttribute('aria-expanded', 'false');
+    }
+  });
   $('#zoomin').addEventListener('click', () => { state.zoom = Math.min(1.8, state.zoom * 1.15); render(); });
   $('#zoomout').addEventListener('click', () => { state.zoom = Math.max(0.35, state.zoom / 1.15); render(); });
   $('#fit').addEventListener('click', fit);
@@ -1093,7 +1274,7 @@
     if (ev.target.closest('.node')) return;
     $('#canvas').focus({ preventScroll: true });
     pan = { sx: ev.clientX, sy: ev.clientY, px: state.px, py: state.py };
-    state.sel = null; state.selEdge = null; renderNodes(); renderInspector();
+    state.sel = null; state.selEdge = null; renderNodes(); renderInspector(); renderPalette();
   });
   $('#canvas').addEventListener('wheel', ev => {
     ev.preventDefault();
@@ -1103,9 +1284,20 @@
 
   let refocusing = false;
   document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && !$('#help-popover').hidden) {
+      $('#help-popover').hidden = true;
+      $('#help').setAttribute('aria-expanded', 'false');
+      $('#help').focus();
+      return;
+    }
     if (ev.key === 'Escape' && openSheet) {
       ev.preventDefault();
       closeMobileSheet();
+      return;
+    }
+    if (ev.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) {
+      ev.preventDefault();
+      $('#global-search').click();
       return;
     }
     if (ev.key === 'Tab' && openSheet) {
@@ -1645,9 +1837,10 @@
     })
   });
 
-  renderPalette();
   loadTemplate();
+  renderPalette();
   syncBillingControls();
+  setGuideStep(state.sel ? UX.phaseForType(nodeById(state.sel).type) : 0, false);
 
   let booted = false;
   const hashMatch = /^#s=(.+)$/.exec(location.hash);
