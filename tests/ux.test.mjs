@@ -140,6 +140,47 @@ test('recovered bootstrap keeps pending or dirty local edits instead of applying
   assert.equal(core.bootstrapAction(true, true, true), 'identity');
 });
 
+test('lifecycle phases map node types without changing simulator semantics', () => {
+  assert.equal(ux.phaseForType('traffic'), 0);
+  assert.equal(ux.phaseForType('cache'), 1);
+  assert.equal(ux.phaseForType('workers'), 2);
+  assert.equal(ux.phaseForType('durable_objects'), 3);
+  assert.equal(ux.phaseForType('r2'), 4);
+  assert.equal(ux.phaseForType('workers_ai'), 5);
+  assert.equal(ux.phaseForType('queues'), 6);
+});
+
+test('guided steps report live model health instead of fixed lesson data', () => {
+  const healthy = ux.guideContent(2, {
+    nodes: [{ type: 'workers', r: { lambda: 12, util: 0.45, err: 0, lat: 0.02 } }],
+    sourceRate: 12, requests: 120, pathLat: 0.08
+  });
+  assert.equal(healthy.status, 'OK');
+  assert.match(healthy.caseText, /45%/);
+  assert.equal(healthy.checklist.every(item => item.checked), true);
+
+  const saturated = ux.guideContent(2, {
+    nodes: [{ type: 'workers', r: { lambda: 120, util: 1.2, err: 0.1, lat: 0.9 } }],
+    sourceRate: 120, requests: 1200, pathLat: 0.9
+  });
+  assert.equal(saturated.status, 'PROBLEMA');
+  assert.equal(saturated.checklist[2].checked, false);
+
+  const missing = ux.guideContent(5, { nodes: [], sourceRate: 0, requests: 0, pathLat: 0 });
+  assert.equal(missing.status, 'PROBLEMA');
+  assert.match(missing.caseText, /Añade AI Gateway/);
+});
+
+test('guide change deltas use runtime counters and identify a reset', () => {
+  const baseline = { time: 10, requests: 100, spent: 0.25, modelSpent: 0.5 };
+  assert.deepEqual(ux.guideChanges(baseline, { time: 25, requests: 160, spent: 0.5, modelSpent: 0.75 }), {
+    reset: false, seconds: 15, requests: 60, cloudflare: 0.25, model: 0.25
+  });
+  assert.deepEqual(ux.guideChanges(baseline, { time: 0, requests: 0, spent: 0, modelSpent: 0 }), {
+    reset: true, seconds: 0, requests: 0, cloudflare: 0, model: 0
+  });
+});
+
 test('state core centralizes saving and persisted identity transitions', () => {
   const state = {
     scenarioRevision: null, scenarioHash: null, dirty: true, saving: false,

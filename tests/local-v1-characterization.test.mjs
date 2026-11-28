@@ -44,7 +44,10 @@ function element() {
     clearListeners() { listeners.clear(); },
     appendChild(child) { this.children.push(child); return child; },
     remove() {},
-    setAttribute(name, value) { attributes.set(name, String(value)); },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+      if (name === 'class') this.className = String(value);
+    },
     getAttribute(name) { return attributes.get(name) ?? null; },
     getBoundingClientRect() { return { left: 0, top: 0, width: 1200, height: 800 }; },
     getTotalLength() { return 100; },

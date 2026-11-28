@@ -8,95 +8,180 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app">
+<div class="app" id="app" data-theme="paper">
   <header class="top">
     <div class="brand">
       <span class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2.5-5 5-7 8-4s4 6 8-2"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2.5-5 5-7 8-4s4 6 8-2"/><path d="M4 9h4M16 15h4"/></svg>
       </span>
       <div>
-        <b>Cloudflare Architecture Simulator</b>
+        <b>Cloudflare <span>Architecture Lab</span></b>
         <span id="scenario-name">model of real Cloudflare behaviour &mdash; not a load test</span>
       </div>
     </div>
-    <div id="save-status" class="save-status" role="status" aria-live="polite" aria-atomic="true">Local only</div>
-    <div class="actions">
-      <button id="tog-pal" class="ghost on" title="Show or hide the component palette" aria-controls="palette" aria-expanded="true">Components</button>
-      <button id="tog-insp" class="ghost on" title="Show or hide costs and the inspector" aria-controls="right-panel" aria-expanded="true">Costs &amp; inspector</button>
-      <button id="reset" class="ghost" title="Reset time, spent and chaos; keeps the architecture">Reset sim</button>
-      <button id="fit" class="ghost">Fit view</button>
-      <button id="copy-link" class="ghost" title="Copy a shareable scenario link">Copy link</button>
-      <button id="copy-json" class="ghost" title="Copy the scenario JSON for agents">Copy JSON</button>
+
+    <nav class="view-nav" aria-label="Workspace views">
+      <button id="nav-simulator" class="nav-pill on" type="button" aria-pressed="true">Simulator</button>
+      <button id="nav-lifecycle" class="nav-pill" type="button" aria-pressed="false">Request path</button>
+      <button id="nav-costs" class="nav-pill" type="button" aria-pressed="false">Costs</button>
+    </nav>
+
+    <div class="top-tools">
+      <div class="tool-buttons">
+        <button id="global-search" class="icon-btn search-pill" type="button" aria-label="Search components" title="Search components ( / )">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <span>Buscar</span><kbd>/</kbd>
+        </button>
+        <button id="help" class="icon-btn" type="button" aria-label="Open simulator help" aria-controls="help-popover" aria-expanded="false" title="Help">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.5-2.5 1.8-2.5 3.5M12 17h.01"/></svg>
+        </button>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch to dark theme" aria-pressed="false" title="Switch theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></svg>
+        </button>
+        <span class="locale-pill" title="Idioma de la guía: español">ES</span>
+        <span class="credit-label">local</span>
+      </div>
+      <div id="save-status" class="save-status" role="status" aria-live="polite" aria-atomic="true">Local only</div>
+      <div class="help-popover" id="help-popover" role="note" hidden>
+        <b>Atajos y controles</b>
+        <span><kbd>/</kbd> busca componentes</span>
+        <span><kbd>Enter</kbd> selecciona un nodo</span>
+        <span><kbd>Delete</kbd> elimina la selección</span>
+        <span>Arrastra el papel para mover la vista.</span>
+      </div>
+    </div>
+
+    <div class="top-actions" aria-label="Simulator actions">
+      <button id="tog-pal" class="ghost on" type="button" title="Show or hide the component palette" aria-controls="palette" aria-expanded="true">Components</button>
+      <button id="tog-insp" class="ghost on" type="button" title="Show or hide costs and the inspector" aria-controls="right-panel" aria-expanded="true">Costs</button>
+      <button id="reset-top" class="ghost" type="button" title="Reset time, spent and chaos; keeps the architecture">Reset</button>
+      <button id="fit" class="ghost" type="button">Fit view</button>
+      <button id="copy-link" class="ghost" type="button" title="Copy a shareable scenario link">Copy link</button>
+      <button id="copy-json" class="ghost" type="button" title="Copy the scenario JSON for agents">Copy JSON</button>
     </div>
   </header>
 
   <div id="channel-error" class="channel-error" role="alert" hidden>
     <span id="channel-error-text"></span>
-    <button id="error-retry" class="ghost" hidden>Retry</button>
+    <button id="error-retry" class="ghost" type="button" hidden>Retry</button>
   </div>
 
   <div class="body">
-    <aside class="palette" id="palette" aria-label="Component palette">
+    <aside class="palette" id="palette" aria-label="Component palette" lang="es">
       <div class="pal-head">
-        <span>Components</span>
-        <button id="close-palette" class="sheet-close" aria-label="Close components" title="Close components" hidden>&times;</button>
+        <div><span>Componentes</span><small id="palette-total">17 elementos</small></div>
+        <button id="close-palette" class="sheet-close" type="button" aria-label="Close components" title="Close components" hidden>&times;</button>
       </div>
-      <input id="search" class="search" placeholder="Search components" autocomplete="off">
+      <input id="search" class="search" placeholder="Buscar componentes" autocomplete="off">
       <div id="palette-list" class="pal-list"></div>
+      <div class="palette-foot" id="palette-progress">COBERTURA 12 / 18</div>
     </aside>
 
-    <main class="stage">
-      <div class="canvas-wrap">
-      <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
-      <div class="canvas" id="canvas" tabindex="-1" role="group" aria-label="Architecture canvas" aria-describedby="canvas-help">
-        <p id="canvas-help" class="sr-only">Tab to a node or connection, press Enter or Space to select it, and press Delete to remove it. Use the inspector Connect to control to add an edge without dragging.</p>
-        <div class="world" id="world">
-          <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
-          <div class="node-layer" id="node-layer"></div>
+    <main class="stage" id="stage">
+      <section class="lesson-head" aria-labelledby="lesson-title">
+        <div class="lesson-copy">
+          <div class="breadcrumb">ARQUITECTURA <span>/</span> SIMULADOR INTERACTIVO</div>
+          <h1 id="lesson-title">Beauty store on Cloudflare</h1>
+          <p id="lesson-subtitle">Sigue cada petición, cambia las capacidades y observa el costo real del modelo.</p>
         </div>
-      </div>
+      </section>
 
+      <section class="metrics" aria-label="Live simulation metrics">
+        <div class="metric"><span>Tasa</span><b id="m-rate">0 req/s</b></div>
+        <div class="metric"><span>Latencia</span><b id="m-latency">&mdash;</b></div>
+        <div class="metric"><span>Peticiones</span><b id="m-requests">0</b></div>
+        <div class="metric"><span>Cloudflare</span><b id="m-cloudflare">$0.00/mo</b></div>
+        <div class="metric"><span>Modelo</span><b id="m-model">unset</b></div>
+        <div class="metric"><span>Usuarios</span><b id="m-users">&mdash;</b></div>
+      </section>
+
+      <div class="canvas-wrap">
+        <div class="alerts" id="alerts" role="status" aria-live="polite"></div>
+        <div class="canvas-controls" role="group" aria-label="Canvas playback controls">
+          <button id="repeat" class="canvas-pill" type="button" title="Repeat the current simulation from zero">Repetir</button>
+          <button id="start" class="canvas-pill primary" type="button" aria-label="Start simulation">Iniciar</button>
+          <button id="reset" class="canvas-pill" type="button" title="Reset time, spent and chaos; keeps the architecture">Restablecer</button>
+        </div>
+        <div class="canvas" id="canvas" tabindex="-1" role="group" aria-label="Architecture canvas" aria-describedby="canvas-help">
+          <p id="canvas-help" class="sr-only">Tab to a node or connection, press Enter or Space to select it, and press Delete to remove it. Use the inspector Connect to control to add an edge without dragging.</p>
+          <div class="world" id="world">
+            <svg class="edge-svg" id="edge-layer" width="3000" height="2200"></svg>
+            <svg class="node-svg" id="node-layer" width="3000" height="2200"></svg>
+          </div>
+        </div>
+        <div class="canvas-legend"><span><i class="legend-dot request"></i>petición</span><span><i class="legend-dot response"></i>respuesta</span><span><i class="legend-dot risk"></i>riesgo</span></div>
         <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
       </div>
+
       <div class="stage-bar">
-      <div class="toolbar">
-        <button id="start" class="primary">Start simulation</button>
-        <div class="speed-field">
-          <div class="speeds">
-            <input id="speed" type="text" inputmode="decimal" min="1" max="7200" step="1" value="60"
-                   aria-label="Simulation speed" aria-describedby="speed-hint" title="Simulated seconds per real second">
-            <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+        <div class="toolbar">
+          <div class="speed-field">
+            <div class="speeds">
+              <input id="speed" type="text" inputmode="decimal" min="1" max="7200" step="1" value="60"
+                     aria-label="Simulation speed" aria-describedby="speed-hint" title="Simulated seconds per real second">
+              <span class="sp-eq" id="speed-eq">&times; &middot; 1s = 1m</span>
+            </div>
+            <span id="speed-hint" class="field-hint" role="status" hidden></span>
           </div>
-          <span id="speed-hint" class="field-hint" role="status" hidden></span>
+        </div>
+
+        <div class="chaos" role="group" aria-label="Chaos experiments">
+          <span class="chaos-lbl">CAOS:</span>
+          <button class="chaos-btn" data-c="m429" type="button" title="Provider returns 429, concurrency drops">429</button>
+          <button class="chaos-btn" data-c="doEvict" type="button" title="A Durable Object is evicted mid-stream">DO evict</button>
+          <button class="chaos-btn" data-c="d1Write" type="button" title="Write contention on the D1 primary">D1 writes</button>
+          <button class="chaos-btn" data-c="cacheStorm" type="button" title="Cache hit ratio goes to zero">Cache miss</button>
+          <button class="chaos-btn" data-c="store402" type="button" title="Store stops paying: 402 on every call">Store 402</button>
+          <button class="chaos-btn" data-c="webhook" type="button" title="Webhook burst on the sync path">Webhooks</button>
+        </div>
+
+        <div class="zoombar" role="group" aria-label="Canvas zoom">
+          <button id="zoomout" type="button" aria-label="Zoom out" title="Zoom out">&minus;</button>
+          <span id="zoomlabel">100%</span>
+          <button id="zoomin" type="button" aria-label="Zoom in" title="Zoom in">+</button>
         </div>
       </div>
 
-      <div class="chaos" role="group" aria-label="Chaos experiments">
-        <span class="chaos-lbl">CHAOS:</span>
-        <button class="chaos-btn" data-c="m429" title="Provider returns 429, concurrency drops">429</button>
-        <button class="chaos-btn" data-c="doEvict" title="A Durable Object is evicted mid-stream">DO evict</button>
-        <button class="chaos-btn" data-c="d1Write" title="Write contention on the D1 primary">D1 writes</button>
-        <button class="chaos-btn" data-c="cacheStorm" title="Cache hit ratio goes to zero">Cache miss</button>
-        <button class="chaos-btn" data-c="store402" title="Store stops paying: 402 on every call">Store 402</button>
-        <button class="chaos-btn" data-c="webhook" title="Webhook burst on the sync path">Webhooks</button>
-      </div>
-
-      <div class="zoombar" role="group" aria-label="Canvas zoom">
-        <button id="zoomout" aria-label="Zoom out" title="Zoom out">&minus;</button>
-        <span id="zoomlabel">100%</span>
-        <button id="zoomin" aria-label="Zoom in" title="Zoom in">+</button>
-      </div>
-      </div>
+      <section class="timeline-card" aria-labelledby="timeline-title">
+        <div class="timeline-head"><b id="timeline-title">EN ESTA SIMULACIÓN</b><span id="timeline-current">Paso 1 de 7</span></div>
+        <div class="step-timeline" role="group" aria-label="Request lifecycle phases">
+          <button class="step-btn" type="button" data-guide-step="0"><span>1</span>Entrada</button>
+          <button class="step-btn" type="button" data-guide-step="1"><span>2</span>Borde</button>
+          <button class="step-btn" type="button" data-guide-step="2"><span>3</span>Worker</button>
+          <button class="step-btn" type="button" data-guide-step="3"><span>4</span>Agente</button>
+          <button class="step-btn" type="button" data-guide-step="4"><span>5</span>Datos</button>
+          <button class="step-btn" type="button" data-guide-step="5"><span>6</span>Modelo</button>
+          <button class="step-btn" type="button" data-guide-step="6"><span>7</span>Salida</button>
+        </div>
+      </section>
     </main>
 
-    <aside class="right" id="right-panel" aria-label="Costs and component inspector">
+    <aside class="right" id="right-panel" aria-label="Architecture guide, costs and component inspector" lang="es">
       <div class="sheet-head">
-        <span>Costs &amp; inspector</span>
-        <button id="close-inspector" class="sheet-close" aria-label="Close costs and inspector" title="Close costs and inspector" hidden>&times;</button>
+        <span>Guía &amp; costos</span>
+        <button id="close-inspector" class="sheet-close" type="button" aria-label="Close costs and inspector" title="Close costs and inspector" hidden>&times;</button>
       </div>
+
+      <section class="guide-card" aria-labelledby="guide-title">
+        <div class="guide-top"><span id="guide-step">PASO 1 / 7</span><span id="guide-status" class="status-chip ok">OK</span></div>
+        <h2 id="guide-title">Tráfico de entrada</h2>
+        <p id="guide-case" class="guide-case">Cargando métricas del modelo…</p>
+        <div class="guide-tip"><b>CONVIENE SABER</b><p id="guide-tip"></p></div>
+        <div class="guide-changes"><b>QUÉ CAMBIÓ</b><div id="guide-changes"></div></div>
+        <div class="guide-nav">
+          <button id="guide-prev" class="pill-btn" type="button">Atrás</button>
+          <button id="guide-next" class="pill-btn primary" type="button">Siguiente</button>
+        </div>
+      </section>
+
+      <section class="learn-card" aria-labelledby="learn-title">
+        <h3 id="learn-title">APRENDERÁS</h3>
+        <ul id="guide-checklist"></ul>
+      </section>
+
       <div class="cost-tabs" role="tablist" aria-label="Costs and component inspector">
-        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost" tabindex="0">Costs</button>
-        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect" tabindex="-1">Components</button>
+        <button id="tab-cost" class="tab on" role="tab" aria-selected="true" aria-controls="cost" tabindex="0">Costos</button>
+        <button id="tab-components" class="tab" role="tab" aria-selected="false" aria-controls="inspect" tabindex="-1">Componentes</button>
       </div>
       <div class="cost" id="cost" role="tabpanel" aria-labelledby="tab-cost">
         <div class="headline">
